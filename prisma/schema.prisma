@@ -1,0 +1,275 @@
+// Localhost Platform - Database Schema
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// USER & AUTH
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  bio           String?
+  languages     String[]  @default([])
+  interests     String[]  @default([])
+  
+  // Location
+  city          String?
+  country       String?
+  
+  // Verification
+  isHost            Boolean @default(false)
+  isVerified        Boolean @default(false)
+  verificationTier  VerificationTier @default(BASIC)
+  trustScore        Int     @default(0)
+  
+  // Auth
+  accounts      Account[]
+  sessions      Session[]
+  
+  // Relations
+  hostedExperiences Experience[] @relation("HostedExperiences")
+  bookings          Booking[]    @relation("GuestBookings")
+  reviewsGiven      Review[]     @relation("ReviewerReviews")
+  reviewsReceived   Review[]     @relation("RevieweeReviews")
+  messagesSent      Message[]    @relation("SentMessages")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================
+// EXPERIENCES
+// ============================================
+
+model Experience {
+  id          String   @id @default(cuid())
+  hostId      String
+  host        User     @relation("HostedExperiences", fields: [hostId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String   @db.Text
+  category    ExperienceCategory
+  
+  // Location
+  neighborhood String
+  city         String
+  country      String
+  address      String?  // Revealed after booking
+  latitude     Float?
+  longitude    Float?
+  
+  // Details
+  duration     Int      // in minutes
+  minGroupSize Int      @default(1)
+  maxGroupSize Int      @default(6)
+  price        Int      // in cents
+  currency     String   @default("USD")
+  
+  // What's included/excluded
+  includedItems String[] @default([])
+  excludedItems String[] @default([])
+  
+  // Media
+  photos      String[] @default([])
+  
+  // Stats
+  rating      Float    @default(0)
+  reviewCount Int      @default(0)
+  
+  // Status
+  isActive    Boolean  @default(true)
+  
+  // Relations
+  bookings    Booking[]
+  reviews     Review[]
+  availability ExperienceAvailability[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([hostId])
+  @@index([category])
+  @@index([city])
+  @@index([isActive])
+}
+
+model ExperienceAvailability {
+  id           String   @id @default(cuid())
+  experienceId String
+  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  
+  date         DateTime
+  startTime    String   // "09:00"
+  endTime      String   // "12:00"
+  spotsLeft    Int
+  
+  @@index([experienceId, date])
+}
+
+// ============================================
+// BOOKINGS
+// ============================================
+
+model Booking {
+  id            String   @id @default(cuid())
+  experienceId  String
+  experience    Experience @relation(fields: [experienceId], references: [id])
+  guestId       String
+  guest         User     @relation("GuestBookings", fields: [guestId], references: [id])
+  
+  date          DateTime
+  guestCount    Int
+  totalPrice    Int      // in cents
+  currency      String   @default("USD")
+  
+  status        BookingStatus   @default(PENDING)
+  paymentStatus PaymentStatus   @default(PENDING)
+  
+  // Payment details
+  stripePaymentId String?
+  
+  // Communication
+  messages      Message[]
+  
+  // Reviews
+  reviews       Review[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([experienceId])
+  @@index([guestId])
+  @@index([status])
+}
+
+// ============================================
+// REVIEWS
+// ============================================
+
+model Review {
+  id           String   @id @default(cuid())
+  bookingId    String
+  booking      Booking  @relation(fields: [bookingId], references: [id])
+  experienceId String
+  experience   Experience @relation(fields: [experienceId], references: [id])
+  
+  reviewerId   String
+  reviewer     User     @relation("ReviewerReviews", fields: [reviewerId], references: [id])
+  revieweeId   String
+  reviewee     User     @relation("RevieweeReviews", fields: [revieweeId], references: [id])
+  
+  type         ReviewType
+  rating       Int      // 1-5
+  content      String   @db.Text
+  
+  createdAt    DateTime @default(now())
+  
+  @@index([experienceId])
+  @@index([revieweeId])
+}
+
+// ============================================
+// MESSAGING
+// ============================================
+
+model Message {
+  id           String   @id @default(cuid())
+  bookingId    String
+  booking      Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  
+  senderId     String
+  sender       User     @relation("SentMessages", fields: [senderId], references: [id])
+  
+  content      String   @db.Text
+  isRead       Boolean  @default(false)
+  
+  createdAt    DateTime @default(now())
+  
+  @@index([bookingId])
+  @@index([senderId])
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum VerificationTier {
+  BASIC     // Email verified
+  VERIFIED  // ID + phone verified
+  TRUSTED   // Background check + 10+ reviews
+}
+
+enum ExperienceCategory {
+  FOOD_DRINK
+  ARTS_CULTURE
+  OUTDOOR_ADVENTURE
+  WELLNESS
+  LEARNING
+  NIGHTLIFE_SOCIAL
+  FAMILY
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum ReviewType {
+  GUEST_TO_HOST
+  HOST_TO_GUEST
+}

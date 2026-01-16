@@ -1,0 +1,47 @@
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import { Providers } from "@/components/providers";
+import { ChatWidget } from "@/components/features";
+import "./globals.css";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "Localhost | Authentic Local Experiences",
+  description: "Connect with verified local hosts for authentic, small-scale experiences. Discover home-cooked meals, cultural tours, and unique adventures in any city.",
+  keywords: ["travel", "local experiences", "authentic tourism", "cultural exchange", "local hosts"],
+  openGraph: {
+    title: "Localhost | Authentic Local Experiences",
+    description: "Connect with verified local hosts for authentic, small-scale experiences.",
+    type: "website",
+  },
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
+      >
+        <Providers>
+          {children}
+          <ChatWidget />
+        </Providers>
+      </body>
+    </html>
+  );
+}
+
