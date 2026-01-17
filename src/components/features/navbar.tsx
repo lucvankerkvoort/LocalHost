@@ -21,9 +21,6 @@ export function Navbar() {
 
           {/* Navigation Links */}
           <div className="hidden md:flex items-center gap-8">
-            <Link href="/explore" className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors">
-              Explore
-            </Link>
             <Link href="/how-it-works" className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors">
               How It Works
             </Link>

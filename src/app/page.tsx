@@ -1,258 +1,365 @@
-import { Button } from '@/components/ui';
-import { Navbar } from '@/components/features';
+'use client';
+
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { CATEGORY_LABELS, CATEGORY_ICONS, type ExperienceCategory } from '@/types';
+import { useRouter } from 'next/navigation';
+import { useChat } from '@ai-sdk/react';
+import { Navbar } from '@/components/features';
+import { HostCard } from '@/components/features/host-card';
+import { ChatMessage } from '@/components/features/chat-message';
+import { HOSTS, getAllCities } from '@/lib/data/hosts';
 
-// Featured categories for the landing page
-const FEATURED_CATEGORIES: ExperienceCategory[] = [
-  'food-drink',
-  'arts-culture',
-  'outdoor-adventure',
-  'wellness',
-  'learning',
-  'nightlife-social',
-];
-
-// Mock featured experiences for demo
-const FEATURED_EXPERIENCES = [
-  {
-    id: '1',
-    title: 'Sunset Cooking Class with Nonna Maria',
-    host: 'Maria',
-    location: 'Rome, Italy',
-    price: 7500,
-    rating: 4.9,
-    reviewCount: 127,
-    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop',
-    category: 'food-drink' as ExperienceCategory,
-  },
-  {
-    id: '2',
-    title: 'Hidden Murals Walking Tour',
-    host: 'Carlos',
-    location: 'Mexico City, Mexico',
-    price: 3500,
-    rating: 4.8,
-    reviewCount: 89,
-    image: 'https://images.unsplash.com/photo-1518998053901-5348d3961a04?w=600&h=400&fit=crop',
-    category: 'arts-culture' as ExperienceCategory,
-  },
-  {
-    id: '3',
-    title: 'Mountain Sunrise Hike & Breakfast',
-    host: 'Yuki',
-    location: 'Kyoto, Japan',
-    price: 5000,
-    rating: 5.0,
-    reviewCount: 64,
-    image: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=600&h=400&fit=crop',
-    category: 'outdoor-adventure' as ExperienceCategory,
-  },
-];
+type SearchMode = 'locals' | 'experiences';
 
 export default function Home() {
+  const router = useRouter();
+  const [searchMode, setSearchMode] = useState<SearchMode>('locals');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  
+  const [localInput, setLocalInput] = useState('');
+  const { messages, sendMessage, status, error } = useChat();
+  const isLoading = status === 'submitted' || status === 'streaming';
+  
+  // Auto-scroll state
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+
+  // Check if scrolled within threshold of bottom
+  const isNearBottom = useCallback((container: HTMLElement) => {
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    return scrollHeight - scrollTop - clientHeight <= 100;
+  }, []);
+
+  // Handle scroll events
+  const handleScroll = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    setShouldAutoScroll(isNearBottom(container));
+  }, [isNearBottom]);
+
+  // Auto-scroll when messages change
+  useEffect(() => {
+    if (!shouldAutoScroll) return;
+    const container = messagesContainerRef.current;
+    if (container) {
+      requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+      });
+    }
+  }, [messages, shouldAutoScroll]);
+
+  // Handle navigation from AI tool results
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.role === 'assistant' && lastMessage.parts) {
+      for (const part of lastMessage.parts) {
+        if (part.type === 'tool-navigate' && 'state' in part && part.state === 'output-available' && 'output' in part) {
+          const result = part.output as { success: boolean; url?: string; action?: string };
+          if (result.success && result.action === 'navigate' && result.url) {
+            router.push(result.url);
+          }
+        }
+      }
+    }
+  }, [messages, router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!localInput.trim()) return;
+
+    const modeContext = searchMode === 'locals' 
+      ? 'The user wants to find LOCAL HOSTS/PEOPLE to meet. Navigate them to the /hosts page with appropriate filters.'
+      : 'The user wants to find EXPERIENCES/ACTIVITIES. Navigate them to the /explore page with appropriate search.';
+    
+    const content = `[Mode: ${searchMode}] ${localInput}\n\nContext: ${modeContext}`;
+    setLocalInput('');
+    setShouldAutoScroll(true);
+    await sendMessage({ text: content });
+  };
+
+  // Featured hosts for the homepage
+  const featuredHosts = HOSTS.slice(0, 3);
+
   return (
     <div className="min-h-screen">
-      {/* Navigation */}
       <Navbar />
 
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        {/* Background Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[var(--sand-beige)] via-[var(--background)] to-[var(--sunset-orange-light)]/20 -z-10" />
-        
-        {/* Decorative Elements */}
-        <div className="absolute top-20 right-10 w-64 h-64 bg-[var(--sunset-orange)]/10 rounded-full blur-3xl -z-10" />
-        <div className="absolute bottom-10 left-10 w-96 h-96 bg-[var(--ocean-blue)]/10 rounded-full blur-3xl -z-10" />
+      {/* Hero Section - AI-First Entry */}
+      <section className="relative pt-32 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        {/* Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[var(--sky-blue-light)]/30 via-[var(--background)] to-[var(--amber-flame)]/10 -z-10" />
+        <div className="absolute top-20 right-10 w-64 h-64 bg-[var(--princeton-orange)]/10 rounded-full blur-3xl -z-10" />
+        <div className="absolute bottom-10 left-10 w-96 h-96 bg-[var(--blue-green)]/10 rounded-full blur-3xl -z-10" />
 
-        <div className="max-w-7xl mx-auto">
-          <div className="max-w-3xl mx-auto text-center animate-fade-in">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center animate-fade-in mb-12">
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-[var(--foreground)] leading-tight mb-6">
-              Discover Authentic{' '}
-              <span className="text-[var(--sunset-orange)]">Local Experiences</span>
+              {searchMode === 'locals' ? (
+                <>Meet Locals Who <span className="text-[var(--princeton-orange)]">Get You</span></>
+              ) : (
+                <>Discover Experiences That <span className="text-[var(--princeton-orange)]">Move You</span></>
+              )}
             </h1>
-            <p className="text-lg sm:text-xl text-[var(--muted-foreground)] mb-8 max-w-2xl mx-auto">
-              Connect with verified local hosts for intimate cooking classes, cultural tours, 
-              outdoor adventures, and unforgettable moments—all in small groups.
+            <p className="text-lg sm:text-xl text-[var(--muted-foreground)] max-w-2xl mx-auto">
+              {searchMode === 'locals' 
+                ? "Skip the tourist traps. Connect with real people who'll show you their world—the way they'd show a friend."
+                : "Find authentic activities hosted by locals. From cooking classes to hidden tours, discover what makes each place special."
+              }
             </p>
-            
-            {/* Search Bar */}
-            <div className="flex flex-col sm:flex-row gap-4 max-w-xl mx-auto">
-              <input
-                type="text"
-                placeholder="Where are you going?"
-                className="flex-1 px-5 py-3 rounded-lg border border-[var(--border)] bg-white text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--sunset-orange)] shadow-sm"
-              />
-              <Button variant="primary" size="lg">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                Search
-              </Button>
+          </div>
+
+          {/* Mode Toggle */}
+          <div className="flex justify-center mb-6">
+            <div className="inline-flex bg-white rounded-full p-1 shadow-md border border-[var(--border)]">
+              <button
+                onClick={() => setSearchMode('locals')}
+                className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                  searchMode === 'locals'
+                    ? 'bg-[var(--princeton-orange)] text-white shadow-sm'
+                    : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                🤝 Find Locals
+              </button>
+              <button
+                onClick={() => setSearchMode('experiences')}
+                className={`px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                  searchMode === 'experiences'
+                    ? 'bg-[var(--blue-green)] text-white shadow-sm'
+                    : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                ✨ Find Experiences
+              </button>
             </div>
           </div>
+
+          {/* AI Chat Search Interface */}
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden max-w-2xl mx-auto border border-[var(--border)]">
+            {/* Chat Header */}
+            <div className="bg-gradient-to-r from-[var(--princeton-orange)] to-[var(--blue-green)] px-5 py-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                  <span className="text-lg">{searchMode === 'locals' ? '🤝' : '✨'}</span>
+                </div>
+                <div>
+                  <h3 className="text-white font-medium text-sm">
+                    {searchMode === 'locals' ? 'Find Your Person' : 'Discover Experiences'}
+                  </h3>
+                  <p className="text-white/80 text-xs">Tell me where you're going and what you love</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Messages Container */}
+            <div 
+              ref={messagesContainerRef}
+              onScroll={handleScroll}
+              className="h-[200px] overflow-y-auto p-4 space-y-3 scroll-smooth bg-[var(--background)]/50"
+            >
+              {messages.length === 0 && (
+                <div className="text-center py-6 text-[var(--muted-foreground)]">
+                  <p className="text-sm">
+                    {searchMode === 'locals' 
+                      ? '👋 Tell me where you\'re heading and what you\'re into!'
+                      : '👋 What kind of experience are you looking for?'
+                    }
+                  </p>
+                  <p className="text-xs mt-2 opacity-70">
+                    {searchMode === 'locals'
+                      ? 'Try: "Rome, I love food and want to explore nightlife"'
+                      : 'Try: "Tokyo, looking for a cooking class or food tour"'
+                    }
+                  </p>
+                </div>
+              )}
+              
+              {messages.map((message) => {
+                const textContent = message.parts
+                  ?.filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+                  .map((part) => part.text)
+                  .join('') || '';
+                
+                // Clean up the mode prefix from user messages
+                const displayContent = message.role === 'user' 
+                  ? textContent.replace(/^\[Mode: (locals|experiences)\]\s*/i, '').split('\n\nContext:')[0]
+                  : textContent;
+                
+                return displayContent ? (
+                  <ChatMessage
+                    key={message.id}
+                    role={message.role as 'user' | 'assistant'}
+                    content={displayContent}
+                  />
+                ) : null;
+              })}
+              
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-[var(--card)] border border-[var(--border)] px-4 py-3 rounded-2xl rounded-bl-md">
+                    <div className="flex gap-1.5">
+                      <span className="w-2 h-2 bg-[var(--muted-foreground)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-[var(--muted-foreground)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-[var(--muted-foreground)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {error && (
+                <div className="text-center py-2 text-red-500 text-sm">
+                  Something went wrong. Please try again.
+                </div>
+              )}
+              
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input */}
+            <form onSubmit={handleSubmit} className="p-4 border-t border-[var(--border)] bg-white">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={localInput}
+                  onChange={(e) => setLocalInput(e.target.value)}
+                  placeholder={searchMode === 'locals' 
+                    ? "Where are you heading? What are you into?"
+                    : "What kind of experience are you looking for?"
+                  }
+                  className="flex-1 px-4 py-2.5 bg-[var(--background)] border border-[var(--border)] rounded-full text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--blue-green)] focus:border-transparent transition-all"
+                  disabled={isLoading}
+                />
+                <button
+                  type="submit"
+                  disabled={isLoading || !localInput.trim()}
+                  className="w-10 h-10 bg-[var(--princeton-orange)] rounded-full flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--blue-green)] transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Quick links */}
+          <p className="text-center text-sm text-[var(--muted-foreground)] mt-4">
+            Or{' '}
+            <button 
+              onClick={() => router.push(searchMode === 'locals' ? '/hosts' : '/explore')} 
+              className="text-[var(--princeton-orange)] hover:underline font-medium"
+            >
+              browse all {searchMode === 'locals' ? 'locals' : 'experiences'}
+            </button>
+          </p>
         </div>
       </section>
 
-      {/* Categories Section */}
+      {/* Featured Locals */}
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl font-bold text-[var(--foreground)] mb-8 text-center">
-            Explore by Category
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-            {FEATURED_CATEGORIES.map((category) => (
-              <Link
-                key={category}
-                href={`/explore?category=${category}`}
-                className="group flex flex-col items-center p-6 rounded-xl bg-[var(--sand-beige-light)] hover:bg-[var(--sunset-orange)] transition-all duration-300"
-              >
-                <span className="text-4xl mb-3 group-hover:scale-110 transition-transform">
-                  {CATEGORY_ICONS[category]}
-                </span>
-                <span className="text-sm font-medium text-[var(--foreground)] group-hover:text-white text-center transition-colors">
-                  {CATEGORY_LABELS[category]}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Featured Experiences */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold text-[var(--foreground)]">
-              Featured Experiences
-            </h2>
-            <Link href="/explore" className="text-[var(--sunset-orange)] hover:underline font-medium">
-              View all →
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-[var(--foreground)]">
+                Featured Locals
+              </h2>
+              <p className="text-[var(--muted-foreground)] mt-1">
+                Real people, ready to show you their world
+              </p>
+            </div>
+            <Link href="/hosts" className="text-[var(--princeton-orange)] hover:underline font-medium">
+              Meet all →
             </Link>
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {FEATURED_EXPERIENCES.map((experience) => (
-              <article
-                key={experience.id}
-                className="group rounded-xl bg-white shadow-md overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
-              >
-                {/* Image */}
-                <div className="relative aspect-video overflow-hidden">
-                  <img
-                    src={experience.image}
-                    alt={experience.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute top-3 left-3">
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/90 text-xs font-medium">
-                      {CATEGORY_ICONS[experience.category]} {CATEGORY_LABELS[experience.category]}
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Content */}
-                <div className="p-5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm text-[var(--muted-foreground)]">
-                      📍 {experience.location}
-                    </span>
-                  </div>
-                  <h3 className="font-semibold text-lg text-[var(--foreground)] mb-2 line-clamp-2">
-                    {experience.title}
-                  </h3>
-                  <p className="text-sm text-[var(--muted-foreground)] mb-3">
-                    Hosted by {experience.host}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1">
-                      <span className="text-[var(--sunset-orange)]">★</span>
-                      <span className="font-medium">{experience.rating}</span>
-                      <span className="text-[var(--muted-foreground)] text-sm">
-                        ({experience.reviewCount})
-                      </span>
-                    </div>
-                    <div className="font-semibold text-[var(--foreground)]">
-                      ${(experience.price / 100).toFixed(0)}<span className="text-sm font-normal text-[var(--muted-foreground)]">/person</span>
-                    </div>
-                  </div>
-                </div>
-              </article>
+            {featuredHosts.map((host) => (
+              <HostCard key={host.id} host={host} />
             ))}
           </div>
         </div>
       </section>
 
       {/* How It Works */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-[var(--ocean-blue)]">
+      <section className="py-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-12">
-            How Localhost Works
+          <h2 className="text-2xl sm:text-3xl font-bold text-[var(--foreground)] mb-12">
+            How It Works
           </h2>
           <div className="grid md:grid-cols-3 gap-8">
             {[
               {
-                icon: '🔍',
-                title: 'Discover',
-                description: 'Browse authentic local experiences in your destination, filtered by your interests.',
+                icon: '🗺️',
+                title: 'Tell Us Where',
+                description: 'Pick your destination. We\'ll find locals who live there.',
               },
               {
-                icon: '📅',
-                title: 'Book',
-                description: 'Choose your date, confirm your spot, and connect with your verified host.',
+                icon: '💬',
+                title: 'Share Your Vibe',
+                description: 'What are you into? Food, art, nightlife? We\'ll match you.',
               },
               {
-                icon: '✨',
-                title: 'Experience',
-                description: 'Enjoy an intimate, memorable experience with a local who loves sharing their world.',
+                icon: '🤝',
+                title: 'Meet Your Person',
+                description: 'Connect with a local who gets you. No tourist traps, just real moments.',
               },
             ].map((step, index) => (
               <div key={index} className="flex flex-col items-center">
-                <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-4xl mb-4">
+                <div className="w-20 h-20 rounded-full bg-[var(--sky-blue-light)]/30 flex items-center justify-center text-4xl mb-4">
                   {step.icon}
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-2">{step.title}</h3>
-                <p className="text-white/80">{step.description}</p>
+                <h3 className="text-xl font-semibold text-[var(--foreground)] mb-2">{step.title}</h3>
+                <p className="text-[var(--muted-foreground)]">{step.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
+      {/* Testimonial/Quote Section */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-[var(--blue-green)]">
+        <div className="max-w-3xl mx-auto text-center">
+          <blockquote className="text-2xl sm:text-3xl text-white font-medium italic mb-6">
+            "I met Carlos in Mexico City and he took me to places I never would have found. We're still in touch 2 years later."
+          </blockquote>
+          <cite className="text-white/80 not-italic">— Sarah, traveled from New York</cite>
+        </div>
+      </section>
+
       {/* CTA Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-[var(--sunset-orange)] to-[var(--sunset-orange-dark)]">
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-[var(--princeton-orange)] to-[var(--amber-flame)]">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-            Share Your World with Travelers
+            You Know Your City Best
           </h2>
           <p className="text-lg text-white/90 mb-8">
-            Turn your passion into memorable experiences. Join our community of hosts 
-            and connect with curious travelers from around the globe.
+            Share what you love with travelers. Cook your grandmother's recipes. Show off your favorite spots. Be the host you'd want to meet.
           </p>
-          <Button variant="outline" size="lg" className="border-white text-white hover:bg-white hover:text-[var(--sunset-orange)]">
+          <Link
+            href="/become-host"
+            className="inline-block px-8 py-4 bg-white text-[var(--princeton-orange)] rounded-xl font-semibold text-lg hover:shadow-lg transition-all"
+          >
             Become a Host
-          </Button>
+          </Link>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 sm:px-6 lg:px-8 bg-[var(--warm-brown)]">
+      <footer className="py-12 px-4 sm:px-6 lg:px-8 bg-[var(--deep-space-blue)]">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
             <div>
-              <h4 className="font-semibold text-white mb-4">Explore</h4>
+              <h4 className="font-semibold text-white mb-4">Discover</h4>
               <ul className="space-y-2">
-                <li><Link href="/explore" className="text-white/70 hover:text-white transition-colors">All Experiences</Link></li>
-                <li><Link href="/explore?category=food-drink" className="text-white/70 hover:text-white transition-colors">Food & Drink</Link></li>
-                <li><Link href="/explore?category=outdoor-adventure" className="text-white/70 hover:text-white transition-colors">Adventure</Link></li>
+                <li><Link href="/hosts" className="text-white/70 hover:text-white transition-colors">Meet Locals</Link></li>
+                <li><Link href="/explore" className="text-white/70 hover:text-white transition-colors">Experiences</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold text-white mb-4">Host</h4>
               <ul className="space-y-2">
-                <li><Link href="/host" className="text-white/70 hover:text-white transition-colors">Become a Host</Link></li>
-                <li><Link href="/host/resources" className="text-white/70 hover:text-white transition-colors">Host Resources</Link></li>
-                <li><Link href="/host/community" className="text-white/70 hover:text-white transition-colors">Community</Link></li>
+                <li><Link href="/become-host" className="text-white/70 hover:text-white transition-colors">Become a Host</Link></li>
+                <li><Link href="/host/resources" className="text-white/70 hover:text-white transition-colors">Resources</Link></li>
               </ul>
             </div>
             <div>
@@ -260,7 +367,6 @@ export default function Home() {
               <ul className="space-y-2">
                 <li><Link href="/help" className="text-white/70 hover:text-white transition-colors">Help Center</Link></li>
                 <li><Link href="/safety" className="text-white/70 hover:text-white transition-colors">Safety</Link></li>
-                <li><Link href="/trust" className="text-white/70 hover:text-white transition-colors">Trust & Reviews</Link></li>
               </ul>
             </div>
             <div>
@@ -268,7 +374,6 @@ export default function Home() {
               <ul className="space-y-2">
                 <li><Link href="/about" className="text-white/70 hover:text-white transition-colors">About Us</Link></li>
                 <li><Link href="/careers" className="text-white/70 hover:text-white transition-colors">Careers</Link></li>
-                <li><Link href="/press" className="text-white/70 hover:text-white transition-colors">Press</Link></li>
               </ul>
             </div>
           </div>
@@ -278,7 +383,7 @@ export default function Home() {
               <span className="font-bold text-white">Localhost</span>
             </div>
             <p className="text-white/60 text-sm">
-              © 2024 Localhost. All rights reserved.
+              © 2026 Localhost. All rights reserved.
             </p>
           </div>
         </div>
