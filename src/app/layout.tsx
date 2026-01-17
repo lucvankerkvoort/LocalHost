@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
-import { ChatWidget } from "@/components/features";
+import { ConditionalChatWidget } from "@/components/features";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,10 +38,9 @@ export default function RootLayout({
       >
         <Providers>
           {children}
-          <ChatWidget />
+          <ConditionalChatWidget />
         </Providers>
       </body>
     </html>
   );
 }
-

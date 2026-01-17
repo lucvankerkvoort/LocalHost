@@ -1,57 +1,62 @@
 @import "tailwindcss";
 
 :root {
-  /* Brand Colors - Earth Tones */
-  --sunset-orange: #E07A5F;
-  --sunset-orange-light: #F2A391;
-  --sunset-orange-dark: #C5614A;
+  /* Brand Colors - New Palette */
+  --sky-blue-light: #8ecae6;
+  --blue-green: #219ebc;
+  --deep-space-blue: #023047;
+  --amber-flame: #ffb703;
+  --princeton-orange: #fb8500;
   
-  --ocean-blue: #3D5A80;
-  --ocean-blue-light: #5A7A9E;
-  --ocean-blue-dark: #2C4562;
-  
-  --forest-green: #4A7C59;
-  --forest-green-light: #6B9D7A;
-  --forest-green-dark: #365A42;
-  
-  --sand-beige: #F4EBD9;
-  --sand-beige-light: #FBF8F1;
-  --sand-beige-dark: #E5D9C3;
-  
-  --warm-brown: #6B4D3A;
-  --warm-brown-light: #8B6D5A;
-  --warm-brown-dark: #4B3528;
+  /* Extended shades */
+  --sky-blue-lighter: #b8ddf0;
+  --sky-blue-dark: #5fb3d9;
+  --blue-green-light: #4eb8d0;
+  --blue-green-dark: #1a7a92;
+  --deep-space-darker: #011627;
+  --amber-light: #ffc733;
+  --princeton-dark: #cc6a00;
   
   /* Semantic Colors */
-  --background: #FBF8F1;
-  --foreground: #2C2C2C;
-  --muted: #9CA3AF;
-  --muted-foreground: #6B7280;
+  --background: #f8fcfd;
+  --foreground: #023047;
+  --muted: #6b9aae;
+  --muted-foreground: #4a7a8c;
   
   --card: #FFFFFF;
-  --card-foreground: #2C2C2C;
+  --card-foreground: #023047;
+  --card-background: #FFFFFF;
   
-  --primary: var(--sunset-orange);
+  --primary: var(--princeton-orange);
   --primary-foreground: #FFFFFF;
   
-  --secondary: var(--ocean-blue);
+  --secondary: var(--blue-green);
   --secondary-foreground: #FFFFFF;
   
-  --accent: var(--forest-green);
-  --accent-foreground: #FFFFFF;
+  --accent: var(--amber-flame);
+  --accent-foreground: #023047;
   
   --destructive: #DC2626;
   --destructive-foreground: #FFFFFF;
   
-  --success: var(--forest-green);
+  --success: #10b981;
   --success-foreground: #FFFFFF;
   
-  --warning: #F59E0B;
-  --warning-foreground: #1F2937;
+  --warning: var(--amber-flame);
+  --warning-foreground: #023047;
   
-  --border: #E5E7EB;
-  --input: #E5E7EB;
-  --ring: var(--sunset-orange);
+  --border: #d0e8ef;
+  --input: #d0e8ef;
+  --ring: var(--blue-green);
+  
+  /* Legacy mappings for compatibility */
+  --sunset-orange: var(--princeton-orange);
+  --sunset-orange-light: var(--amber-flame);
+  --terracotta: var(--princeton-dark);
+  --ocean-blue: var(--blue-green);
+  --forest-green: var(--blue-green-dark);
+  --sand-beige: var(--sky-blue-light);
+  --sand-beige-light: var(--sky-blue-lighter);
   
   /* Spacing & Sizing */
   --radius: 0.75rem;
@@ -59,6 +64,7 @@
   --radius-lg: 1rem;
   --radius-full: 9999px;
 }
+
 
 @theme inline {
   --color-background: var(--background);
@@ -84,16 +90,17 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #1A1A2E;
-    --foreground: #F5F5F5;
-    --muted: #6B7280;
-    --muted-foreground: #9CA3AF;
+    --background: #011627;
+    --foreground: #f8fcfd;
+    --muted: #4a7a8c;
+    --muted-foreground: #6b9aae;
     
-    --card: #242438;
-    --card-foreground: #F5F5F5;
+    --card: #023047;
+    --card-foreground: #f8fcfd;
+    --card-background: #023047;
     
-    --border: #374151;
-    --input: #374151;
+    --border: #1a7a92;
+    --input: #1a7a92;
   }
 }
 
@@ -123,7 +130,7 @@ html {
 
 /* Selection styling */
 ::selection {
-  background-color: var(--sunset-orange);
+  background-color: var(--princeton-orange);
   color: white;
 }
 
