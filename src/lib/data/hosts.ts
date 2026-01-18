@@ -28,7 +28,7 @@ export interface HostExperience {
 }
 
 // Rich host profiles - these are the core entity now
-export const HOSTS: Host[] = [
+const CURATED_HOSTS: Host[] = [
   {
     id: 'maria-rome',
     name: 'Maria Rossi',
@@ -230,6 +230,10 @@ export const HOSTS: Host[] = [
     ],
   },
 ];
+
+// Import generated hosts and merge with curated ones
+import generatedHosts from './generated-hosts.json';
+export const HOSTS: Host[] = [...CURATED_HOSTS, ...(generatedHosts as Host[])];
 
 // Helper function to get a host by ID
 export function getHostById(id: string): Host | undefined {

@@ -1,0 +1,110 @@
+// Itinerary types for the visual builder
+
+export type ItineraryItemType = 
+  | 'activity' 
+  | 'meal' 
+  | 'transport' 
+  | 'accommodation' 
+  | 'localhost';
+
+export const ITEM_TYPE_CONFIG: Record<ItineraryItemType, { label: string; icon: string; color: string }> = {
+  activity: { label: 'Activity', icon: '🎯', color: 'var(--blue-green)' },
+  meal: { label: 'Food & Drink', icon: '🍽️', color: 'var(--princeton-orange)' },
+  transport: { label: 'Transport', icon: '🚗', color: 'var(--muted)' },
+  accommodation: { label: 'Accommodation', icon: '🏨', color: 'var(--deep-space-blue)' },
+  localhost: { label: 'Localhost', icon: '👤', color: 'var(--amber-flame)' },
+};
+
+export interface ItineraryItem {
+  id: string;
+  type: ItineraryItemType;
+  title: string;
+  description?: string;
+  location?: string;
+  startTime?: string; // HH:MM format
+  endTime?: string;
+  hostId?: string; // Future: link to Localhost experience
+  position: number;
+}
+
+export interface ItineraryDay {
+  id: string;
+  date: string; // ISO date string (YYYY-MM-DD)
+  dayNumber: number;
+  items: ItineraryItem[];
+}
+
+export interface Itinerary {
+  id: string;
+  title: string;
+  destination: string;
+  startDate: string; // ISO date string
+  endDate: string;
+  days: ItineraryDay[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Helper to generate unique IDs
+export function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
+// Helper to create days array from date range
+export function createDaysFromRange(startDate: string, endDate: string): ItineraryDay[] {
+  const days: ItineraryDay[] = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  let dayNumber = 1;
+  const current = new Date(start);
+  
+  while (current <= end) {
+    days.push({
+      id: generateId(),
+      date: current.toISOString().split('T')[0],
+      dayNumber,
+      items: [],
+    });
+    current.setDate(current.getDate() + 1);
+    dayNumber++;
+  }
+  
+  return days;
+}
+
+// Helper to create a new itinerary
+export function createItinerary(
+  title: string, 
+  destination: string, 
+  startDate: string, 
+  endDate: string
+): Itinerary {
+  const now = new Date().toISOString();
+  return {
+    id: generateId(),
+    title,
+    destination,
+    startDate,
+    endDate,
+    days: createDaysFromRange(startDate, endDate),
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+// Helper to create a new item
+export function createItem(
+  type: ItineraryItemType,
+  title: string,
+  position: number,
+  options?: Partial<Omit<ItineraryItem, 'id' | 'type' | 'title' | 'position'>>
+): ItineraryItem {
+  return {
+    id: generateId(),
+    type,
+    title,
+    position,
+    ...options,
+  };
+}

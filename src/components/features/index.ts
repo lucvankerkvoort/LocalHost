@@ -16,3 +16,7 @@ export { BookingSummary } from './booking-summary';
 export { ChatMessage } from './chat-message';
 export { ChatWidget } from './chat-widget';
 export { ConditionalChatWidget } from './conditional-chat-widget';
+export { ItineraryBuilder } from './itinerary-builder';
+export { ItineraryDayColumn } from './itinerary-day';
+export { ItineraryItem } from './itinerary-item';
+export { AddItemModal } from './add-item-modal';
