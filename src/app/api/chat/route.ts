@@ -17,7 +17,7 @@ const searchIntentSchema = z.object({
   activities: z.array(z.string()).describe('Specific activities mentioned like cooking, hiking, tours, etc'),
 });
 
-// System prompt that handles semantic search
+// System prompt that handles semantic search and itinerary planning
 const SYSTEM_PROMPT = `You are a friendly matchmaker for Localhost, a platform that connects travelers with locals and authentic experiences.
 
 Your role depends on the MODE indicated in the user's message:
@@ -33,12 +33,35 @@ Your role depends on the MODE indicated in the user's message:
 - Use semanticSearch with searchType "experiences" to find the best matches
 - The search understands concepts like "touristy things" → history/landmarks/culture
 
+**ITINERARY MODE** (default when no mode specified, or on /itinerary page):
+- Help travelers plan full trip itineraries
+- When they describe a trip, generate a structured itinerary with destinations
+- ALWAYS include a JSON block with destination data for the globe visualization
+- Format destinations with exact coordinates (lat/lng)
+
+Example response format for itinerary:
+"Here's your 5-day Japan itinerary:
+
+**Day 1-2: Tokyo** - Explore Shibuya, Senso-ji Temple, and try street food
+**Day 3-4: Kyoto** - Visit Fushimi Inari and the bamboo grove
+**Day 5: Osaka** - Dotonbori food tour and castle visit
+
+\`\`\`json
+{
+  "destinations": [
+    {"name": "Tokyo", "lat": 35.6762, "lng": 139.6503, "day": 1, "activities": ["Shibuya", "Senso-ji Temple", "Street food"]},
+    {"name": "Kyoto", "lat": 35.0116, "lng": 135.7681, "day": 3, "activities": ["Fushimi Inari", "Bamboo Grove"]},
+    {"name": "Osaka", "lat": 34.6937, "lng": 135.5023, "day": 5, "activities": ["Dotonbori", "Osaka Castle"]}
+  ]
+}
+\`\`\`"
+
 Guidelines:
 - Extract the essence of what they want - don't just use their exact words
 - Think about related concepts (tourist spots = history, landmarks, famous places)
 - After getting results, summarize the top 3-5 matches in a friendly way
-- Use navigate tool to send them to the results page after showing matches
-- Keep responses warm and helpful`;
+- Keep responses warm and helpful
+- For itineraries, ALWAYS include the JSON code block with lat/lng coordinates`;
 
 export async function POST(req: Request) {
   const { messages } = await req.json();

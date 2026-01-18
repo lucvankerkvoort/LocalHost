@@ -7,6 +7,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "postinstall": "rm -f public/cesium && ln -sf ../node_modules/cesium/Build/Cesium public/cesium",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
@@ -21,6 +22,7 @@
     "@ai-sdk/react": "^3.0.40",
     "@prisma/client": "^7.2.0",
     "ai": "^6.0.38",
+    "cesium": "^1.137.0",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.3",
     "next": "16.1.2",
@@ -28,7 +30,10 @@
     "prisma": "^7.2.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-markdown": "^10.1.0"
+    "react-globe.gl": "^2.37.0",
+    "react-markdown": "^10.1.0",
+    "resium": "^1.19.2",
+    "three": "^0.182.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -37,6 +42,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.2",
+    "symlink-dir": "^9.0.0",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5"

@@ -21,10 +21,13 @@ export function Navbar() {
 
           {/* Navigation Links */}
           <div className="hidden md:flex items-center gap-8">
-            <Link href="/how-it-works" className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors">
-              How It Works
+            <Link href="/explore" className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors">
+              Explore
             </Link>
-            <Link href="/host" className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors">
+            <Link href="/itinerary" className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors">
+              Itinerary
+            </Link>
+            <Link href="/hosts" className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors">
               Become a Host
             </Link>
           </div>
