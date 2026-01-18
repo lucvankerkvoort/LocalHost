@@ -20,7 +20,7 @@ import {
 import type { Viewer as CesiumViewer } from 'cesium';
 
 // Set the module base URL
-buildModuleUrl.setBaseUrl('/cesium/');
+(buildModuleUrl as any).setBaseUrl('/cesium/');
 
 // Use OpenStreetMap tiles (no API key required)
 const osmProvider = new UrlTemplateImageryProvider({
@@ -50,7 +50,7 @@ export default function CesiumGlobe({
       const dest = destinations.find(d => d.id === selectedDestination);
       if (dest) {
         viewerRef.current.camera.flyTo({
-          destination: Cartesian3.fromDegrees(dest.lng, dest.lat, 500000),
+          destination: Cartesian3.fromDegrees(dest.lng, dest.lat, 100000),
           duration: 2,
         });
       }
@@ -63,7 +63,7 @@ export default function CesiumGlobe({
       const firstDest = destinations[0];
       setTimeout(() => {
         viewerRef.current?.camera.flyTo({
-          destination: Cartesian3.fromDegrees(firstDest.lng, firstDest.lat, 2000000),
+          destination: Cartesian3.fromDegrees(firstDest.lng, firstDest.lat, 800000),
           duration: 3,
         });
       }, 500);
