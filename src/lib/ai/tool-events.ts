@@ -172,6 +172,8 @@ export function ingestToolParts(
 ) {
   if (!Array.isArray(parts)) return;
 
+  console.log('[ingestToolParts] Processing parts:', parts);
+
   for (const part of parts) {
     if (!isToolPart(part)) continue;
     
@@ -190,6 +192,13 @@ export function ingestToolParts(
       if (seen.has(key)) continue;
       seen.add(key);
     }
+
+    console.log(`[ingestToolParts] Dispatching tool:`, {
+      toolName,
+      state,
+      params: part.input,
+      result: getToolPartResult(part),
+    });
 
     dispatch(
       toolCallReceived({

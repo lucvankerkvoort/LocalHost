@@ -2,6 +2,9 @@
 
 import { SessionProvider } from 'next-auth/react';
 import { ReactNode } from 'react';
+import { ReduxProvider } from '@/store/provider';
+import { ToolNavigationListener } from '@/components/tool-navigation-listener';
+import { OrchestratorJobListener } from '@/components/orchestrator-job-listener';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -10,7 +13,11 @@ interface ProvidersProps {
 export function Providers({ children }: ProvidersProps) {
   return (
     <SessionProvider>
-      {children}
+      <ReduxProvider>
+        {children}
+        <ToolNavigationListener />
+        <OrchestratorJobListener />
+      </ReduxProvider>
     </SessionProvider>
   );
 }

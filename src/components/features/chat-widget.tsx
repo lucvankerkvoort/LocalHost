@@ -65,9 +65,33 @@ function useDraggablePanel(position: Position, onPositionChange: (pos: Position)
 
 import { usePathname } from 'next/navigation';
 
+// Intent-based UI configuration
+const INTENT_UI_CONFIG = {
+  general: {
+    emoji: '🤝',
+    title: 'Find Your Person',
+    subtitle: 'Tell me where you\'re going!',
+    emptyStateGreeting: '👋 Hey! I can help you find locals who match your vibe.',
+    emptyStateHint: 'Try: "I\'m going to Rome and I love food and art"',
+    inputPlaceholder: 'Where are you heading?',
+  },
+  become_host: {
+    emoji: '🏠',
+    title: 'Create Your Experience',
+    subtitle: 'I\'ll help you set up your hosting profile',
+    emptyStateGreeting: '👋 Ready to become a host? Let\'s start with your city!',
+    emptyStateHint: 'Tell me which city you\'re in, e.g. "I\'m in Barcelona"',
+    inputPlaceholder: 'Which city are you in?',
+  },
+} as const;
+
 export function ChatWidget() {
   const pathname = usePathname();
   const intent = pathname === '/become-host' ? 'become_host' : 'general';
+  const uiConfig = INTENT_UI_CONFIG[intent];
+  
+  // Stable chat ID per intent - conversations persist when switching routes
+  const chatId = `chat-${intent}`;
 
   const [isOpen, setIsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -75,7 +99,8 @@ export function ChatWidget() {
   const seenToolEventsRef = useRef<Set<string>>(new Set());
   const dispatch = useAppDispatch();
   
-  const { messages, sendMessage, status, error } = useChat() as any;
+  // Use the chatId to maintain separate conversations per intent
+  const { messages, sendMessage, status, error } = useChat({ id: chatId }) as any;
   const isLoading = status === 'submitted' || status === 'streaming';
   
   const [localInput, setLocalInput] = useState('');
@@ -306,11 +331,11 @@ export function ChatWidget() {
               >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                    <span className="text-xl">🤝</span>
+                    <span className="text-xl">{uiConfig.emoji}</span>
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-white font-semibold">Find Your Person</h3>
-                    <p className="text-white/80 text-sm">Drag header to move • Tell me where you're going!</p>
+                    <h3 className="text-white font-semibold">{uiConfig.title}</h3>
+                    <p className="text-white/80 text-sm">Drag header to move • {uiConfig.subtitle}</p>
                   </div>
                   {/* Reset position button */}
                   {(panelPosition.x !== 0 || panelPosition.y !== 0) && (
@@ -342,8 +367,8 @@ export function ChatWidget() {
                 <OrchestratorJobStatus />
                 {messages.length === 0 && (
                   <div className="text-center py-8 text-[var(--muted-foreground)]">
-                    <p className="text-sm">👋 Hey! I can help you find locals who match your vibe.</p>
-                    <p className="text-xs mt-2">Try: "I'm going to Rome and I love food and art"</p>
+                    <p className="text-sm">{uiConfig.emptyStateGreeting}</p>
+                    <p className="text-xs mt-2">{uiConfig.emptyStateHint}</p>
                   </div>
                 )}
                 
@@ -509,7 +534,7 @@ export function ChatWidget() {
                     type="text"
                     value={localInput}
                     onChange={(e) => setLocalInput(e.target.value)}
-                    placeholder="Where are you heading?"
+                    placeholder={uiConfig.inputPlaceholder}
                     className="flex-1 px-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-full text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--blue-green)] focus:border-transparent transition-all"
                     disabled={isLoading}
                   />

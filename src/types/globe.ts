@@ -1,4 +1,35 @@
-// Globe itinerary types for Resium/CesiumJS visualization
+import { ItineraryItem } from './itinerary';
+
+export interface HostMarkerData {
+  id: string;
+  hostId?: string;
+  name: string;
+  lat: number;
+  lng: number;
+  photo?: string;
+  headline?: string;
+  rating?: number;
+  experienceCount?: number;
+}
+
+export interface PlaceMarkerData {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  category?: string;
+  confidence?: number;
+}
+
+export interface RouteMarkerData {
+  id: string;
+  routeId: string;
+  kind: 'start' | 'end';
+  lat: number;
+  lng: number;
+  name?: string;
+  dayNumber?: number; // Day this marker belongs to (for filtering)
+}
 
 export interface GlobeDestination {
   id: string;
@@ -6,7 +37,19 @@ export interface GlobeDestination {
   lat: number;
   lng: number;
   day: number;
-  activities: string[];
+  activities: ItineraryItem[];
+  color: string;
+  suggestedHosts?: unknown[];
+  city?: string;
+}
+
+export interface CityMarkerData {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  dayIds: string[];
+  dayNumbers: number[];
   color: string;
 }
 
@@ -19,6 +62,7 @@ export interface TravelRoute {
   toLat: number;
   toLng: number;
   mode: 'flight' | 'train' | 'drive' | 'walk';
+  dayNumber?: number; // Day this route belongs to (for filtering by selected day)
 }
 
 export interface GlobeItinerary {
@@ -26,6 +70,7 @@ export interface GlobeItinerary {
   title: string;
   destinations: GlobeDestination[];
   routes: TravelRoute[];
+  routeMarkers?: RouteMarkerData[];
   createdAt: string;
 }
 
@@ -51,6 +96,8 @@ export function getColorForDay(day: number): string {
 }
 
 // Sample destinations for testing
+import { createItem } from './itinerary';
+
 export const SAMPLE_DESTINATIONS: GlobeDestination[] = [
   {
     id: 'tokyo',
@@ -58,7 +105,11 @@ export const SAMPLE_DESTINATIONS: GlobeDestination[] = [
     lat: 35.6762,
     lng: 139.6503,
     day: 1,
-    activities: ['Arrive at Narita', 'Check in to hotel', 'Explore Shibuya'],
+    activities: [
+      createItem('transport', 'Arrive at Narita', 0),
+      createItem('accommodation', 'Check in to hotel', 1),
+      createItem('activity', 'Explore Shibuya', 2)
+    ],
     color: DAY_COLORS[0],
   },
   {
@@ -67,7 +118,11 @@ export const SAMPLE_DESTINATIONS: GlobeDestination[] = [
     lat: 35.0116,
     lng: 135.7681,
     day: 3,
-    activities: ['Fushimi Inari', 'Kinkaku-ji Temple', 'Gion district'],
+    activities: [
+      createItem('activity', 'Fushimi Inari', 0),
+      createItem('activity', 'Kinkaku-ji Temple', 1),
+      createItem('meal', 'Gion district dinner', 2)
+    ],
     color: DAY_COLORS[2],
   },
   {
@@ -76,7 +131,11 @@ export const SAMPLE_DESTINATIONS: GlobeDestination[] = [
     lat: 34.6937,
     lng: 135.5023,
     day: 5,
-    activities: ['Dotonbori', 'Osaka Castle', 'Street food tour'],
+    activities: [
+      createItem('activity', 'Dotonbori', 0),
+      createItem('activity', 'Osaka Castle', 1),
+      createItem('meal', 'Street food tour', 2)
+    ],
     color: DAY_COLORS[4],
   },
 ];

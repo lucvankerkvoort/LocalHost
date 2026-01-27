@@ -1,18 +1,15 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import { ChatWidget } from './chat-widget';
 
-// Pages where the inline AI chat is used instead of the floating widget
-const PAGES_WITHOUT_FLOATING_CHAT = ['/'];
-
+/**
+ * Conditional Chat Widget - now shows on ALL pages.
+ * 
+ * The floating ChatWidget is the single source of truth for AI chat interactions.
+ * Previously this component would hide the widget on certain pages (like /itinerary),
+ * but now we want a consistent chat experience everywhere.
+ */
 export function ConditionalChatWidget() {
-  const pathname = usePathname();
-  
-  // Don't show floating chat on pages that have inline chat
-  if (PAGES_WITHOUT_FLOATING_CHAT.includes(pathname)) {
-    return null;
-  }
-  
+  // Always show the floating chat widget
   return <ChatWidget />;
 }

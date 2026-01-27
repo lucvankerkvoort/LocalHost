@@ -8,6 +8,7 @@ interface ItineraryItemProps {
   onEdit: (item: ItineraryItemType) => void;
   onDelete: (dayId: string, itemId: string) => void;
   onDragStart: (e: React.DragEvent, dayId: string, item: ItineraryItemType) => void;
+  onBook: (dayId: string, item: ItineraryItemType) => void;
 }
 
 export function ItineraryItem({ 
@@ -15,17 +16,20 @@ export function ItineraryItem({
   dayId, 
   onEdit, 
   onDelete, 
-  onDragStart 
+  onDragStart,
+  onBook
 }: ItineraryItemProps) {
   const config = ITEM_TYPE_CONFIG[item.type];
+  const isLocalhost = item.type === 'localhost';
+  const status = item.status || 'DRAFT';
   
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, dayId, item)}
-      className="group bg-white rounded-lg p-3 shadow-sm border border-[var(--border)] 
+      className={`group bg-white rounded-lg p-3 shadow-sm border border-[var(--border)] 
                  hover:shadow-md hover:border-[var(--blue-green)] transition-all duration-200
-                 cursor-grab active:cursor-grabbing"
+                 cursor-grab active:cursor-grabbing ${status === 'BOOKED' ? 'border-l-4 border-l-emerald-500' : ''}`}
     >
       {/* Header: Type icon + Title */}
       <div className="flex items-start gap-2">
@@ -36,9 +40,16 @@ export function ItineraryItem({
           {config.icon}
         </span>
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-[var(--foreground)] text-sm truncate">
-            {item.title}
-          </h4>
+          <div className="flex items-center gap-2">
+            <h4 className="font-medium text-[var(--foreground)] text-sm truncate">
+              {item.title}
+            </h4>
+            {status === 'BOOKED' && (
+              <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">
+                Booked
+              </span>
+            )}
+          </div>
           {item.location && (
             <p className="text-xs text-[var(--muted-foreground)] truncate mt-0.5">
               📍 {item.location}
@@ -59,6 +70,19 @@ export function ItineraryItem({
         <p className="mt-2 text-xs text-[var(--muted-foreground)] line-clamp-2">
           {item.description}
         </p>
+      )}
+
+      {/* Booking Action */}
+      {isLocalhost && status === 'DRAFT' && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onBook(dayId, item);
+          }}
+          className="mt-3 w-full py-1.5 bg-[var(--princeton-orange)] text-white text-xs font-medium rounded-md hover:bg-[var(--princeton-dark)] transition-colors opacity-90 group-hover:opacity-100"
+        >
+          Book Now
+        </button>
       )}
       
       {/* Actions (visible on hover) */}

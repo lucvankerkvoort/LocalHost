@@ -38,10 +38,19 @@ export function BookingWidget({
 
   const totalPrice = price * guestCount;
 
-  const handleBooking = () => {
+  const handleBooking = async () => {
     setIsLoading(true);
-    // Navigate to booking checkout page
-    router.push(`/booking/${experienceId}?date=${selectedDate}&guests=${guestCount}`);
+    
+    // Simulating API call/Processing time
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    // Dispatch "BOOK" intent to chat orchestrator
+    // In a real app, this would call a payment API first, then confirm via chat.
+    window.dispatchEvent(new CustomEvent('send-chat-message', { 
+      detail: `I'm ready to book this experience for ${guestCount} people on ${selectedDate}. Confirm my reservation.` 
+    }));
+
+    setIsLoading(false);
   };
 
   return (
@@ -136,12 +145,15 @@ export function BookingWidget({
         isLoading={isLoading}
         onClick={handleBooking}
       >
-        Reserve
+        Confirm & Pay
       </Button>
 
-      <p className="text-center text-sm text-[var(--muted-foreground)] mt-3">
-        You won't be charged yet
-      </p>
+      <div className="mt-4 p-3 bg-blue-50 rounded-lg text-xs text-blue-700 flex items-start gap-2">
+        <span className="text-lg">🔒</span>
+        <p>
+          <strong>Commitment Gate:</strong> Direct chat with the host will be unlocked immediately after booking to coordinate your meeting details.
+        </p>
+      </div>
     </div>
   );
 }

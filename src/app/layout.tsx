@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { ConditionalChatWidget } from "@/components/features";
+import { Header } from "@/components/layout/header";
+import { GlobalUI } from "@/components/layout/global-ui";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -37,6 +39,8 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <Providers>
+          <GlobalUI />
+          <Header />
           {children}
           <ConditionalChatWidget />
         </Providers>

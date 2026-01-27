@@ -12,6 +12,7 @@ interface ItineraryDayProps {
   onDragStart: (e: React.DragEvent, dayId: string, item: ItineraryItemType) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent, dayId: string) => void;
+  onBookItem: (dayId: string, item: ItineraryItemType) => void;
 }
 
 function formatDate(dateString: string): string {
@@ -27,6 +28,7 @@ export function ItineraryDayColumn({
   onDragStart,
   onDragOver,
   onDrop,
+  onBookItem,
 }: ItineraryDayProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   
@@ -76,7 +78,7 @@ export function ItineraryDayColumn({
             <p className="text-xs mt-1">Add your first item!</p>
           </div>
         ) : (
-          day.items
+          [...day.items]
             .sort((a, b) => a.position - b.position)
             .map(item => (
               <ItineraryItem
@@ -86,6 +88,7 @@ export function ItineraryDayColumn({
                 onEdit={(item) => onEditItem(day.id, item)}
                 onDelete={onDeleteItem}
                 onDragStart={onDragStart}
+                onBook={onBookItem}
               />
             ))
         )}
