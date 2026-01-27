@@ -68,6 +68,22 @@ export function HostCard({ host }: HostCardProps) {
             {host.experiences.length} {host.experiences.length === 1 ? 'experience' : 'experiences'}
           </span>
         </div>
+
+        {/* Action Button (Stops propagation to avoid navigation) */}
+        <div className="mt-4 pt-4 border-t border-[var(--border)]">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // Dispatch custom event for the chat widget to pick up
+              window.dispatchEvent(new CustomEvent('send-chat-message', { detail: `I'm interested in ${host.name}. Add them to my plan as a tentative option.` }));
+            }}
+            className="w-full py-2 px-4 bg-[var(--sand-beige)] hover:bg-[var(--princeton-orange)] hover:text-white text-[var(--foreground)] rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2"
+          >
+            <span>📅</span>
+            Add to Plan
+          </button>
+        </div>
       </div>
     </Link>
   );

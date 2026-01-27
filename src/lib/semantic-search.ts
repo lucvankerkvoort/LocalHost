@@ -208,9 +208,26 @@ export function scoreExperience(
 
 /**
  * Semantic search for hosts - scores all hosts and returns top N
+ * If intent.location is provided, FILTERS to only hosts in that location
  */
 export function semanticSearchHosts(intent: SearchIntent, limit: number = 20): ScoredHost[] {
-  const scored = HOSTS.map(host => scoreHost(host, intent));
+  // Filter by location first if provided (strict filtering, not just boosting)
+  let candidates = HOSTS;
+  if (intent.location) {
+    const locationLower = intent.location.toLowerCase();
+    candidates = HOSTS.filter(host => 
+      host.city.toLowerCase().includes(locationLower) || 
+      host.country.toLowerCase().includes(locationLower) ||
+      locationLower.includes(host.city.toLowerCase()) ||
+      locationLower.includes(host.country.toLowerCase())
+    );
+    // Fallback to all hosts if no location match (prevents empty results)
+    if (candidates.length === 0) {
+      candidates = HOSTS;
+    }
+  }
+  
+  const scored = candidates.map(host => scoreHost(host, intent));
   return scored
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
@@ -218,11 +235,28 @@ export function semanticSearchHosts(intent: SearchIntent, limit: number = 20): S
 
 /**
  * Semantic search for experiences - scores all experiences and returns top N
+ * If intent.location is provided, FILTERS to only hosts in that location
  */
 export function semanticSearchExperiences(intent: SearchIntent, limit: number = 20): ScoredExperience[] {
+  // Filter by location first if provided (strict filtering, not just boosting)
+  let candidates = HOSTS;
+  if (intent.location) {
+    const locationLower = intent.location.toLowerCase();
+    candidates = HOSTS.filter(host => 
+      host.city.toLowerCase().includes(locationLower) || 
+      host.country.toLowerCase().includes(locationLower) ||
+      locationLower.includes(host.city.toLowerCase()) ||
+      locationLower.includes(host.country.toLowerCase())
+    );
+    // Fallback to all hosts if no location match (prevents empty results)
+    if (candidates.length === 0) {
+      candidates = HOSTS;
+    }
+  }
+  
   const allExperiences: ScoredExperience[] = [];
   
-  for (const host of HOSTS) {
+  for (const host of candidates) {
     for (const experience of host.experiences) {
       allExperiences.push(scoreExperience(experience, host, intent));
     }

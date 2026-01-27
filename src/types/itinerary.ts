@@ -24,6 +24,9 @@ export interface ItineraryItem {
   startTime?: string; // HH:MM format
   endTime?: string;
   hostId?: string; // Future: link to Localhost experience
+  experienceId?: string; // Specific experience ID
+  status?: 'DRAFT' | 'PENDING' | 'BOOKED' | 'FAILED';
+  candidateId?: string; // Link to ExperienceCandidate for booking
   position: number;
 }
 
