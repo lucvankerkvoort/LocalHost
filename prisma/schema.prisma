@@ -3,6 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
+
 }
 
 datasource db {
@@ -17,6 +18,7 @@ model User {
   id            String    @id @default(cuid())
   email         String    @unique
   emailVerified DateTime?
+  password      String?
   name          String?
   image         String?
   bio           String?
@@ -43,6 +45,9 @@ model User {
   reviewsGiven      Review[]     @relation("ReviewerReviews")
   reviewsReceived   Review[]     @relation("RevieweeReviews")
   messagesSent      Message[]    @relation("SentMessages")
+  experienceCandidates ExperienceCandidate[]
+  experienceDraft   ExperienceDraft?
+  hostExperience    HostExperience?
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -272,4 +277,205 @@ enum PaymentStatus {
 enum ReviewType {
   GUEST_TO_HOST
   HOST_TO_GUEST
+}
+
+// ============================================
+// ITINERARY-BASED BOOKING & CHAT
+// ============================================
+
+model ExperienceCandidate {
+  id            String   @id @default(cuid())
+  
+  // Reference (static host data for now)
+  hostId        String           // References static Host.id from hosts.ts
+  experienceId  String           // References static HostExperience.id
+  
+  // Itinerary context
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tripId        String?          // Future: link to Trip model
+  dayNumber     Int              // Day within the trip (1, 2, 3...)
+  date          DateTime?        // Actual calendar date if set
+  timeSlot      String?          // "morning", "afternoon", "evening"
+  
+  // Status
+  status        CandidateStatus  @default(INTERESTED)
+  
+  // Relations
+  preliminaryChat PreliminaryChat?
+  chatThread      ChatThread?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([hostId])
+  @@index([status])
+}
+
+enum CandidateStatus {
+  INTERESTED      // Added to day, no message sent
+  AWAITING_REPLY  // Preliminary message sent, waiting for host
+  REPLIED         // Host responded
+  UNRESPONSIVE    // Host didn't reply within 24h
+  BOOKED          // Payment complete
+  CANCELLED       // User removed or cancelled
+}
+
+model PreliminaryChat {
+  id            String   @id @default(cuid())
+  candidateId   String   @unique
+  candidate     ExperienceCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  // Messages
+  userMessage   String?  @db.Text
+  userSentAt    DateTime?
+  hostReply     String?  @db.Text
+  hostRepliedAt DateTime?
+  
+  // Timing
+  expiresAt     DateTime?        // 24h after userSentAt
+  status        PreliminaryChatStatus @default(OPEN)
+  
+  createdAt     DateTime @default(now())
+  
+  @@index([candidateId])
+  @@index([status])
+}
+
+enum PreliminaryChatStatus {
+  OPEN      // Awaiting messages
+  CLOSED    // Host replied, thread complete
+  EXPIRED   // 24h passed without reply
+}
+
+model ChatThread {
+  id            String   @id @default(cuid())
+  candidateId   String   @unique
+  candidate     ExperienceCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  // Participants
+  userId        String
+  hostId        String   // Static host ID
+  
+  messages      ChatMessage[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([hostId])
+}
+
+model ChatMessage {
+  id          String     @id @default(cuid())
+  threadId    String
+  thread      ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  
+  senderId    String     // Either userId or hostId
+  senderType  SenderType
+  content     String     @db.Text
+  isRead      Boolean    @default(false)
+  
+  createdAt   DateTime   @default(now())
+  
+  @@index([threadId])
+}
+
+enum SenderType {
+  USER
+  HOST
+}
+
+// ============================================
+// HOST EXPERIENCE CREATION
+// ============================================
+
+model ExperienceDraft {
+  id          String   @id @default(cuid())
+  userId      String   @unique  // Only one draft per user (MVP)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Location
+  city        String?
+  country     String?
+  
+  // Content (AI-generated, host-editable)
+  title       String?
+  shortDesc   String?  @db.Text  // Marketing-facing
+  longDesc    String?  @db.Text  // Narrative description
+  
+  // Stops
+  stops       ExperienceStop[] @relation("DraftStops")
+  
+  // Metadata
+  duration    Int?     // Estimated minutes
+  status      DraftStatus @default(IN_PROGRESS)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum DraftStatus {
+  IN_PROGRESS
+  AI_GENERATED
+  READY_TO_PUBLISH
+}
+
+model ExperienceStop {
+  id          String   @id @default(cuid())
+  
+  // Belongs to either draft or published experience
+  draftId     String?
+  draft       ExperienceDraft? @relation("DraftStops", fields: [draftId], references: [id], onDelete: Cascade)
+  experienceId String?
+  experience  HostExperience? @relation("ExperienceStops", fields: [experienceId], references: [id], onDelete: Cascade)
+  
+  // Stop details
+  name        String
+  description String?  @db.Text
+  address     String?
+  lat         Float?
+  lng         Float?
+  order       Int      @default(0)
+  
+  @@index([draftId])
+  @@index([experienceId])
+}
+
+model HostExperience {
+  id          String   @id @default(cuid())
+  hostId      String   @unique  // Only one experience per host (MVP)
+  host        User     @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  
+  // Location
+  city        String
+  country     String
+  
+  // Content
+  title       String
+  shortDesc   String   @db.Text
+  longDesc    String   @db.Text
+  
+  // Stops
+  stops       ExperienceStop[] @relation("ExperienceStops")
+  
+  // Metadata
+  duration    Int      // Minutes
+  price       Int?     // Cents (optional for MVP)
+  
+  // Status
+  status      HostExperienceStatus @default(PUBLISHED)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([city])
+  @@index([status])
+}
+
+enum HostExperienceStatus {
+  PUBLISHED
+  UNPUBLISHED
+  FLAGGED
 }
