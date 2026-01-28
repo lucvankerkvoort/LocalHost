@@ -7,6 +7,8 @@ import hostsReducer from './hosts-slice';
 import hostCreationReducer from './host-creation-slice';
 import uiReducer from './ui-slice';
 
+import p2pChatReducer from './p2p-chat-slice';
+
 export const store = configureStore({
   reducer: {
     globe: globeReducer,
@@ -15,6 +17,7 @@ export const store = configureStore({
     hosts: hostsReducer,
     hostCreation: hostCreationReducer,
     ui: uiReducer,
+    p2pChat: p2pChatReducer,
   },
 });
 

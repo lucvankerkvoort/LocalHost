@@ -21,6 +21,18 @@ const nextConfig: NextConfig = {
   env: {
     CESIUM_BASE_URL: "cesium",
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'plus.unsplash.com',
+      },
+    ],
+  },
 };
 
 export default nextConfig;

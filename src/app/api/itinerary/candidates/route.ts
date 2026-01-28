@@ -86,8 +86,8 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       return NextResponse.json(
-        { error: 'Experience already added to this day' },
-        { status: 409 }
+        { candidate: existing, message: 'Experience already added to this day' },
+        { status: 200 }
       );
     }
 

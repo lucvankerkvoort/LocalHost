@@ -35,13 +35,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen flex flex-col overflow-hidden`}
         suppressHydrationWarning
       >
         <Providers>
           <GlobalUI />
           <Header />
-          {children}
+          <main className="flex-1 relative overflow-y-auto overflow-x-hidden flex flex-col">
+            {children}
+          </main>
           <ConditionalChatWidget />
         </Providers>
       </body>

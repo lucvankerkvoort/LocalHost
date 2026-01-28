@@ -1,23 +1,17 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-
-interface Conversation {
-  id: string;
-  hostId: string;
-  hostName: string;
-  hostPhoto: string;
-  lastMessage: string;
-  timestamp: Date;
-  unread: number;
-}
-
-interface Message {
-  id: string;
-  content: string;
-  sender: 'user' | 'host';
-  timestamp: Date;
-}
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { 
+  initThread, 
+  sendMessage, 
+  receiveMessage, 
+  markThreadAsRead,
+  selectAllThreads,
+  selectThreadByHostId
+} from '@/store/p2p-chat-slice';
+import { selectAllHosts } from '@/store/hosts-slice';
+import { closeContactHost } from '@/store/ui-slice';
 
 interface P2PChatPanelProps {
   isOpen: boolean;
@@ -29,54 +23,64 @@ interface P2PChatPanelProps {
  * Shows list of conversations and allows direct messaging.
  */
 export function P2PChatPanel({ isOpen, onClose }: P2PChatPanelProps) {
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  const dispatch = useAppDispatch();
+  const threads = useAppSelector(selectAllThreads);
+  const selectedThread = useAppSelector(state => selectThreadByHostId(state, selectedConversationId));
+  const contactHostId = useAppSelector(state => state.ui.contactHostId);
+  const allHosts = useAppSelector(selectAllHosts);
 
-  // Mock conversations - in real app, this would come from API/Redux
-  const [conversations] = useState<Conversation[]>([
-    {
-      id: 'conv-1',
-      hostId: 'host-akira',
-      hostName: 'Akira Tanaka',
-      hostPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop',
-      lastMessage: 'Looking forward to meeting you!',
-      timestamp: new Date(),
-      unread: 1,
-    },
-  ]);
-
-  // Mock messages for selected conversation
-  const [messages] = useState<Message[]>([
-    {
-      id: 'msg-1',
-      content: 'Hi Akira! I\'m excited about the coffee roasting experience!',
-      sender: 'user',
-      timestamp: new Date(Date.now() - 3600000),
-    },
-    {
-      id: 'msg-2',
-      content: 'Looking forward to meeting you!',
-      sender: 'host',
-      timestamp: new Date(),
-    },
-  ]);
+  // Sync with global "Contact Host" action
+  useEffect(() => {
+    if (contactHostId) {
+      // Find host details
+      const host = allHosts.find(h => h.id === contactHostId);
+      if (host) {
+        // Init thread if doesn't exist
+        dispatch(initThread({
+            hostId: host.id,
+            hostName: host.name,
+            hostPhoto: host.photo
+        }));
+        setSelectedConversationId(host.id);
+      }
+      // Reset the trigger so we don't re-open constantly if we navigate away and back
+      // Actually keeping it might be fine, but let's clear it if we close the panel
+    }
+  }, [contactHostId, allHosts, dispatch]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, selectedConversation]);
+  }, [selectedThread?.messages]);
+
+  // Mark as read when viewing
+  useEffect(() => {
+    if (selectedConversationId && isOpen) {
+        dispatch(markThreadAsRead({ hostId: selectedConversationId }));
+    }
+  }, [selectedConversationId, dispatch, isOpen, selectedThread?.messages.length]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageInput.trim()) return;
+    if (!messageInput.trim() || !selectedConversationId) return;
     
-    // TODO: Implement actual message sending
-    console.log('Sending message:', messageInput);
+    const content = messageInput.trim();
+    // 1. Send user message
+    dispatch(sendMessage({ hostId: selectedConversationId, content }));
     setMessageInput('');
+    
+    // 2. Mock Reply after 1-3 seconds
+    setTimeout(() => {
+        dispatch(receiveMessage({ 
+            hostId: selectedConversationId, 
+            content: "Thanks for reaching out! I'd love to show you around. Let me know what dates work for you." 
+        }));
+    }, 1500);
   };
-
-  const selectedHost = conversations.find(c => c.id === selectedConversation);
 
   if (!isOpen) return null;
 
@@ -104,48 +108,47 @@ export function P2PChatPanel({ isOpen, onClose }: P2PChatPanelProps) {
           </button>
         </div>
 
-        {selectedConversation ? (
+        {selectedConversationId && selectedThread ? (
           // Chat View
           <>
             {/* Chat Header */}
             <div className="p-3 border-b border-[var(--border)] flex items-center gap-3">
               <button
-                onClick={() => setSelectedConversation(null)}
+                onClick={() => setSelectedConversationId(null)}
                 className="p-1.5 hover:bg-[var(--muted)] rounded-lg transition-colors"
+                title="Back to conversations"
               >
                 ←
               </button>
-              {selectedHost && (
-                <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
                   <img
-                    src={selectedHost.hostPhoto}
-                    alt={selectedHost.hostName}
+                    src={selectedThread.hostPhoto}
+                    alt={selectedThread.hostName}
                     className="w-8 h-8 rounded-full object-cover"
                   />
-                  <span className="font-medium">{selectedHost.hostName}</span>
-                </div>
-              )}
+                  <span className="font-medium">{selectedThread.hostName}</span>
+              </div>
             </div>
             
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {messages.map(msg => (
+              {selectedThread.messages.map(msg => (
                 <div
                   key={msg.id}
-                  className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${msg.senderType === 'USER' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
                     className={`max-w-[80%] px-4 py-2 rounded-2xl ${
-                      msg.sender === 'user'
+                      msg.senderType === 'USER'
                         ? 'bg-[var(--princeton-orange)] text-white rounded-br-md'
                         : 'bg-[var(--muted)] text-[var(--foreground)] rounded-bl-md'
                     }`}
                   >
                     <p className="text-sm">{msg.content}</p>
                     <p className={`text-[10px] mt-1 ${
-                      msg.sender === 'user' ? 'text-white/70' : 'text-[var(--muted-foreground)]'
+                      msg.senderType === 'USER' ? 'text-white/70' : 'text-[var(--muted-foreground)]'
                     }`}>
-                      {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                 </div>
@@ -180,7 +183,7 @@ export function P2PChatPanel({ isOpen, onClose }: P2PChatPanelProps) {
         ) : (
           // Conversations List
           <div className="flex-1 overflow-y-auto">
-            {conversations.length === 0 ? (
+            {threads.length === 0 ? (
               <div className="p-8 text-center text-[var(--muted-foreground)]">
                 <p className="text-4xl mb-3">💬</p>
                 <p className="font-medium">No conversations yet</p>
@@ -190,37 +193,40 @@ export function P2PChatPanel({ isOpen, onClose }: P2PChatPanelProps) {
               </div>
             ) : (
               <div className="divide-y divide-[var(--border)]">
-                {conversations.map(conv => (
+                {threads.map(thread => {
+                   const lastMsg = thread.messages[thread.messages.length - 1];
+                   return (
                   <button
-                    key={conv.id}
-                    onClick={() => setSelectedConversation(conv.id)}
+                    key={thread.hostId}
+                    onClick={() => setSelectedConversationId(thread.hostId)}
                     className="w-full p-4 flex items-center gap-3 hover:bg-[var(--muted)]/50 transition-colors text-left"
                   >
                     <div className="relative">
                       <img
-                        src={conv.hostPhoto}
-                        alt={conv.hostName}
+                        src={thread.hostPhoto}
+                        alt={thread.hostName}
                         className="w-12 h-12 rounded-full object-cover"
                       />
-                      {conv.unread > 0 && (
+                      {thread.unreadCount > 0 && (
                         <span className="absolute -top-1 -right-1 w-5 h-5 bg-[var(--princeton-orange)] text-white text-xs font-bold rounded-full flex items-center justify-center">
-                          {conv.unread}
+                          {thread.unreadCount}
                         </span>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-[var(--foreground)]">{conv.hostName}</span>
+                        <span className="font-medium text-[var(--foreground)]">{thread.hostName}</span>
                         <span className="text-xs text-[var(--muted-foreground)]">
-                          {conv.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {lastMsg ? new Date(lastMsg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                         </span>
                       </div>
                       <p className="text-sm text-[var(--muted-foreground)] truncate">
-                        {conv.lastMessage}
+                        {lastMsg ? lastMsg.content : 'New conversation'}
                       </p>
                     </div>
                   </button>
-                ))}
+                   );
+                })}
               </div>
             )}
           </div>
