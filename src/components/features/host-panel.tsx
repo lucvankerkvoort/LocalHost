@@ -7,6 +7,7 @@ interface HostPanelProps {
   hosts: HostMarkerData[];
   selectedHostId?: string | null;
   selectedDayNumber?: number;
+  addedExperienceIds?: Set<string>;
   onHostClick: (host: HostMarkerData) => void;
   onViewProfile: (host: HostMarkerData) => void;
   onAddExperience: (host: Host, experience: HostExperience) => void;
@@ -16,6 +17,7 @@ export function HostPanel({
   hosts,
   selectedHostId,
   selectedDayNumber,
+  addedExperienceIds,
   onHostClick,
   onViewProfile,
   onAddExperience,
@@ -67,6 +69,7 @@ export function HostPanel({
             host={fullHost!}
             isSelected={marker.id === selectedHostId}
             selectedDayNumber={selectedDayNumber}
+            addedExperienceIds={addedExperienceIds}
             onClick={() => onHostClick(marker)}
             onViewProfile={() => onViewProfile(marker)}
             onAddExperience={(exp) => onAddExperience(fullHost!, exp)}
@@ -82,6 +85,7 @@ interface HostCardWithExperiencesProps {
   host: Host;
   isSelected: boolean;
   selectedDayNumber?: number;
+  addedExperienceIds?: Set<string>;
   onClick: () => void;
   onViewProfile: () => void;
   onAddExperience: (experience: HostExperience) => void;
@@ -92,6 +96,7 @@ function HostCardWithExperiences({
   host,
   isSelected,
   selectedDayNumber,
+  addedExperienceIds,
   onClick,
   onViewProfile,
   onAddExperience,
@@ -147,38 +152,49 @@ function HostCardWithExperiences({
         </div>
         
         <div className="divide-y divide-[var(--border)]/30">
-          {host.experiences.map((exp) => (
-            <div
-              key={exp.id}
-              className="p-3 hover:bg-[var(--muted)]/20 transition-colors"
-            >
-              <div className="flex gap-3">
-                <img
-                  src={exp.photo}
-                  alt={exp.title}
-                  className="w-16 h-12 rounded-lg object-cover flex-shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-medium text-[var(--foreground)] line-clamp-1">
-                    {exp.title}
-                  </h4>
-                  <div className="flex items-center gap-2 mt-1 text-xs text-[var(--muted-foreground)]">
-                    <span>⏱ {Math.round(exp.duration / 60)}h</span>
-                    <span className="text-amber-500">★ {exp.rating}</span>
-                    <span className="ml-auto font-semibold text-[var(--foreground)]">
-                      ${(exp.price / 100).toFixed(0)}
-                    </span>
+          {host.experiences.map((exp) => {
+            const isAdded = addedExperienceIds?.has(exp.id);
+            
+            return (
+              <div
+                key={exp.id}
+                className="p-3 hover:bg-[var(--muted)]/20 transition-colors"
+              >
+                <div className="flex gap-3">
+                  <img
+                    src={exp.photo}
+                    alt={exp.title}
+                    className="w-16 h-12 rounded-lg object-cover flex-shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-medium text-[var(--foreground)] line-clamp-1">
+                      {exp.title}
+                    </h4>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-[var(--muted-foreground)]">
+                      <span>⏱ {Math.round(exp.duration / 60)}h</span>
+                      <span className="text-amber-500">★ {exp.rating}</span>
+                      <span className="ml-auto font-semibold text-[var(--foreground)]">
+                        ${(exp.price / 100).toFixed(0)}
+                      </span>
+                    </div>
                   </div>
                 </div>
+                <button
+                  onClick={() => onAddExperience(exp)}
+                  className={`w-full mt-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    isAdded 
+                      ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20 border border-red-200'
+                      : 'bg-[var(--princeton-orange)] text-white hover:bg-[var(--princeton-dark)]'
+                  }`}
+                >
+                  {isAdded 
+                    ? 'Remove from Day' 
+                    : selectedDayNumber ? `Add to Day ${selectedDayNumber}` : 'Add to Trip'
+                  }
+                </button>
               </div>
-              <button
-                onClick={() => onAddExperience(exp)}
-                className="w-full mt-2 px-3 py-1.5 bg-[var(--princeton-orange)] text-white rounded-lg text-xs font-medium hover:bg-[var(--princeton-dark)] transition-colors"
-              >
-                {selectedDayNumber ? `Add to Day ${selectedDayNumber}` : 'Add to Trip'}
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

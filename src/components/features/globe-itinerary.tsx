@@ -17,6 +17,9 @@ import { ItineraryItem, createItem } from '@/types/itinerary';
 import { getHostsByCity } from '@/lib/data/hosts';
 import { CATEGORY_ICONS, CATEGORY_LABELS, ExperienceCategory } from '@/types';
 import { ExperienceDrawer } from './experience-drawer';
+import { ProposalDialog } from './proposal-dialog';
+
+import { sendMessage, initThread } from '@/store/p2p-chat-slice';
 import { BookingDialog } from './booking-dialog';
 import { ItineraryDayColumn } from './itinerary-day';
 import { HostPanel } from './host-panel';
@@ -92,6 +95,20 @@ export default function GlobeItinerary() {
   const hostMarkers = useAppSelector((state) => state.globe.hostMarkers);
   const placeMarkers = useAppSelector((state) => state.globe.placeMarkers);
   const allHosts = useAppSelector(selectAllHosts);
+
+  const selectedDestData = useMemo(() => {
+    if (!selectedDestination) return null;
+    return destinations.find((d) => d.id === selectedDestination) || null;
+  }, [selectedDestination, destinations]);
+
+  const addedExperienceIds = useMemo(() => {
+    if (!selectedDestData) return new Set<string>();
+    return new Set(
+      selectedDestData.activities
+        .filter(item => item.experienceId)
+        .map(item => item.experienceId!)
+    );
+  }, [selectedDestData]);
 
   const [showTimeline, setShowTimeline] = useState(true);
   
@@ -236,9 +253,37 @@ export default function GlobeItinerary() {
   }, [persistItineraryState, router]);
 
 
-  // Add Experience from Drawer
-  const handleAddExperience = (host: any, experience: any) => {
-    if (!selectedDestination) return;
+  // Proposal Dialog State
+  const [pendingProposal, setPendingProposal] = useState<{
+    host: { id: string; name: string; photo?: string }; // Make photo optional in type
+    experience: any;
+  } | null>(null);
+
+
+
+  const handleConfirmProposal = (message: string) => {
+    if (!pendingProposal) return;
+    
+    // 1. Initialize thread & Send Message
+    dispatch(initThread({
+      hostId: pendingProposal.host.id,
+      hostName: pendingProposal.host.name,
+      hostPhoto: pendingProposal.host.photo || '' // Fallback if missing
+    }));
+    
+    dispatch(sendMessage({
+      hostId: pendingProposal.host.id,
+      content: message
+    }));
+
+    // 2. Add to Itinerary (Execute original logic)
+    const { host, experience } = pendingProposal;
+    console.log('[GlobeItinerary] handleAddExperience', { host, experience, selectedDestination });
+    
+    if (!selectedDestination) {
+      console.warn('[GlobeItinerary] No selected destination!');
+      return;
+    }
 
     const nextDestinations = destinations.map(dest => {
       if (dest.id === selectedDestination) {
@@ -248,6 +293,7 @@ export default function GlobeItinerary() {
           experienceId: experience.id,
           description: `${experience.category} • ${experience.price / 100}$`,
         });
+        console.log('[GlobeItinerary] Creating new item:', newItem);
         return {
           ...dest,
           activities: [...dest.activities, newItem]
@@ -256,12 +302,42 @@ export default function GlobeItinerary() {
       return dest;
     });
     dispatch(setDestinations(nextDestinations));
+    
+    // 3. Cleanup
+    setPendingProposal(null);
     setDrawerOpen(false);
+  };
+
+  // Add Experience from Drawer
+  const handleAddExperience = (host: any, experience: any) => {
+    // Check if already added (Toggle Remove)
+    if (addedExperienceIds.has(experience.id)) {
+      if (!selectedDestination) return;
+
+      const nextDestinations = destinations.map(dest => {
+        if (dest.id === selectedDestination) {
+          return {
+            ...dest,
+            activities: dest.activities.filter(a => a.experienceId !== experience.id)
+          };
+        }
+        return dest;
+      });
+      dispatch(setDestinations(nextDestinations));
+      return;
+    }
+
+    // Intercept: Open Proposal Dialog instead of adding directly
+    setPendingProposal({ host, experience });
   };
 
   // Booking Handler
   const handleBookItem = async (dayId: string, item: ItineraryItem) => {
-    if (item.type !== 'localhost' || !item.hostId || !item.experienceId) return;
+    console.log('[GlobeItinerary] handleBookItem called', { dayId, item });
+    if (item.type !== 'localhost' || !item.hostId || !item.experienceId) {
+      console.warn('[GlobeItinerary] Item validation failed', item);
+      return;
+    }
 
     try {
       let candidateId = item.candidateId;
@@ -270,8 +346,12 @@ export default function GlobeItinerary() {
       // If no candidate yet, create one
       if (!candidateId) {
         const dest = destinations.find(d => d.id === dayId);
-        if (!dest) return;
+        if (!dest) {
+             console.error('[GlobeItinerary] Day not found:', dayId);
+             return;
+        }
 
+        console.log('[GlobeItinerary] Creating candidate via API...');
         // Call API to create candidate
         const res = await fetch('/api/itinerary/candidates', {
           method: 'POST',
@@ -286,10 +366,13 @@ export default function GlobeItinerary() {
         });
 
         if (!res.ok) {
-          throw new Error('Failed to create booking candidate');
+          const errorText = await res.text();
+          console.error('[GlobeItinerary] API Error:', res.status, errorText);
+          throw new Error('Failed to create booking candidate: ' + errorText);
         }
 
         const data = await res.json();
+        console.log('[GlobeItinerary] Candidate created:', data);
         candidateData = data.candidate;
         candidateId = candidateData.id;
 
@@ -303,36 +386,57 @@ export default function GlobeItinerary() {
               )
             };
           }
-          return d;
+          return dest; // WARNING: BUG HERE originally? "return d;" was correct. "return dest" invalid ref? 
+          // Wait, dest is from map(d => ...). Correct is "return d".
+          // In previous code:
+          /*
+          const nextDestinations = destinations.map(d => {
+            if (d.id === dayId) { ... }
+            return d;
+          });
+          */
+          // I must ensure I don't introduce a bug.
         });
-        dispatch(setDestinations(nextDestinations));
-      } else {
-        // Fetch existing candidate? Or just assume we can pass minimal data?
-        // Ideally we should fetch fresh candidate data but for now we might construct it or fetch it.
-        // Let's assume we need to fetch it to get current status etc. if we want to be safe,
-        // but for speed let's construct what we can or rely on what we have if we used the API.
-        // Actually, the BookingDialog expects ExperienceCandidateData.
         
-        // Let's try to fetch it to be sure
+        // Let's rewrite the map clearly in the ReplacementContent
+        const updatedDestinations = destinations.map(d => {
+            if (d.id === dayId) {
+                return {
+                    ...d,
+                    activities: d.activities.map(i => 
+                        i.id === item.id ? { ...i, candidateId: candidateId, status: 'PENDING' as const } : i
+                    )
+                };
+            }
+            return d;
+        });
+        
+        dispatch(setDestinations(updatedDestinations));
+      } else {
+        console.log('[GlobeItinerary] Fetching existing candidate:', candidateId);
         const res = await fetch(`/api/itinerary/candidates?dayNumber=${destinations.find(d => d.id === dayId)?.day}`);
         const data = await res.json();
         candidateData = data.candidates.find((c: any) => c.id === candidateId);
       }
 
       if (candidateData) {
+        console.log('[GlobeItinerary] Opening Booking Dialog with:', candidateData);
         setBookingDialogState({
           isOpen: true,
           candidate: candidateData,
         });
+      } else {
+          console.error('[GlobeItinerary] No candidate data found after operations.');
       }
 
     } catch (error) {
       console.error('Booking flow error:', error);
-      alert('Failed to start booking flow. Please try again.');
+      alert('Failed to start booking flow. Check console for details.');
     }
   };
 
   const handleConfirmBooking = async (candidateId: string) => {
+      console.log('[GlobeItinerary] Confirming booking:', candidateId);
     try {
       const res = await fetch('/api/bookings', {
         method: 'POST',
@@ -435,7 +539,7 @@ export default function GlobeItinerary() {
     }
   };
 
-  const selectedDestData = destinations.find(d => d.id === selectedDestination);
+
 
   const cityMarkers = useMemo<CityMarkerData[]>(() => {
     if (destinations.length === 0) return [];
@@ -582,7 +686,7 @@ export default function GlobeItinerary() {
   }, [selectedDestData, allHosts]);
 
   return (
-    <div className="h-screen flex flex-col bg-[var(--deep-space-blue)]">
+    <div className="h-full w-full flex flex-col bg-[var(--deep-space-blue)]">
       {/* Header */}
       {/* Floating Map Controls */}
       <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
@@ -618,7 +722,7 @@ export default function GlobeItinerary() {
           
           {/* Itinerary Panel for Selected Day */}
           {selectedDestData && (
-             <div className="absolute top-4 left-4 z-10">
+             <div className="absolute top-4 left-4 z-10 max-h-[calc(100vh-120px)] overflow-y-auto hidden-scrollbar">
                 <ItineraryDayColumn 
                   day={{
                       id: selectedDestData.id,
@@ -686,7 +790,7 @@ export default function GlobeItinerary() {
                     if (selectedDestination) {
                       handleAddExperience(
                         { id: selectedHost.id, name: selectedHost.name },
-                        { title: `Experience with ${selectedHost.name}`, category: 'local-host', price: 0 }
+                        { id: `custom-${selectedHost.id}`, title: `Experience with ${selectedHost.name}`, category: 'local-host', price: 0 }
                       );
                       setSelectedHost(null);
                     } else {
@@ -708,13 +812,14 @@ export default function GlobeItinerary() {
           hosts={nearbyHosts.length > 0 ? nearbyHosts : hostMarkers}
           selectedHostId={selectedHost?.id}
           selectedDayNumber={selectedDestData?.day}
+          addedExperienceIds={addedExperienceIds}
           onHostClick={(host) => setSelectedHost(host)}
           onViewProfile={handleViewHostProfile}
           onAddExperience={(host, experience) => {
             if (selectedDestination) {
               handleAddExperience(
                 { id: host.id, name: host.name },
-                { title: experience.title, category: experience.category, price: experience.price }
+                experience
               );
             } else {
               alert('Please select a day on the map first!');
@@ -760,6 +865,14 @@ export default function GlobeItinerary() {
         city={drawerCity}
         onClose={() => setDrawerOpen(false)}
         onAddExperience={handleAddExperience}
+      />
+
+      <ProposalDialog
+        isOpen={!!pendingProposal}
+        onClose={() => setPendingProposal(null)}
+        onConfirm={handleConfirmProposal}
+        hostName={pendingProposal?.host.name || ''}
+        experienceTitle={pendingProposal?.experience.title || ''}
       />
       
       {/* Booking Dialog */}
