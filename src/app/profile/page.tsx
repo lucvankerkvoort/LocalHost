@@ -4,7 +4,7 @@ import { useAppSelector } from '@/store/hooks';
 import { selectHostCreation } from '@/store/host-creation-slice';
 import Link from 'next/link';
 
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 
 export default function ProfilePage() {
   const { data: session } = useSession();
@@ -23,14 +23,32 @@ export default function ProfilePage() {
     return (
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center p-4">
         <div className="text-center max-w-md">
-          <h2 className="text-2xl font-bold mb-4">No Profile Found</h2>
-          <p className="text-[var(--muted-foreground)] mb-6">Start by creating your host profile.</p>
-          <Link 
-            href="/become-host" 
-            className="px-6 py-3 bg-[var(--princeton-orange)] text-white rounded-xl font-medium hover:bg-[var(--princeton-dark)] transition-colors"
-          >
-            Create Profile
-          </Link>
+          <div className="mb-6 flex flex-col items-center">
+             {session?.user?.image && (
+                 <img src={session.user.image} alt="Profile" className="w-16 h-16 rounded-full mb-3" />
+             )}
+             <h2 className="text-xl font-bold">Welcome, {session?.user?.name || session?.user?.email || 'Traveler'}</h2>
+             <p className="text-sm text-[var(--muted-foreground)]">{session?.user?.email}</p>
+          </div>
+          
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-6 mb-6">
+              <h3 className="font-semibold mb-2">Want to host experiences?</h3>
+              <p className="text-sm text-[var(--muted-foreground)] mb-4">Create a host profile to start accepting bookings.</p>
+              <Link 
+                href="/become-host" 
+                className="px-6 py-2 bg-[var(--princeton-orange)] text-white rounded-lg font-medium hover:bg-[var(--princeton-dark)] transition-colors inline-block w-full"
+              >
+                Create Host Profile
+              </Link>
+          </div>
+          <div>
+            <button 
+                onClick={() => signOut({ callbackUrl: '/' })}
+                className="text-sm text-red-500 hover:text-red-700 hover:underline"
+            >
+                Sign Out
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -70,7 +88,13 @@ export default function ProfilePage() {
             </div>
             <div className="text-right hidden md:block">
               <div className="text-2xl font-bold">★ {host.rating}</div>
-              <div className="text-sm text-[var(--muted-foreground)] underline">{host.reviews} reviews</div>
+              <div className="text-sm text-[var(--muted-foreground)] underline mb-4">{host.reviews} reviews</div>
+              <button 
+                onClick={() => signOut({ callbackUrl: '/' })}
+                className="px-4 py-2 text-sm font-medium text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors border border-red-200"
+              >
+                Sign Out
+              </button>
             </div>
           </div>
 

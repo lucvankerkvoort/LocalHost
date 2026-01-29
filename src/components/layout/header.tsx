@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setP2PChatOpen } from '@/store/ui-slice';
@@ -26,7 +27,14 @@ export function Header({ onToggleTimeline, showTimeline }: HeaderProps) {
       <div className="flex items-center justify-between max-w-7xl mx-auto w-full">
         {/* Logo / Brand */}
         <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <span className="text-2xl">🌍</span>
+          <div className="relative w-8 h-8">
+            <Image 
+              src="/logo.png" 
+              alt="Localhost Logo" 
+              fill
+              className="object-contain"
+            />
+          </div>
           <h1 className="font-bold text-xl text-[var(--foreground)]">Localhost</h1>
         </Link>
         
@@ -102,6 +110,7 @@ export function Header({ onToggleTimeline, showTimeline }: HeaderProps) {
                </svg>
              </Link>
           )}
+
         </div>
       </div>
     </header>

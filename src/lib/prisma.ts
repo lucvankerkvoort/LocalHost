@@ -3,17 +3,18 @@ import { withAccelerate } from '@prisma/extension-accelerate';
 
 // Prevent multiple instances of Prisma Client in development
 const globalForPrisma = globalThis as unknown as {
-  prisma: ReturnType<typeof makePrismaClient> | undefined;
+  prisma: ReturnType<typeof prismaClientSingleton> | undefined;
 };
 
-function makePrismaClient() {
+const prismaClientSingleton = () => {
   return new PrismaClient({
+    // @ts-ignore: accelerateUrl is required for the accelerate extension but missing in strict types sometimes
     accelerateUrl: process.env.DATABASE_URL,
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   }).$extends(withAccelerate());
-}
+};
 
-export const prisma = globalForPrisma.prisma ?? makePrismaClient();
+export const prisma = globalForPrisma.prisma ?? prismaClientSingleton();
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;

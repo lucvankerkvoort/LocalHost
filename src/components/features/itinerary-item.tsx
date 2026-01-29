@@ -19,8 +19,26 @@ export function ItineraryItem({
   onDragStart,
   onBook
 }: ItineraryItemProps) {
-  const config = ITEM_TYPE_CONFIG[item.type];
-  const isLocalhost = item.type === 'localhost';
+  // Map backend types to frontend types for config
+  const getTypeKey = (type: string | ItineraryItemType): ItineraryItemType => {
+    switch (type) {
+      case 'EXPERIENCE': return 'localhost';
+      case 'SIGHT': return 'activity';
+      case 'MEAL': return 'meal';
+      case 'TRANSPORT': return 'transport';
+      case 'LODGING': return 'accommodation';
+      case 'FREE_TIME': return 'activity';
+      case 'NOTE': return 'activity';
+      default: 
+        return (ITEM_TYPE_CONFIG[type as ItineraryItemType] ? type as ItineraryItemType : 'activity');
+    }
+  };
+
+  const configKey = getTypeKey(item.type);
+  const config = ITEM_TYPE_CONFIG[configKey] || ITEM_TYPE_CONFIG.activity;
+
+  // Check if it's a localhost experience (either explicitly or mapped)
+  const isLocalhost = item.type === 'localhost' || item.type === 'EXPERIENCE';
   const status = item.status || 'DRAFT';
   
   return (
