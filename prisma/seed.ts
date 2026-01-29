@@ -1,6 +1,7 @@
-import { PrismaClient, ExperienceCategory } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import 'dotenv/config';
+import { ExperienceCategory } from '@prisma/client';
+import { prisma } from '../src/lib/prisma';
+import bcrypt from 'bcryptjs';
 
 async function main() {
   console.log('🌱 Seeding database...');
@@ -18,6 +19,8 @@ async function main() {
   console.log('✓ Cleared existing data');
 
   // Create demo users
+  const password = await bcrypt.hash('password', 10);
+
   const host1 = await prisma.user.create({
     data: {
       email: 'maria@localhost.com',
@@ -32,6 +35,7 @@ async function main() {
       isVerified: true,
       verificationTier: 'TRUSTED',
       trustScore: 95,
+      password,
     },
   });
 
@@ -49,6 +53,7 @@ async function main() {
       isVerified: true,
       verificationTier: 'VERIFIED',
       trustScore: 88,
+      password,
     },
   });
 
@@ -66,6 +71,7 @@ async function main() {
       isVerified: true,
       verificationTier: 'TRUSTED',
       trustScore: 92,
+      password,
     },
   });
 
@@ -82,6 +88,7 @@ async function main() {
       isVerified: true,
       verificationTier: 'VERIFIED',
       trustScore: 75,
+      password,
     },
   });
 
@@ -253,7 +260,7 @@ What makes this special:
       experienceId: experience1.id,
       guestId: demoGuest.id,
       date: new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
-      guestCount: 2,
+      guests: 2,
       totalPrice: 15000, // $150 for 2 people
       currency: 'USD',
       status: 'CONFIRMED',

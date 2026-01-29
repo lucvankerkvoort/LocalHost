@@ -4,11 +4,10 @@ import { useState, useRef, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { 
   initThread, 
-  sendMessage, 
-  receiveMessage, 
+  sendChatMessage, 
+  receiveMessage,
   markThreadAsRead,
-  selectAllThreads,
-  selectThreadByHostId
+  selectAllThreads
 } from '@/store/p2p-chat-slice';
 import { selectAllHosts } from '@/store/hosts-slice';
 import { closeContactHost } from '@/store/ui-slice';
@@ -23,34 +22,32 @@ interface P2PChatPanelProps {
  * Shows list of conversations and allows direct messaging.
  */
 export function P2PChatPanel({ isOpen, onClose }: P2PChatPanelProps) {
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const dispatch = useAppDispatch();
   const threads = useAppSelector(selectAllThreads);
-  const selectedThread = useAppSelector(state => selectThreadByHostId(state, selectedConversationId));
+  const selectedThread = threads.find(t => t.bookingId === selectedBookingId);
   const contactHostId = useAppSelector(state => state.ui.contactHostId);
   const allHosts = useAppSelector(selectAllHosts);
 
   // Sync with global "Contact Host" action
   useEffect(() => {
     if (contactHostId) {
-      // Find host details
-      const host = allHosts.find(h => h.id === contactHostId);
-      if (host) {
-        // Init thread if doesn't exist
-        dispatch(initThread({
-            hostId: host.id,
-            hostName: host.name,
-            hostPhoto: host.photo
-        }));
-        setSelectedConversationId(host.id);
+      // Find existing thread for this host
+      const existingThread = threads.find(t => t.hostId === contactHostId);
+      if (existingThread) {
+          setSelectedBookingId(existingThread.bookingId);
+      } else {
+          // If no thread exists, we can't really start one without a booking in this new model.
+          // For now, let's just log or maybe show an empty state.
+          console.warn('No active booking/thread found for host:', contactHostId);
+          // Optional: We could trigger a "Draft Booking" creation here if we wanted "Inquiry" mode.
       }
-      // Reset the trigger so we don't re-open constantly if we navigate away and back
-      // Actually keeping it might be fine, but let's clear it if we close the panel
     }
-  }, [contactHostId, allHosts, dispatch]);
+  }, [contactHostId, threads]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -59,27 +56,19 @@ export function P2PChatPanel({ isOpen, onClose }: P2PChatPanelProps) {
 
   // Mark as read when viewing
   useEffect(() => {
-    if (selectedConversationId && isOpen) {
-        dispatch(markThreadAsRead({ hostId: selectedConversationId }));
+    if (selectedBookingId && isOpen) {
+        dispatch(markThreadAsRead({ bookingId: selectedBookingId }));
     }
-  }, [selectedConversationId, dispatch, isOpen, selectedThread?.messages.length]);
+  }, [selectedBookingId, dispatch, isOpen, selectedThread?.messages.length]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageInput.trim() || !selectedConversationId) return;
+    if (!messageInput.trim() || !selectedBookingId) return;
     
     const content = messageInput.trim();
-    // 1. Send user message
-    dispatch(sendMessage({ hostId: selectedConversationId, content }));
+    // 1. Send user message via API
+    dispatch(sendChatMessage({ bookingId: selectedBookingId, content }));
     setMessageInput('');
-    
-    // 2. Mock Reply after 1-3 seconds
-    setTimeout(() => {
-        dispatch(receiveMessage({ 
-            hostId: selectedConversationId, 
-            content: "Thanks for reaching out! I'd love to show you around. Let me know what dates work for you." 
-        }));
-    }, 1500);
   };
 
   if (!isOpen) return null;
@@ -108,13 +97,13 @@ export function P2PChatPanel({ isOpen, onClose }: P2PChatPanelProps) {
           </button>
         </div>
 
-        {selectedConversationId && selectedThread ? (
+        {selectedBookingId && selectedThread ? (
           // Chat View
           <>
             {/* Chat Header */}
             <div className="p-3 border-b border-[var(--border)] flex items-center gap-3">
               <button
-                onClick={() => setSelectedConversationId(null)}
+                onClick={() => setSelectedBookingId(null)}
                 className="p-1.5 hover:bg-[var(--muted)] rounded-lg transition-colors"
                 title="Back to conversations"
               >
@@ -188,7 +177,7 @@ export function P2PChatPanel({ isOpen, onClose }: P2PChatPanelProps) {
                 <p className="text-4xl mb-3">💬</p>
                 <p className="font-medium">No conversations yet</p>
                 <p className="text-sm mt-1">
-                  Message a localhost to start planning your experience!
+                  Add an experience to your itinerary to start chatting with a host!
                 </p>
               </div>
             ) : (
@@ -197,8 +186,8 @@ export function P2PChatPanel({ isOpen, onClose }: P2PChatPanelProps) {
                    const lastMsg = thread.messages[thread.messages.length - 1];
                    return (
                   <button
-                    key={thread.hostId}
-                    onClick={() => setSelectedConversationId(thread.hostId)}
+                    key={thread.bookingId}
+                    onClick={() => setSelectedBookingId(thread.bookingId)}
                     className="w-full p-4 flex items-center gap-3 hover:bg-[var(--muted)]/50 transition-colors text-left"
                   >
                     <div className="relative">

@@ -19,7 +19,7 @@ import { CATEGORY_ICONS, CATEGORY_LABELS, ExperienceCategory } from '@/types';
 import { ExperienceDrawer } from './experience-drawer';
 import { ProposalDialog } from './proposal-dialog';
 
-import { sendMessage, initThread } from '@/store/p2p-chat-slice';
+import { initThread, sendChatMessage } from '@/store/p2p-chat-slice';
 import { BookingDialog } from './booking-dialog';
 import { ItineraryDayColumn } from './itinerary-day';
 import { HostPanel } from './host-panel';
@@ -31,6 +31,11 @@ import {
   setItineraryData,
   setSelectedDestination,
 } from '@/store/globe-slice';
+import { 
+  fetchActiveTrip, 
+  addExperienceToTrip, 
+  removeExperienceFromTrip 
+} from '@/store/globe-thunks';
 import { selectAllHosts, filterHostsByProximity, type HostWithLocation } from '@/store/hosts-slice';
 import type { HostMarkerData } from '@/types/globe';
 import { openContactHost } from '@/store/ui-slice';
@@ -94,7 +99,14 @@ export default function GlobeItinerary() {
   const visualTarget = useAppSelector((state) => state.globe.visualTarget);
   const hostMarkers = useAppSelector((state) => state.globe.hostMarkers);
   const placeMarkers = useAppSelector((state) => state.globe.placeMarkers);
+  const tripId = useAppSelector((state) => state.globe.tripId);
   const allHosts = useAppSelector(selectAllHosts);
+
+  /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => {
+    dispatch(fetchActiveTrip());
+  }, [dispatch]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const selectedDestData = useMemo(() => {
     if (!selectedDestination) return null;
@@ -264,44 +276,47 @@ export default function GlobeItinerary() {
   const handleConfirmProposal = (message: string) => {
     if (!pendingProposal) return;
     
-    // 1. Initialize thread & Send Message
-    dispatch(initThread({
-      hostId: pendingProposal.host.id,
-      hostName: pendingProposal.host.name,
-      hostPhoto: pendingProposal.host.photo || '' // Fallback if missing
-    }));
-    
-    dispatch(sendMessage({
-      hostId: pendingProposal.host.id,
-      content: message
-    }));
+    // 1. (Old Chat init removed - moving to post-success)
 
-    // 2. Add to Itinerary (Execute original logic)
+    // 2. Add to Itinerary (Persistent)
     const { host, experience } = pendingProposal;
-    console.log('[GlobeItinerary] handleAddExperience', { host, experience, selectedDestination });
     
-    if (!selectedDestination) {
-      console.warn('[GlobeItinerary] No selected destination!');
-      return;
-    }
+    if (tripId && selectedDestination) {
+       dispatch(addExperienceToTrip({
+         tripId: tripId || null,
+         dayId: selectedDestData?.id, 
+         dayNumber: selectedDestData?.day || 1,
+         experience,
+         host
+       })).unwrap().then((result: any) => {
+           if (result.local) {
+               setPendingProposal(null);
+               return; 
+           }
+           // result should be { item, booking }
+           if (result && result.booking) {
+               console.log("Experience added, starting chat for booking:", result.booking.id);
+               
+               // Initialize thread with bookingId
+               dispatch(initThread({
+                   bookingId: result.booking.id,
+                   hostId: host.id,
+                   hostName: host.name,
+                   hostPhoto: host.photo || ''
+               }));
 
-    const nextDestinations = destinations.map(dest => {
-      if (dest.id === selectedDestination) {
-        const newItem = createItem('localhost', experience.title, dest.activities.length, {
-          location: `${host.name}'s Place`,
-          hostId: host.id,
-          experienceId: experience.id,
-          description: `${experience.category} • ${experience.price / 100}$`,
-        });
-        console.log('[GlobeItinerary] Creating new item:', newItem);
-        return {
-          ...dest,
-          activities: [...dest.activities, newItem]
-        };
-      }
-      return dest;
-    });
-    dispatch(setDestinations(nextDestinations));
+               // Send the message
+               dispatch(sendChatMessage({
+                   bookingId: result.booking.id,
+                   content: message
+               }));
+           }
+       }).catch(err => {
+           console.error("Failed to add experience and start chat:", err);
+       });
+    } else {
+       console.warn('[GlobeItinerary] Cannot add experience: Missing tripId or selectedDestination');
+    }
     
     // 3. Cleanup
     setPendingProposal(null);
@@ -313,30 +328,51 @@ export default function GlobeItinerary() {
     // Check if already added (Toggle Remove)
     if (addedExperienceIds.has(experience.id)) {
       if (!selectedDestination) return;
-
-      const nextDestinations = destinations.map(dest => {
-        if (dest.id === selectedDestination) {
-          return {
-            ...dest,
-            activities: dest.activities.filter(a => a.experienceId !== experience.id)
-          };
-        }
-        return dest;
-      });
-      dispatch(setDestinations(nextDestinations));
-      return;
+      
+      const itemToRemove = selectedDestData?.activities.find(item => item.experienceId === experience.id);
+      
+      if (itemToRemove && tripId) {
+          dispatch(removeExperienceFromTrip({ tripId, itemId: itemToRemove.id }));
+      } else {
+          console.warn('Cannot remove: item not found or missing tripId');
+      }
+    } else {
+        // Open proposal dialog
+        setPendingProposal({ host, experience });
     }
-
-    // Intercept: Open Proposal Dialog instead of adding directly
-    setPendingProposal({ host, experience });
   };
 
   // Booking Handler
   const handleBookItem = async (dayId: string, item: ItineraryItem) => {
-    console.log('[GlobeItinerary] handleBookItem called', { dayId, item });
-    if (item.type !== 'localhost' || !item.hostId || !item.experienceId) {
-      console.warn('[GlobeItinerary] Item validation failed', item);
+    console.log('[GlobeItinerary] handleBookItem called', { dayId, item, tripId });
+    
+    // Validate Item Type (Handle both 'localhost' and backend 'EXPERIENCE' types)
+    const isLocalhostType = item.type === 'localhost' || item.type === 'EXPERIENCE';
+    
+    if (!isLocalhostType || !item.hostId || !item.experienceId) {
+      console.warn('[GlobeItinerary] Item validation failed:', { 
+          type: item.type, 
+          hostId: item.hostId, 
+          expId: item.experienceId,
+          isLocalhostType
+      });
+      // Temporary Alert for debugging
+      // alert(`Debug: Validation Failed. Type: ${item.type}`);
       return;
+    }
+
+    // GUEST CHECK: If no tripId, we are in local/guest mode
+    if (!tripId) {
+        const confirmSave = window.confirm("You need to save your itinerary and sign in to book this experience. Would you like to save now?");
+        if (confirmSave) {
+            // Trigger Save Flow (which leads to Login)
+            // For now, we can redirect to login, or simpler: just alert. 
+            // In a real app, we'd dispatch a save action or open a dialog.
+            // Let's redirect to signin with a callback? 
+            // Better: We need a 'saveTrip' function. For now, let's just redirect.
+            window.location.href = '/auth/signin?callbackUrl=/'; // Rudimentary
+        }
+        return;
     }
 
     try {
@@ -690,6 +726,17 @@ export default function GlobeItinerary() {
       {/* Header */}
       {/* Floating Map Controls */}
       <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+           {!tripId && (
+              <button
+                onClick={() => {
+                   const confirmSave = window.confirm("Join Localhost to save your itinerary?");
+                   if (confirmSave) window.location.href = '/auth/signin?callbackUrl=/';
+                }}
+                className="px-3 py-1.5 text-sm rounded-lg bg-[var(--princeton-orange)] text-white font-medium hover:bg-[var(--princeton-dark)] transition-colors shadow-lg animate-pulse"
+              >
+                Save Itinerary
+              </button>
+           )}
            <button
              onClick={loadSampleData}
              className="px-3 py-1.5 text-sm rounded-lg bg-[var(--background)]/80 backdrop-blur-md border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--background)] transition-colors shadow-sm"

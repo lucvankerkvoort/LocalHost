@@ -45,7 +45,7 @@ model User {
   reviewsGiven      Review[]     @relation("ReviewerReviews")
   reviewsReceived   Review[]     @relation("RevieweeReviews")
   messagesSent      Message[]    @relation("SentMessages")
-  experienceCandidates ExperienceCandidate[]
+  trips             Trip[]
   experienceDraft   ExperienceDraft?
   hostExperience    HostExperience?
   
@@ -134,6 +134,7 @@ model Experience {
   bookings    Booking[]
   reviews     Review[]
   availability ExperienceAvailability[]
+  itineraryItems ItineraryItem[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -158,23 +159,142 @@ model ExperienceAvailability {
 }
 
 // ============================================
-// BOOKINGS
+// TRIPS & ITINERARY
+// ============================================
+
+model Trip {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  status      TripStatus @default(DRAFT)
+  preferences Json       @default("{}")
+  startDate   DateTime?
+  endDate     DateTime?
+  
+  stops       TripStop[]
+  bookings    Booking[]
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([userId])
+}
+
+model TripStop {
+  id        String   @id @default(cuid())
+  tripId    String
+  trip      Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  
+  country   String
+  city      String
+  lat       Float
+  lng       Float
+  order     Int
+  
+  days      ItineraryDay[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tripId, order])
+}
+
+model ItineraryDay {
+  id         String   @id @default(cuid())
+  tripStopId String
+  tripStop   TripStop @relation(fields: [tripStopId], references: [id], onDelete: Cascade)
+  
+  dayIndex   Int
+  date       DateTime?
+  title      String?
+  
+  items      ItineraryItem[]
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tripStopId, dayIndex])
+}
+
+model ItineraryItem {
+  id           String            @id @default(cuid())
+  dayId        String
+  day          ItineraryDay      @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  
+  type         ItineraryItemType
+  title        String
+  description  String?
+  startTime    DateTime?
+  endTime      DateTime?
+  locationName String?
+  lat          Float?
+  lng          Float?
+  
+  experienceId String?
+  experience   Experience?       @relation(fields: [experienceId], references: [id])
+  
+  orderIndex   Int
+  createdByAI  Boolean           @default(true)
+  isDeleted    Boolean           @default(false)
+  
+  bookings     Booking[]         @relation("ItemBookings")
+
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([dayId, orderIndex])
+}
+
+enum TripStatus {
+  DRAFT
+  PLANNED
+  PARTIALLY_BOOKED
+  BOOKED
+  COMPLETED
+}
+
+enum ItineraryItemType {
+  SIGHT
+  EXPERIENCE
+  MEAL
+  FREE_TIME
+  TRANSPORT
+  NOTE
+  LODGING
+}
+
+// ============================================
+// BOOKINGS (Updated)
 // ============================================
 
 model Booking {
   id            String   @id @default(cuid())
+  
+  // Relations
+  tripId        String?
+  trip          Trip?    @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  
   experienceId  String
   experience    Experience @relation(fields: [experienceId], references: [id])
+  
   guestId       String
   guest         User     @relation("GuestBookings", fields: [guestId], references: [id])
   
+  itemId        String?
+  itineraryItem ItineraryItem? @relation("ItemBookings", fields: [itemId], references: [id])
+  
+  // Details
   date          DateTime
-  guestCount    Int
+  guests        Int
   totalPrice    Int      // in cents
   currency      String   @default("USD")
   
-  status        BookingStatus   @default(PENDING)
+  status        BookingStatus   @default(TENTATIVE) // Changed default to match new flow
   paymentStatus PaymentStatus   @default(PENDING)
+  
+  // Features
+  chatUnlocked  Boolean       @default(false)
   
   // Payment details
   stripePaymentId String?
@@ -190,7 +310,29 @@ model Booking {
   
   @@index([experienceId])
   @@index([guestId])
+  @@index([tripId])
   @@index([status])
+}
+
+// ============================================
+// CHAT (Updated for Booking-centric flow)
+// ============================================
+
+model ChatThread {
+  id            String   @id @default(cuid())
+  
+  // Linked to Booking (Tentative or Confirmed)
+  bookingId     String   @unique
+  // We can't link to Booking here directly *if* Booking already has `messages`. 
+  // But the new design suggests ChatThread might be better than loose Messages.
+  // For now, let's keep it simple: Messages can belong to Booking directly (as they did).
+  // But if we want Thread metadata...
+  
+  // Wait, existing schema had Message linked to Booking.
+  // The User's spec didn't mention ChatThread model, but I promised to persist Chat.
+  // I will link ChatThread to Booking for now to enable the P2P features.
+  // Actually, let's just use the Booking's messages relation for now to allow conversation
+  // even if status is TENTATIVE.
 }
 
 // ============================================
@@ -261,10 +403,11 @@ enum ExperienceCategory {
 }
 
 enum BookingStatus {
-  PENDING
+  TENTATIVE
   CONFIRMED
   CANCELLED
   COMPLETED
+  PENDING // Keeping for backward compat if needed, but TENTATIVE is preferred
 }
 
 enum PaymentStatus {
@@ -277,114 +420,6 @@ enum PaymentStatus {
 enum ReviewType {
   GUEST_TO_HOST
   HOST_TO_GUEST
-}
-
-// ============================================
-// ITINERARY-BASED BOOKING & CHAT
-// ============================================
-
-model ExperienceCandidate {
-  id            String   @id @default(cuid())
-  
-  // Reference (static host data for now)
-  hostId        String           // References static Host.id from hosts.ts
-  experienceId  String           // References static HostExperience.id
-  
-  // Itinerary context
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tripId        String?          // Future: link to Trip model
-  dayNumber     Int              // Day within the trip (1, 2, 3...)
-  date          DateTime?        // Actual calendar date if set
-  timeSlot      String?          // "morning", "afternoon", "evening"
-  
-  // Status
-  status        CandidateStatus  @default(INTERESTED)
-  
-  // Relations
-  preliminaryChat PreliminaryChat?
-  chatThread      ChatThread?
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  @@index([userId])
-  @@index([hostId])
-  @@index([status])
-}
-
-enum CandidateStatus {
-  INTERESTED      // Added to day, no message sent
-  AWAITING_REPLY  // Preliminary message sent, waiting for host
-  REPLIED         // Host responded
-  UNRESPONSIVE    // Host didn't reply within 24h
-  BOOKED          // Payment complete
-  CANCELLED       // User removed or cancelled
-}
-
-model PreliminaryChat {
-  id            String   @id @default(cuid())
-  candidateId   String   @unique
-  candidate     ExperienceCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  
-  // Messages
-  userMessage   String?  @db.Text
-  userSentAt    DateTime?
-  hostReply     String?  @db.Text
-  hostRepliedAt DateTime?
-  
-  // Timing
-  expiresAt     DateTime?        // 24h after userSentAt
-  status        PreliminaryChatStatus @default(OPEN)
-  
-  createdAt     DateTime @default(now())
-  
-  @@index([candidateId])
-  @@index([status])
-}
-
-enum PreliminaryChatStatus {
-  OPEN      // Awaiting messages
-  CLOSED    // Host replied, thread complete
-  EXPIRED   // 24h passed without reply
-}
-
-model ChatThread {
-  id            String   @id @default(cuid())
-  candidateId   String   @unique
-  candidate     ExperienceCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  
-  // Participants
-  userId        String
-  hostId        String   // Static host ID
-  
-  messages      ChatMessage[]
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  @@index([userId])
-  @@index([hostId])
-}
-
-model ChatMessage {
-  id          String     @id @default(cuid())
-  threadId    String
-  thread      ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  
-  senderId    String     // Either userId or hostId
-  senderType  SenderType
-  content     String     @db.Text
-  isRead      Boolean    @default(false)
-  
-  createdAt   DateTime   @default(now())
-  
-  @@index([threadId])
-}
-
-enum SenderType {
-  USER
-  HOST
 }
 
 // ============================================

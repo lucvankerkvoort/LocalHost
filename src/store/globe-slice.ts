@@ -8,6 +8,7 @@ import { toolCallReceived, type ToolCallEvent } from './tool-calls-slice';
 const MAX_PLACE_DISTANCE_METERS = 300000;
 
 interface GlobeState {
+  tripId: string | null;
   visualTarget: { lat: number; lng: number; height?: number } | null;
   destinations: GlobeDestination[];
   routes: TravelRoute[];
@@ -18,6 +19,7 @@ interface GlobeState {
 }
 
 const initialState: GlobeState = {
+  tripId: null,
   visualTarget: null,
   destinations: [],
   routes: [],
@@ -35,12 +37,16 @@ function applyPlan(state: GlobeState, plan: ItineraryPlan) {
   state.selectedDestination = destinations[0]?.id ?? null;
   state.visualTarget = null;
   state.placeMarkers = [];
+  // Note: Localhost AI generated plans don't strictly have a DB TripID yet unless saved.
 }
 
 const globeSlice = createSlice({
   name: 'globe',
   initialState,
   reducers: {
+    setTripId(state, action: PayloadAction<string>) {
+      state.tripId = action.payload;
+    },
     setVisualTarget(state, action: PayloadAction<GlobeState['visualTarget']>) {
       state.visualTarget = action.payload;
     },
@@ -150,6 +156,28 @@ const globeSlice = createSlice({
         state.placeMarkers = action.payload.placeMarkers;
       }
     },
+    addLocalExperience(
+      state,
+      action: PayloadAction<{ dayNumber: number; item: any }>
+    ) {
+      const { dayNumber, item } = action.payload;
+      const destination = state.destinations.find((d) => d.day === dayNumber);
+      if (destination) {
+        // Ensure activities array exists
+        if (!destination.activities) destination.activities = [];
+        
+        // Add item with temporary ID if needed
+        const newItem = {
+          ...item,
+          id: item.id || `local-${Date.now()}-${Math.random()}`,
+          isLocal: true, // Flag for UI
+        };
+        
+        destination.activities.push(newItem);
+        
+        // Force update reference to trigger re-renders if needed (Immer handles this usually)
+      }
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(toolCallReceived, (state, action: PayloadAction<ToolCallEvent>) => {
@@ -232,6 +260,7 @@ const globeSlice = createSlice({
 });
 
 export const {
+  setTripId,
   setVisualTarget,
   clearVisualTarget,
   setDestinations,
@@ -247,6 +276,7 @@ export const {
   setItineraryFromPlan,
   setItineraryData,
   hydrateGlobeState,
+  addLocalExperience,
 } = globeSlice.actions;
 
 export default globeSlice.reducer;
