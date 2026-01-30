@@ -7,11 +7,16 @@ import { prisma } from '@/lib/prisma';
  * POST /api/host/publish
  * Publish the draft as a live experience
  */
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { draftId } = await request.json();
+    if (!draftId) {
+      return NextResponse.json({ error: 'Draft ID required' }, { status: 400 });
     }
 
     // Check if user already has a published experience
@@ -28,7 +33,7 @@ export async function POST() {
 
     // Get the draft
     const draft = await prisma.experienceDraft.findUnique({
-      where: { userId: session.user.id },
+      where: { id: draftId },
       include: {
         stops: {
           orderBy: { order: 'asc' },
@@ -36,17 +41,24 @@ export async function POST() {
       },
     });
 
-    if (!draft) {
+    if (!draft || draft.userId !== session.user.id) {
       return NextResponse.json(
-        { error: 'No draft found to publish' },
+        { error: 'Draft not found or unauthorized' },
         { status: 404 }
       );
     }
 
     // Validate draft is complete
-    if (!draft.city || !draft.title || !draft.shortDesc || !draft.longDesc || !draft.duration) {
+    const missingFields = [];
+    if (!draft.city) missingFields.push('City');
+    if (!draft.title) missingFields.push('Title');
+    if (!draft.shortDesc) missingFields.push('Short Description');
+    if (!draft.longDesc) missingFields.push('Full Description');
+    if (!draft.duration) missingFields.push('Duration');
+
+    if (missingFields.length > 0) {
       return NextResponse.json(
-        { error: 'Draft is incomplete. Please fill in all required fields.' },
+        { error: `Draft is incomplete. Missing: ${missingFields.join(', ')}` },
         { status: 400 }
       );
     }
@@ -62,12 +74,12 @@ export async function POST() {
     const experience = await prisma.hostExperience.create({
       data: {
         hostId: session.user.id,
-        city: draft.city,
+        city: draft.city!,
         country: draft.country || '',
-        title: draft.title,
-        shortDesc: draft.shortDesc,
-        longDesc: draft.longDesc,
-        duration: draft.duration,
+        title: draft.title!,
+        shortDesc: draft.shortDesc!,
+        longDesc: draft.longDesc!,
+        duration: draft.duration!,
         status: 'PUBLISHED',
       },
     });

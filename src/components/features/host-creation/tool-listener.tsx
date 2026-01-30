@@ -4,11 +4,11 @@ import { useEffect, useRef } from 'react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { setCity, addStop, updateDraft } from '@/store/host-creation-slice';
 
-import { useRouter } from 'next/navigation';
+
 
 export function HostCreationToolListener() {
   const dispatch = useAppDispatch();
-  const router = useRouter();
+
   const latestEvents = useAppSelector((state) => state.toolCalls.latestByTool);
   
   // Track processed IDs to avoid loops/duplicates
@@ -85,11 +85,8 @@ export function HostCreationToolListener() {
           break;
 
         case 'completeProfile':
-          console.log('[HostCreationToolListener] Profile complete! Navigating to profile...');
+          console.log('[HostCreationToolListener] Profile complete! Ready for review.');
           dispatch(updateDraft({ status: 'review' }));
-          setTimeout(() => {
-            router.push('/profile');
-          }, 500);
           break;
       }
       

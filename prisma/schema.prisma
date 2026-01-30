@@ -50,7 +50,7 @@ model User {
   reviewsReceived   Review[]     @relation("RevieweeReviews")
   messagesSent      Message[]    @relation("SentMessages")
   trips             Trip[]
-  experienceDraft   ExperienceDraft?
+  experienceDrafts  ExperienceDraft[]
   hostExperience    HostExperience?
   
   createdAt DateTime @default(now())
@@ -433,7 +433,7 @@ enum ReviewType {
 
 model ExperienceDraft {
   id          String   @id @default(cuid())
-  userId      String   @unique  // Only one draft per user (MVP)
+  userId      String   // Removed @unique to allow multiple drafts
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   // Location
@@ -445,11 +445,16 @@ model ExperienceDraft {
   shortDesc   String?  @db.Text  // Marketing-facing
   longDesc    String?  @db.Text  // Narrative description
   
+  // Flexible sections for AI generation (e.g. house rules, amenities)
+  sections    Json?    @default("{}")
+
   // Stops
   stops       ExperienceStop[] @relation("DraftStops")
   
   // Metadata
   duration    Int?     // Estimated minutes
+  price       Int?     // Cents
+  currency    String?  @default("USD")
   status      DraftStatus @default(IN_PROGRESS)
   
   createdAt   DateTime @default(now())

@@ -53,13 +53,16 @@ export const hostCreationSlice = createSlice({
       // Logic would be here
     },
     updateDraft: (state, action: PayloadAction<Partial<HostCreationState>>) => {
-      return { ...state, ...action.payload };
+      Object.assign(state, action.payload);
+    },
+    setDraft: (state, action: PayloadAction<Partial<HostCreationState>>) => {
+      return { ...initialState, ...action.payload };
     },
     resetDraft: () => initialState,
   },
 });
 
-export const { setCity, addStop, removeStop, updateDraft, resetDraft } = hostCreationSlice.actions;
+export const { setCity, addStop, removeStop, updateDraft, setDraft, resetDraft } = hostCreationSlice.actions;
 
 export const selectHostCreation = (state: RootState) => state.hostCreation;
 

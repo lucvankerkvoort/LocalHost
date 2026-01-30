@@ -14,16 +14,17 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const draft = await prisma.experienceDraft.findUnique({
+    const drafts = await prisma.experienceDraft.findMany({
       where: { userId: session.user.id },
       include: {
         stops: {
           orderBy: { order: 'asc' },
         },
       },
+      orderBy: { updatedAt: 'desc' },
     });
 
-    return NextResponse.json({ draft });
+    return NextResponse.json({ drafts });
   } catch (error) {
     console.error('[host/draft] GET error:', error);
     return NextResponse.json(
@@ -57,36 +58,33 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { city, country, title, shortDesc, longDesc, duration, stops, status } = body;
+    const { id, city, country, title, shortDesc, longDesc, duration, stops, status } = body;
 
-    // Upsert the draft
-    const draft = await prisma.experienceDraft.upsert({
-      where: { userId: session.user.id },
-      create: {
-        userId: session.user.id,
-        city,
-        country,
-        title,
-        shortDesc,
-        longDesc,
-        duration,
-        status: status || 'IN_PROGRESS',
-      },
-      update: {
-        ...(city !== undefined && { city }),
-        ...(country !== undefined && { country }),
-        ...(title !== undefined && { title }),
-        ...(shortDesc !== undefined && { shortDesc }),
-        ...(longDesc !== undefined && { longDesc }),
-        ...(duration !== undefined && { duration }),
-        ...(status !== undefined && { status }),
-      },
-      include: {
-        stops: {
-          orderBy: { order: 'asc' },
-        },
-      },
-    });
+    let draft;
+
+    if (id) {
+       // Update existing
+       const existing = await prisma.experienceDraft.findUnique({ where: { id }});
+       if (!existing || existing.userId !== session.user.id) {
+         return NextResponse.json({ error: 'Draft not found' }, { status: 404 });
+       }
+       draft = await prisma.experienceDraft.update({
+         where: { id },
+         data: {
+           city, country, title, shortDesc, longDesc, duration, status
+         },
+         include: { stops: { orderBy: { order: 'asc' } } }
+       });
+    } else {
+       // Create new
+       draft = await prisma.experienceDraft.create({
+         data: {
+           userId: session.user.id,
+           city, country, title, shortDesc, longDesc, duration, status: status || 'IN_PROGRESS'
+         },
+         include: { stops: true }
+       });
+    }
 
     // Handle stops if provided
     if (stops && Array.isArray(stops)) {
@@ -137,17 +135,27 @@ export async function POST(request: NextRequest) {
  * DELETE /api/host/draft
  * Delete the current draft
  */
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Draft ID required' }, { status: 400 });
+    }
+
+    const draft = await prisma.experienceDraft.findUnique({ where: { id }});
+    if (!draft || draft.userId !== session.user.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     await prisma.experienceDraft.delete({
-      where: { userId: session.user.id },
-    }).catch(() => {
-      // Ignore if draft doesn't exist
+      where: { id },
     });
 
     return NextResponse.json({ success: true });
