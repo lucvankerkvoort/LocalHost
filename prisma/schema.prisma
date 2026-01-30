@@ -212,6 +212,7 @@ model ItineraryDay {
   dayIndex   Int
   date       DateTime?
   title      String?
+  suggestedHosts Json?     @default("[]") // Store array of suggested hosts/experiences
   
   items      ItineraryItem[]
   

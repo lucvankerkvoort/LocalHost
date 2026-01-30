@@ -67,6 +67,9 @@ const globeSlice = createSlice({
     setRoutes(state, action: PayloadAction<TravelRoute[]>) {
       state.routes = action.payload;
     },
+    setRouteMarkers(state, action: PayloadAction<RouteMarkerData[]>) {
+      state.routeMarkers = action.payload;
+    },
     setSelectedDestination(state, action: PayloadAction<string | null>) {
       state.selectedDestination = action.payload;
     },
@@ -276,6 +279,7 @@ export const {
   clearVisualTarget,
   setDestinations,
   setRoutes,
+  setRouteMarkers,
   setSelectedDestination,
   setHostMarkers,
   addHostMarkers,

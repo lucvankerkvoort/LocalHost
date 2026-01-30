@@ -22,6 +22,7 @@ interface ApiItineraryDay {
   dayIndex: number; 
   title: string | null;
   items: ApiItineraryItem[]; // Update reference
+  suggestedHosts?: any[];
 }
 
 export interface ApiTripStop {
@@ -75,7 +76,8 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
             day: day.dayIndex, 
             activities,
             color: getColorForDay(day.dayIndex),
-            city: stop.city
+            city: stop.city,
+            suggestedHosts: day.suggestedHosts || [],
         });
     }
   }
@@ -118,6 +120,7 @@ export function convertGlobeDestinationsToApiPayload(destinations: GlobeDestinat
     currentStop.days.push({
       dayIndex: dest.day,
       title: dest.name,
+      suggestedHosts: dest.suggestedHosts || [],
       // date: computed? we don't track absolute dates in GlobeDestination yet, usually relative
       items: dest.activities.map((item, idx) => ({
         type: mapItemType(item.type),

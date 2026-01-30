@@ -80,6 +80,7 @@ export async function POST(
                             dayIndex: day.dayIndex,
                             date: day.date ? new Date(day.date) : null,
                             title: day.title,
+                            suggestedHosts: day.suggestedHosts ?? [],
                         }
                     });
 

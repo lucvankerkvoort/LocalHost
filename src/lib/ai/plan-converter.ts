@@ -90,6 +90,11 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
         createItem('SIGHT', act.place.name, idx, {
           description: act.notes,
           location: act.place.description || act.place.address || `${act.timeSlot}`,
+          place: {
+            id: act.place.id || `place-${idx}`,
+            name: act.place.name,
+            location: act.place.location
+          }
         })
       ),
       color: getColorForDay(day.dayNumber),
@@ -187,6 +192,60 @@ export function mapTransportMode(mode: 'walk' | 'transit' | 'drive'): TravelRout
 }
 
 /**
+ * Regenerate markers and simple routes from restored GlobeDestinations
+ * (Used when loading from DB where detailed navigation events might be simplified)
+ */
+export function generateMarkersFromDestinations(destinations: GlobeDestination[]): {
+  routeMarkers: RouteMarkerData[];
+  hostMarkers: any[]; // Type as any or HostMarkerData
+} {
+  const routeMarkers: RouteMarkerData[] = [];
+  const hostMarkers: any[] = [];
+  const seenHostIds = new Set<string>();
+
+  const isValidCoordinate = (lat: number, lng: number) =>
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180 &&
+    !(lat === 0 && lng === 0);
+
+  destinations.forEach(dest => {
+    // 1. Collect Suggested Hosts
+    if (dest.suggestedHosts && Array.isArray(dest.suggestedHosts)) {
+      dest.suggestedHosts.forEach((host: any) => {
+        if (!seenHostIds.has(host.id)) {
+          seenHostIds.add(host.id);
+          hostMarkers.push(host);
+        }
+      });
+    }
+
+    // 2. Generate Route Markers for Activities
+    dest.activities.forEach(act => {
+      if (act.place && act.place.location) {
+        const { lat, lng } = act.place.location;
+        if (isValidCoordinate(lat, lng)) {
+          routeMarkers.push({
+            id: `marker-${act.id}`,
+            routeId: `route-${dest.id}`, // grouping by day/destination
+            kind: 'end',
+            lat,
+            lng,
+            name: act.place.name,
+            dayNumber: dest.day
+          });
+        }
+      }
+    });
+  });
+
+  return { routeMarkers, hostMarkers };
+}
+
+/**
  * Calculate center point from multiple coordinates (for camera positioning)
  */
 export function getCenterPoint(destinations: GlobeDestination[]): { lat: number; lng: number } | null {
@@ -200,3 +259,4 @@ export function getCenterPoint(destinations: GlobeDestination[]): { lat: number;
     lng: sumLng / destinations.length,
   };
 }
+
