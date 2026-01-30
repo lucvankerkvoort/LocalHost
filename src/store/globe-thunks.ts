@@ -187,3 +187,36 @@ export const removeExperienceFromTrip = createAsyncThunk(
         }
     }
 );
+
+import { convertGlobeDestinationsToApiPayload } from '@/lib/api/trip-converter';
+
+export const saveTripPlan = createAsyncThunk(
+    'globe/saveTripPlan',
+    async (_, { getState }) => {
+        const state = getState() as any; // Cast to access root state
+        const tripId = state.globe.tripId;
+        const destinations = state.globe.destinations;
+
+        if (!tripId) return; 
+
+        try {
+            const payload = convertGlobeDestinationsToApiPayload(destinations);
+            
+            const res = await fetch(`/api/trips/${tripId}/plan`, {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                console.error('Failed to auto-save trip plan');
+                throw new Error('Failed to save trip');
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('Error saving trip plan:', error);
+            throw error;
+        }
+    }
+);

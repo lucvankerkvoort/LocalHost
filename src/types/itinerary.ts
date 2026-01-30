@@ -32,6 +32,15 @@ export interface ItineraryItem {
   status?: 'DRAFT' | 'PENDING' | 'BOOKED' | 'FAILED';
   candidateId?: string; // Link to ExperienceCandidate for booking
   position: number;
+  place?: {
+    id: string;
+    name: string;
+    location: {
+      lat: number;
+      lng: number;
+    };
+    category?: string;
+  };
 }
 
 export interface ItineraryDay {

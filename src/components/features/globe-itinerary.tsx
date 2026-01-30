@@ -34,7 +34,8 @@ import {
 import { 
   fetchActiveTrip, 
   addExperienceToTrip, 
-  removeExperienceFromTrip 
+  removeExperienceFromTrip,
+  saveTripPlan 
 } from '@/store/globe-thunks';
 import { selectAllHosts, filterHostsByProximity, type HostWithLocation } from '@/store/hosts-slice';
 import type { HostMarkerData } from '@/types/globe';
