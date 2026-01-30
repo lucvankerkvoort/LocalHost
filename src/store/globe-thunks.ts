@@ -7,48 +7,67 @@ import { RootState } from './store'; // Need to be careful with circular imports
 // Fetch the user's active trip (or create one)
 export const fetchActiveTrip = createAsyncThunk(
   'globe/fetchActiveTrip',
-  async (_, { dispatch }) => {
+  async (tripId: string | undefined | null, { dispatch }) => {
     try {
-      // 1. Get trips
-      const res = await fetch('/api/trips');
-      
-      // Handle Guest / Unauthorized gracefully
-      if (res.status === 401 || res.status === 403) {
-          console.log('[fetchActiveTrip] Guest user detected, starting in local mode');
-          return null; // No trip, but no error. UI remains in "Local Mode"
-      }
+      let activeTrip: ApiTrip | null = null;
 
-      if (!res.ok) throw new Error('Failed to fetch trips');
-      const data = await res.json();
-      
-      let activeTrip: ApiTrip;
-
-      if (data.trips && data.trips.length > 0) {
-        activeTrip = data.trips[0];
-        const detailRes = await fetch(`/api/trips/${activeTrip.id}`);
+      // 1. If tripId provided, fetch that specific trip
+      if (tripId) {
+        const detailRes = await fetch(`/api/trips/${tripId}`);
+        if (detailRes.status === 401 || detailRes.status === 403) {
+            console.log('[fetchActiveTrip] Unauthorized/Guest accessing trip');
+            return null; 
+        }
         if (detailRes.ok) {
             activeTrip = await detailRes.json();
-        } 
+        } else {
+             console.error('[fetchActiveTrip] Failed to fetch specific trip:', tripId);
+             // Fallback? Or just fail? Fail for now.
+             return null;
+        }
       } else {
-        // Create a default trip
-        const createRes = await fetch('/api/trips', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                title: 'My First Trip', 
-                startDate: new Date().toISOString(),
-                endDate: new Date(Date.now() + 7 * 86400000).toISOString()
-            })
-        });
-        if (!createRes.ok) throw new Error('Failed to create trip');
-        activeTrip = await createRes.json();
+        // 2. Default behavior: Get first trip or create default
+        const res = await fetch('/api/trips');
+        
+        // Handle Guest / Unauthorized gracefully
+        if (res.status === 401 || res.status === 403) {
+            console.log('[fetchActiveTrip] Guest user detected, starting in local mode');
+            return null; // No trip, but no error. UI remains in "Local Mode"
+        }
+
+        if (!res.ok) throw new Error('Failed to fetch trips');
+        const data = await res.json();
+        
+        if (data.trips && data.trips.length > 0) {
+            // Fetch detail for the first one
+            const firstTrip = data.trips[0];
+            const detailRes = await fetch(`/api/trips/${firstTrip.id}`);
+            if (detailRes.ok) {
+                activeTrip = await detailRes.json();
+            } 
+        } else {
+            // Create a default trip
+            const createRes = await fetch('/api/trips', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    title: 'My First Trip', 
+                    startDate: new Date().toISOString(),
+                    endDate: new Date(Date.now() + 7 * 86400000).toISOString()
+                })
+            });
+            if (!createRes.ok) throw new Error('Failed to create trip');
+            activeTrip = await createRes.json();
+        }
       }
 
       // Convert and update store
-      if (activeTrip && activeTrip.stops) {
+      if (activeTrip && activeTrip.id) {
           dispatch(setTripId(activeTrip.id));
-          const globeDestinations = convertTripToGlobeDestinations(activeTrip);
-          dispatch(setDestinations(globeDestinations));
+          if (activeTrip.stops) {
+              const globeDestinations = convertTripToGlobeDestinations(activeTrip);
+              dispatch(setDestinations(globeDestinations));
+          }
           return activeTrip;
       }
       return null;

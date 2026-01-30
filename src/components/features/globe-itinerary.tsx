@@ -90,7 +90,11 @@ type GlobeItinerarySnapshot = {
   selectedCategory: ExperienceCategory | 'all';
 };
 
-export default function GlobeItinerary() {
+type GlobeItineraryProps = {
+  tripId?: string;
+};
+
+export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryProps) {
   const dispatch = useAppDispatch();
   const destinations = useAppSelector((state) => state.globe.destinations);
   const routes = useAppSelector((state) => state.globe.routes);
@@ -99,14 +103,22 @@ export default function GlobeItinerary() {
   const visualTarget = useAppSelector((state) => state.globe.visualTarget);
   const hostMarkers = useAppSelector((state) => state.globe.hostMarkers);
   const placeMarkers = useAppSelector((state) => state.globe.placeMarkers);
-  const tripId = useAppSelector((state) => state.globe.tripId);
+  const tripIdState = useAppSelector((state) => state.globe.tripId);
   const allHosts = useAppSelector(selectAllHosts);
 
+  // Use prop ID if available (priority), otherwise state ID (if already set?), but typically fetchActiveTrip sets state.
+  // Actually, we should just pass propTripId to fetchActiveTrip.
+  
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
-    dispatch(fetchActiveTrip());
-  }, [dispatch]);
+    dispatch(fetchActiveTrip(propTripId));
+  }, [dispatch, propTripId]);
   /* eslint-enable react-hooks/exhaustive-deps */
+  
+  const tripId = propTripId || tripIdState; // Prefer prop if we force it? Or state once loaded?
+  // tripIdState is what the store says. fetchActiveTrip updates it.
+  // The rest of the component uses 'tripId' variable mainly for "is guest" check.
+  // Let's rely on state.globe.tripId (tripIdState) since fetchActiveTrip updates it.
 
   const selectedDestData = useMemo(() => {
     if (!selectedDestination) return null;
