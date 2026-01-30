@@ -34,19 +34,6 @@ export function Navbar() {
               <span className="font-bold text-xl text-[var(--foreground)]">Localhost</span>
             </Link>
 
-            {/* Desktop Navigation Links */}
-            <div className="hidden md:flex items-center gap-8">
-              <Link href="/explore" className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors">
-                Explore
-              </Link>
-              <Link href="/trips" className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors">
-                My Trips
-              </Link>
-              <Link href={ctaLink.href} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors">
-                {ctaLink.label}
-              </Link>
-            </div>
-
             {/* Right Side Actions */}
             <div className="flex items-center gap-3">
               {/* P2P Chat Button */}
@@ -88,10 +75,10 @@ export function Navbar() {
                 </>
               )}
 
-              {/* Mobile Menu Button */}
+              {/* Menu Button (Visible on all screens) */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-2 rounded-lg hover:bg-[var(--muted)] transition-colors"
+                className="p-2 rounded-lg hover:bg-[var(--muted)] transition-colors"
                 aria-label="Toggle menu"
               >
                 <svg
@@ -111,17 +98,10 @@ export function Navbar() {
           </div>
         </div>
 
-        {/* Mobile Menu Overlay */}
+        {/* Menu Overlay (Visible on all screens when open) */}
         {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-[var(--border)] bg-[var(--background)] px-4 py-4 shadow-lg animate-in slide-in-from-top-2 duration-200">
+          <div className="border-t border-[var(--border)] bg-[var(--background)] px-4 py-4 shadow-lg animate-in slide-in-from-top-2 duration-200">
             <div className="flex flex-col space-y-4">
-              <Link 
-                href="/explore" 
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="text-lg font-medium text-[var(--foreground)] hover:text-[var(--princeton-orange)] transition-colors"
-              >
-                Explore
-              </Link>
               <Link 
                 href="/trips" 
                 onClick={() => setIsMobileMenuOpen(false)}
