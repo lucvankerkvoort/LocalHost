@@ -1,7 +1,14 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { clearHostMarkers, clearItinerary, setDestinations, setTripId } from './globe-slice';
+import { 
+  setRouteMarkers, 
+  setHostMarkers, 
+  clearHostMarkers, 
+  clearItinerary, 
+  setDestinations, 
+  setTripId 
+} from './globe-slice';
 import { convertTripToGlobeDestinations, ApiTrip } from '@/lib/api/trip-converter';
-import { convertPlanToGlobeData } from '@/lib/ai/plan-converter';
+import { convertPlanToGlobeData, generateMarkersFromDestinations } from '@/lib/ai/plan-converter';
 import type { ItineraryPlan } from '@/lib/ai/types';
 import { RootState } from './store'; // Need to be careful with circular imports if store imports this. 
 // Ideally slice doesn't import thunks, components import thunks.
@@ -75,6 +82,13 @@ export const fetchActiveTrip = createAsyncThunk(
           if (activeTrip.stops && activeTrip.stops.length > 0) {
               const globeDestinations = convertTripToGlobeDestinations(activeTrip);
               dispatch(setDestinations(globeDestinations));
+              
+              // Regenerate markers from the loaded content
+              const { routeMarkers, hostMarkers } = generateMarkersFromDestinations(globeDestinations);
+              dispatch(setRouteMarkers(routeMarkers));
+              if (hostMarkers.length > 0) {
+                  dispatch(setHostMarkers(hostMarkers));
+              }
           } else {
               dispatch(clearItinerary());
           }
