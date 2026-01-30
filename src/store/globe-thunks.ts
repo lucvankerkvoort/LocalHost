@@ -8,6 +8,11 @@ import { RootState } from './store'; // Need to be careful with circular imports
 export const fetchActiveTrip = createAsyncThunk(
   'globe/fetchActiveTrip',
   async (tripId: string | undefined | null, { dispatch }) => {
+    // Clear previous state immediately to prevent stale data
+    // dispatch(clearItinerary()); // This might cause flashing. Let component handle unmount clearing.
+    // Actually, if we switch trips directly (no unmount), we need to clear.
+    // But usually we navigate via router, which unmounts.
+    
     try {
       let activeTrip: ApiTrip | null = null;
 

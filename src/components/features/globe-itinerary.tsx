@@ -30,6 +30,7 @@ import {
   setHostMarkers,
   setItineraryData,
   setSelectedDestination,
+  clearItinerary,
 } from '@/store/globe-slice';
 import { 
   fetchActiveTrip, 
@@ -112,7 +113,15 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
+    // If we have a new tripId, we should clear the previous state to avoid flashing old data
+    // However, if we preserve state for smooth transitions, we might trigger a loading state instead.
+    // For now, let's clear on mount if tripId changes/is set.
+    
     dispatch(fetchActiveTrip(propTripId));
+
+    return () => {
+        dispatch(clearItinerary());
+    };
   }, [dispatch, propTripId]);
   /* eslint-enable react-hooks/exhaustive-deps */
   
