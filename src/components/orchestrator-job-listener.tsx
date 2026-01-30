@@ -5,6 +5,8 @@ import { useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { jobStarted, jobProgress, jobCompleted, jobFailed } from '@/store/orchestrator-slice';
 import { recordToolResult } from '@/lib/ai/tool-events';
+import { saveTripPlanForTrip } from '@/store/globe-thunks';
+import type { ItineraryPlan } from '@/lib/ai/types';
 
 const POLL_INTERVAL_MS = 1500;
 
@@ -13,11 +15,13 @@ export function OrchestratorJobListener() {
   const latestGenerate = useAppSelector(
     (state) => state.toolCalls.lastResultsByTool.generateItinerary
   );
+  const activeTripId = useAppSelector((state) => state.globe.tripId);
   const pollRef = useRef<{ jobId?: string; timer?: number; inFlight?: boolean }>({});
 
   useEffect(() => {
-    const result = latestGenerate?.result as { jobId?: string; message?: string } | undefined;
+    const result = latestGenerate?.result as { jobId?: string; message?: string; tripId?: string } | undefined;
     const jobId = result?.jobId;
+    const jobTripId = result?.tripId ?? activeTripId ?? undefined;
     if (!jobId || pollRef.current.jobId === jobId) return;
 
     pollRef.current.jobId = jobId;
@@ -53,9 +57,17 @@ export function OrchestratorJobListener() {
           dispatch(jobCompleted({ id: jobId }));
           recordToolResult(dispatch, {
             toolName: 'generateItinerary',
-            result: { success: true, plan: job.plan, hostMarkers: job.hostMarkers ?? [] },
+            result: {
+              success: true,
+              plan: job.plan,
+              hostMarkers: job.hostMarkers ?? [],
+              tripId: jobTripId,
+            },
             source: 'orchestrator',
           });
+          if (jobTripId) {
+            dispatch(saveTripPlanForTrip({ tripId: jobTripId, plan: job.plan as ItineraryPlan }));
+          }
           window.clearInterval(intervalId);
           return;
         }
@@ -100,7 +112,7 @@ export function OrchestratorJobListener() {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [dispatch, latestGenerate]);
+  }, [activeTripId, dispatch, latestGenerate]);
 
   return null;
 }

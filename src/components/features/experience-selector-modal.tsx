@@ -96,7 +96,7 @@ export function ExperienceSelectorModal({
               >
                 <div className="flex gap-3">
                   <Image
-                    src={exp.photo || host.photo}
+                    src={exp.photos?.[0] || host.photo}
                     alt={exp.title}
                     width={64}
                     height={64}

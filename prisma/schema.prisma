@@ -21,9 +21,13 @@ model User {
   password      String?
   name          String?
   image         String?
-  bio           String?
   languages     String[]  @default([])
   interests     String[]  @default([])
+  
+  // Host Profile
+  bio           String?
+  quote         String?
+  responseTime  String?   @default("within a day") // e.g. "within an hour"
   
   // Location
   city          String?

@@ -76,7 +76,38 @@ export async function createTrip(data: CreateTripData) {
     revalidatePath('/trips');
     return { success: true, tripId: newTrip.id };
   } catch (error) {
-    console.error('Failed to create trip:', error);
     return { success: false, error: 'Failed to create trip' };
+  }
+}
+
+export async function deleteTrip(tripId: string) {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  try {
+    const trip = await prisma.trip.findUnique({
+      where: { id: tripId },
+    });
+
+    if (!trip) {
+      return { success: false, error: 'Trip not found' };
+    }
+
+    if (trip.userId !== session.user.id) {
+      return { success: false, error: 'Forbidden' };
+    }
+
+    await prisma.trip.delete({
+      where: { id: tripId },
+    });
+
+    revalidatePath('/trips');
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to delete trip:', error);
+    return { success: false, error: 'Failed to delete trip' };
   }
 }

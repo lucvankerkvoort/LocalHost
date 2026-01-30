@@ -22,12 +22,14 @@
         "id": "exp-0",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "outdoor-adventure",
+        "category": "OUTDOOR_ADVENTURE",
         "duration": 90,
         "price": 12700,
         "rating": 4.6,
         "reviewCount": 12,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -54,12 +56,14 @@
         "id": "exp-1",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 120,
         "price": 6900,
         "rating": 4.6,
         "reviewCount": 32,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -86,12 +90,14 @@
         "id": "exp-2",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 180,
         "price": 4000,
         "rating": 4.7,
         "reviewCount": 33,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -118,12 +124,14 @@
         "id": "exp-3",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 90,
         "price": 12500,
         "rating": 4.9,
         "reviewCount": 19,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -150,12 +158,14 @@
         "id": "exp-4",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 120,
         "price": 11000,
         "rating": 4.7,
         "reviewCount": 113,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -182,12 +192,14 @@
         "id": "exp-5",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 180,
         "price": 11300,
         "rating": 4.8,
         "reviewCount": 36,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -214,12 +226,14 @@
         "id": "exp-6",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "arts-culture",
+        "category": "ARTS_CULTURE",
         "duration": 90,
         "price": 3400,
         "rating": 4.9,
         "reviewCount": 124,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -246,12 +260,14 @@
         "id": "exp-7",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "wellness",
+        "category": "WELLNESS",
         "duration": 120,
         "price": 7500,
         "rating": 4.8,
         "reviewCount": 60,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -278,12 +294,14 @@
         "id": "exp-8",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 180,
         "price": 3600,
         "rating": 4.9,
         "reviewCount": 105,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -310,12 +328,14 @@
         "id": "exp-9",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 90,
         "price": 12700,
         "rating": 4.6,
         "reviewCount": 14,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -342,12 +362,14 @@
         "id": "exp-10",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 120,
         "price": 10600,
         "rating": 4.7,
         "reviewCount": 14,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -374,12 +396,14 @@
         "id": "exp-11",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 180,
         "price": 5300,
         "rating": 4.8,
         "reviewCount": 61,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -406,12 +430,14 @@
         "id": "exp-12",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 90,
         "price": 3300,
         "rating": 4.7,
         "reviewCount": 63,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -438,12 +464,14 @@
         "id": "exp-13",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "outdoor-adventure",
+        "category": "OUTDOOR_ADVENTURE",
         "duration": 120,
         "price": 4900,
         "rating": 4.9,
         "reviewCount": 84,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -470,12 +498,14 @@
         "id": "exp-14",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 180,
         "price": 6400,
         "rating": 5,
         "reviewCount": 132,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -502,12 +532,14 @@
         "id": "exp-15",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 90,
         "price": 9000,
         "rating": 4.7,
         "reviewCount": 90,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -534,12 +566,14 @@
         "id": "exp-16",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "arts-culture",
+        "category": "ARTS_CULTURE",
         "duration": 120,
         "price": 11600,
         "rating": 4.7,
         "reviewCount": 13,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -566,12 +600,14 @@
         "id": "exp-17",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 180,
         "price": 11200,
         "rating": 4.8,
         "reviewCount": 7,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -598,12 +634,14 @@
         "id": "exp-18",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 90,
         "price": 9600,
         "rating": 4.9,
         "reviewCount": 59,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -630,12 +668,14 @@
         "id": "exp-19",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "outdoor-adventure",
+        "category": "OUTDOOR_ADVENTURE",
         "duration": 120,
         "price": 3600,
         "rating": 4.6,
         "reviewCount": 123,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -662,12 +702,14 @@
         "id": "exp-20",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "wellness",
+        "category": "WELLNESS",
         "duration": 180,
         "price": 4600,
         "rating": 4.7,
         "reviewCount": 100,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -694,12 +736,14 @@
         "id": "exp-21",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "wellness",
+        "category": "WELLNESS",
         "duration": 90,
         "price": 8900,
         "rating": 4.9,
         "reviewCount": 126,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -726,12 +770,14 @@
         "id": "exp-22",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 120,
         "price": 7600,
         "rating": 4.6,
         "reviewCount": 49,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -758,12 +804,14 @@
         "id": "exp-23",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 180,
         "price": 10600,
         "rating": 4.7,
         "reviewCount": 150,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -790,12 +838,14 @@
         "id": "exp-24",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "wellness",
+        "category": "WELLNESS",
         "duration": 90,
         "price": 9000,
         "rating": 4.6,
         "reviewCount": 18,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -823,12 +873,14 @@
         "id": "exp-25",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "outdoor-adventure",
+        "category": "OUTDOOR_ADVENTURE",
         "duration": 120,
         "price": 10500,
         "rating": 4.9,
         "reviewCount": 60,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -855,12 +907,14 @@
         "id": "exp-26",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 180,
         "price": 3800,
         "rating": 4.8,
         "reviewCount": 62,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -887,12 +941,14 @@
         "id": "exp-27",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "wellness",
+        "category": "WELLNESS",
         "duration": 90,
         "price": 11700,
         "rating": 4.6,
         "reviewCount": 28,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -919,12 +975,14 @@
         "id": "exp-28",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "outdoor-adventure",
+        "category": "OUTDOOR_ADVENTURE",
         "duration": 120,
         "price": 10500,
         "rating": 4.9,
         "reviewCount": 21,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -951,12 +1009,14 @@
         "id": "exp-29",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 180,
         "price": 10000,
         "rating": 4.8,
         "reviewCount": 135,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -983,12 +1043,14 @@
         "id": "exp-30",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 90,
         "price": 4900,
         "rating": 5,
         "reviewCount": 139,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1015,12 +1077,14 @@
         "id": "exp-31",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 120,
         "price": 7100,
         "rating": 4.9,
         "reviewCount": 98,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1047,12 +1111,14 @@
         "id": "exp-32",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 180,
         "price": 4600,
         "rating": 4.8,
         "reviewCount": 130,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1079,12 +1145,14 @@
         "id": "exp-33",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 90,
         "price": 11300,
         "rating": 4.6,
         "reviewCount": 106,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1111,12 +1179,14 @@
         "id": "exp-34",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 120,
         "price": 7800,
         "rating": 4.7,
         "reviewCount": 65,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1144,12 +1214,14 @@
         "id": "exp-35",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 180,
         "price": 8100,
         "rating": 4.9,
         "reviewCount": 42,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1176,12 +1248,14 @@
         "id": "exp-36",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "outdoor-adventure",
+        "category": "OUTDOOR_ADVENTURE",
         "duration": 90,
         "price": 8900,
         "rating": 4.8,
         "reviewCount": 48,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1208,12 +1282,14 @@
         "id": "exp-37",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "arts-culture",
+        "category": "ARTS_CULTURE",
         "duration": 120,
         "price": 8500,
         "rating": 4.9,
         "reviewCount": 52,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1240,12 +1316,14 @@
         "id": "exp-38",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 180,
         "price": 8300,
         "rating": 4.8,
         "reviewCount": 38,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1272,12 +1350,14 @@
         "id": "exp-39",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "outdoor-adventure",
+        "category": "OUTDOOR_ADVENTURE",
         "duration": 90,
         "price": 8800,
         "rating": 4.7,
         "reviewCount": 111,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1304,12 +1384,14 @@
         "id": "exp-40",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 120,
         "price": 6600,
         "rating": 4.9,
         "reviewCount": 103,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1336,12 +1418,14 @@
         "id": "exp-41",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 180,
         "price": 5700,
         "rating": 4.7,
         "reviewCount": 49,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1368,12 +1452,14 @@
         "id": "exp-42",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "wellness",
+        "category": "WELLNESS",
         "duration": 90,
         "price": 6600,
         "rating": 4.8,
         "reviewCount": 26,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1400,12 +1486,14 @@
         "id": "exp-43",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "outdoor-adventure",
+        "category": "OUTDOOR_ADVENTURE",
         "duration": 120,
         "price": 5000,
         "rating": 4.7,
         "reviewCount": 154,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1432,12 +1520,14 @@
         "id": "exp-44",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "outdoor-adventure",
+        "category": "OUTDOOR_ADVENTURE",
         "duration": 180,
         "price": 4200,
         "rating": 4.7,
         "reviewCount": 151,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1464,12 +1554,14 @@
         "id": "exp-45",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "arts-culture",
+        "category": "ARTS_CULTURE",
         "duration": 90,
         "price": 4400,
         "rating": 4.7,
         "reviewCount": 42,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1496,12 +1588,14 @@
         "id": "exp-46",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 120,
         "price": 7400,
         "rating": 4.5,
         "reviewCount": 34,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1528,12 +1622,14 @@
         "id": "exp-47",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 180,
         "price": 3500,
         "rating": 4.8,
         "reviewCount": 25,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1560,12 +1656,14 @@
         "id": "exp-48",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "outdoor-adventure",
+        "category": "OUTDOOR_ADVENTURE",
         "duration": 90,
         "price": 6700,
         "rating": 4.8,
         "reviewCount": 144,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1592,12 +1690,14 @@
         "id": "exp-49",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "arts-culture",
+        "category": "ARTS_CULTURE",
         "duration": 120,
         "price": 9200,
         "rating": 4.8,
         "reviewCount": 102,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1624,12 +1724,14 @@
         "id": "exp-50",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 180,
         "price": 4500,
         "rating": 4.6,
         "reviewCount": 50,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1656,12 +1758,14 @@
         "id": "exp-51",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "outdoor-adventure",
+        "category": "OUTDOOR_ADVENTURE",
         "duration": 90,
         "price": 7400,
         "rating": 4.6,
         "reviewCount": 95,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1688,12 +1792,14 @@
         "id": "exp-52",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "arts-culture",
+        "category": "ARTS_CULTURE",
         "duration": 120,
         "price": 9200,
         "rating": 4.6,
         "reviewCount": 10,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1720,12 +1826,14 @@
         "id": "exp-53",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "arts-culture",
+        "category": "ARTS_CULTURE",
         "duration": 180,
         "price": 4600,
         "rating": 4.7,
         "reviewCount": 95,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1752,12 +1860,14 @@
         "id": "exp-54",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "wellness",
+        "category": "WELLNESS",
         "duration": 90,
         "price": 9000,
         "rating": 4.9,
         "reviewCount": 36,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1784,12 +1894,14 @@
         "id": "exp-55",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 120,
         "price": 12800,
         "rating": 4.9,
         "reviewCount": 48,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1816,12 +1928,14 @@
         "id": "exp-56",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "arts-culture",
+        "category": "ARTS_CULTURE",
         "duration": 180,
         "price": 5500,
         "rating": 4.9,
         "reviewCount": 56,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1848,12 +1962,14 @@
         "id": "exp-57",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "arts-culture",
+        "category": "ARTS_CULTURE",
         "duration": 90,
         "price": 12300,
         "rating": 5,
         "reviewCount": 34,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1881,12 +1997,14 @@
         "id": "exp-58",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "outdoor-adventure",
+        "category": "OUTDOOR_ADVENTURE",
         "duration": 120,
         "price": 11600,
         "rating": 4.8,
         "reviewCount": 129,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1913,12 +2031,14 @@
         "id": "exp-59",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "outdoor-adventure",
+        "category": "OUTDOOR_ADVENTURE",
         "duration": 180,
         "price": 8700,
         "rating": 4.8,
         "reviewCount": 105,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1945,12 +2065,14 @@
         "id": "exp-60",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 90,
         "price": 11200,
         "rating": 4.9,
         "reviewCount": 137,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -1977,12 +2099,14 @@
         "id": "exp-61",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 120,
         "price": 10200,
         "rating": 4.8,
         "reviewCount": 51,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2009,12 +2133,14 @@
         "id": "exp-62",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 180,
         "price": 3900,
         "rating": 4.5,
         "reviewCount": 102,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2041,12 +2167,14 @@
         "id": "exp-63",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "outdoor-adventure",
+        "category": "OUTDOOR_ADVENTURE",
         "duration": 90,
         "price": 12100,
         "rating": 5,
         "reviewCount": 138,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2073,12 +2201,14 @@
         "id": "exp-64",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 120,
         "price": 4400,
         "rating": 4.7,
         "reviewCount": 141,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2105,12 +2235,14 @@
         "id": "exp-65",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "arts-culture",
+        "category": "ARTS_CULTURE",
         "duration": 180,
         "price": 10500,
         "rating": 4.7,
         "reviewCount": 5,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2137,12 +2269,14 @@
         "id": "exp-66",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "arts-culture",
+        "category": "ARTS_CULTURE",
         "duration": 90,
         "price": 6800,
         "rating": 4.9,
         "reviewCount": 9,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2169,12 +2303,14 @@
         "id": "exp-67",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "wellness",
+        "category": "WELLNESS",
         "duration": 120,
         "price": 9900,
         "rating": 4.7,
         "reviewCount": 5,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2201,12 +2337,14 @@
         "id": "exp-68",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "arts-culture",
+        "category": "ARTS_CULTURE",
         "duration": 180,
         "price": 3400,
         "rating": 4.7,
         "reviewCount": 84,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2233,12 +2371,14 @@
         "id": "exp-69",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 90,
         "price": 11800,
         "rating": 4.9,
         "reviewCount": 30,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2265,12 +2405,14 @@
         "id": "exp-70",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 120,
         "price": 4400,
         "rating": 4.7,
         "reviewCount": 103,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2297,12 +2439,14 @@
         "id": "exp-71",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 180,
         "price": 4400,
         "rating": 4.7,
         "reviewCount": 139,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2329,12 +2473,14 @@
         "id": "exp-72",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "arts-culture",
+        "category": "ARTS_CULTURE",
         "duration": 90,
         "price": 6400,
         "rating": 4.7,
         "reviewCount": 17,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2361,12 +2507,14 @@
         "id": "exp-73",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 120,
         "price": 11000,
         "rating": 4.5,
         "reviewCount": 52,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2393,12 +2541,14 @@
         "id": "exp-74",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 180,
         "price": 5700,
         "rating": 4.9,
         "reviewCount": 120,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2426,12 +2576,14 @@
         "id": "exp-75",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 90,
         "price": 7300,
         "rating": 4.9,
         "reviewCount": 11,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2458,12 +2610,14 @@
         "id": "exp-76",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "wellness",
+        "category": "WELLNESS",
         "duration": 120,
         "price": 3200,
         "rating": 4.8,
         "reviewCount": 15,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2490,12 +2644,14 @@
         "id": "exp-77",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 180,
         "price": 7000,
         "rating": 4.8,
         "reviewCount": 101,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2522,12 +2678,14 @@
         "id": "exp-78",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "wellness",
+        "category": "WELLNESS",
         "duration": 90,
         "price": 12400,
         "rating": 4.8,
         "reviewCount": 18,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2554,12 +2712,14 @@
         "id": "exp-79",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 120,
         "price": 9400,
         "rating": 4.6,
         "reviewCount": 23,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2586,12 +2746,14 @@
         "id": "exp-80",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 180,
         "price": 9300,
         "rating": 4.6,
         "reviewCount": 121,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2618,12 +2780,14 @@
         "id": "exp-81",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 90,
         "price": 3300,
         "rating": 4.9,
         "reviewCount": 138,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2650,12 +2814,14 @@
         "id": "exp-82",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 120,
         "price": 3500,
         "rating": 4.6,
         "reviewCount": 74,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2682,12 +2848,14 @@
         "id": "exp-83",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 180,
         "price": 9200,
         "rating": 4.5,
         "reviewCount": 36,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2714,12 +2882,14 @@
         "id": "exp-84",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "arts-culture",
+        "category": "ARTS_CULTURE",
         "duration": 90,
         "price": 10600,
         "rating": 4.7,
         "reviewCount": 138,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2746,12 +2916,14 @@
         "id": "exp-85",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 120,
         "price": 7900,
         "rating": 4.6,
         "reviewCount": 135,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2778,12 +2950,14 @@
         "id": "exp-86",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 180,
         "price": 11000,
         "rating": 5,
         "reviewCount": 67,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2810,12 +2984,14 @@
         "id": "exp-87",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "learning",
+        "category": "LEARNING",
         "duration": 90,
         "price": 6100,
         "rating": 4.8,
         "reviewCount": 151,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2842,12 +3018,14 @@
         "id": "exp-88",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 120,
         "price": 8400,
         "rating": 5,
         "reviewCount": 54,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2874,12 +3052,14 @@
         "id": "exp-89",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "outdoor-adventure",
+        "category": "OUTDOOR_ADVENTURE",
         "duration": 180,
         "price": 8800,
         "rating": 4.9,
         "reviewCount": 123,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2906,12 +3086,14 @@
         "id": "exp-90",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 90,
         "price": 8500,
         "rating": 4.7,
         "reviewCount": 8,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2938,12 +3120,14 @@
         "id": "exp-91",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 120,
         "price": 11100,
         "rating": 4.8,
         "reviewCount": 78,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -2970,12 +3154,14 @@
         "id": "exp-92",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 180,
         "price": 10100,
         "rating": 4.7,
         "reviewCount": 49,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -3002,12 +3188,14 @@
         "id": "exp-93",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 90,
         "price": 8300,
         "rating": 4.5,
         "reviewCount": 7,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -3034,12 +3222,14 @@
         "id": "exp-94",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 120,
         "price": 10800,
         "rating": 4.7,
         "reviewCount": 73,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -3067,12 +3257,14 @@
         "id": "exp-95",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "arts-culture",
+        "category": "ARTS_CULTURE",
         "duration": 180,
         "price": 10600,
         "rating": 4.9,
         "reviewCount": 139,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -3099,12 +3291,14 @@
         "id": "exp-96",
         "title": "Secret Food Tour",
         "description": "An authentic local experience.",
-        "category": "nightlife-social",
+        "category": "NIGHTLIFE_SOCIAL",
         "duration": 90,
         "price": 12900,
         "rating": 4.5,
         "reviewCount": 123,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -3131,12 +3325,14 @@
         "id": "exp-97",
         "title": "Hidden Gems Walk",
         "description": "An authentic local experience.",
-        "category": "arts-culture",
+        "category": "ARTS_CULTURE",
         "duration": 120,
         "price": 3600,
         "rating": 4.5,
         "reviewCount": 111,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -3163,12 +3359,14 @@
         "id": "exp-98",
         "title": "Local Experience",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 180,
         "price": 5300,
         "rating": 4.5,
         "reviewCount": 24,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   },
@@ -3195,12 +3393,14 @@
         "id": "exp-99",
         "title": "Sunset Adventure",
         "description": "An authentic local experience.",
-        "category": "food-drink",
+        "category": "FOOD_DRINK",
         "duration": 90,
         "price": 7300,
         "rating": 4.8,
         "reviewCount": 86,
-        "photo": "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        "photos": [
+          "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=600&h=400&fit=crop"
+        ]
       }
     ]
   }

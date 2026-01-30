@@ -87,7 +87,7 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
       lng: anchorLocation.location.lng,
       day: day.dayNumber,
       activities: day.activities.map((act, idx): ItineraryItem =>
-        createItem('activity', act.place.name, idx, {
+        createItem('SIGHT', act.place.name, idx, {
           description: act.notes,
           location: act.place.description || act.place.address || `${act.timeSlot}`,
         })
@@ -97,6 +97,19 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
       city: extractCityName(anchorLocation),
     };
     destinations.push(destination);
+
+    // Add markers for ALL activities in this day to ensure they appear on the map
+    // (even if no explicit navigation route exists between them)
+    day.activities.forEach((act) => {
+      if (act.place && act.place.location) {
+        addRouteMarker(
+          `activity-marker-${act.place.name}`, // Pseudo-route ID for standalone markers
+          'end', // distinct as a 'stop'
+          act.place,
+          day.dayNumber
+        );
+      }
+    });
 
     // Extract navigation routes within this day
     if (day.navigationEvents && day.navigationEvents.length > 0) {

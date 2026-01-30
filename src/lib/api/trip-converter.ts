@@ -84,6 +84,11 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
 }
 
 export function convertGlobeDestinationsToApiPayload(destinations: GlobeDestination[]): any {
+  const mapItemType = (type: ItineraryItem['type'] | undefined) => {
+    if (!type) return 'SIGHT';
+    return type;
+  };
+
   // 1. Group by City to reconstruct Stops
   const stops: any[] = [];
   let currentStop: any = null;
@@ -115,12 +120,12 @@ export function convertGlobeDestinationsToApiPayload(destinations: GlobeDestinat
       title: dest.name,
       // date: computed? we don't track absolute dates in GlobeDestination yet, usually relative
       items: dest.activities.map((item, idx) => ({
-        type: item.type || 'activity',
+        type: mapItemType(item.type),
         title: item.title,
         description: item.description,
         startTime: null, // item.timeSlot? we need mapping
         experienceId: item.experienceId,
-        locationName: item.place?.name || item.location,
+        locationName: item.place?.name || item.location || dest.city || dest.name,
         lat: item.place?.location?.lat,
         lng: item.place?.location?.lng,
         orderIndex: idx,

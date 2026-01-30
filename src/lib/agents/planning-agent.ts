@@ -228,7 +228,7 @@ export class PlanningAgent implements Agent {
                   price: r.experience.price,
                   rating: r.experience.rating,
                   reviewCount: r.experience.reviewCount,
-                  photo: r.experience.photo,
+                  photo: r.experience.photos[0],
                   host: {
                     id: r.experience.hostId,
                     name: r.experience.hostName,

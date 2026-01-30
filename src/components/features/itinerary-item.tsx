@@ -21,24 +21,38 @@ export function ItineraryItem({
 }: ItineraryItemProps) {
   // Map backend types to frontend types for config
   const getTypeKey = (type: string | ItineraryItemType): ItineraryItemType => {
-    switch (type) {
-      case 'EXPERIENCE': return 'localhost';
-      case 'SIGHT': return 'activity';
-      case 'MEAL': return 'meal';
-      case 'TRANSPORT': return 'transport';
-      case 'LODGING': return 'accommodation';
-      case 'FREE_TIME': return 'activity';
-      case 'NOTE': return 'activity';
-      default: 
-        return (ITEM_TYPE_CONFIG[type as ItineraryItemType] ? type as ItineraryItemType : 'activity');
+    // If it's already a valid key, return it.
+    if (Object.keys(ITEM_TYPE_CONFIG).includes(type)) {
+      return type as ItineraryItemType;
+    }
+
+    const normalized = type.toLowerCase();
+    switch (normalized) {
+      case 'activity':
+        return 'SIGHT';
+      case 'meal':
+        return 'MEAL';
+      case 'transport':
+        return 'TRANSPORT';
+      case 'accommodation':
+        return 'LODGING';
+      case 'free_time':
+      case 'free-time':
+        return 'FREE_TIME';
+      case 'note':
+        return 'NOTE';
+      case 'localhost':
+        return 'EXPERIENCE';
+      default:
+        return 'SIGHT';
     }
   };
 
   const configKey = getTypeKey(item.type);
-  const config = ITEM_TYPE_CONFIG[configKey] || ITEM_TYPE_CONFIG.activity;
+  const config = ITEM_TYPE_CONFIG[configKey] || ITEM_TYPE_CONFIG.SIGHT;
 
   // Check if it's a localhost experience (either explicitly or mapped)
-  const isLocalhost = item.type === 'localhost' || item.type === 'EXPERIENCE';
+  const isLocalhost = item.type === 'EXPERIENCE';
   const status = item.status || 'DRAFT';
   
   return (

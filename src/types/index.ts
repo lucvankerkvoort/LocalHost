@@ -56,32 +56,32 @@ export interface Experience {
 }
 
 export type ExperienceCategory =
-  | 'food-drink'
-  | 'arts-culture'
-  | 'outdoor-adventure'
-  | 'wellness'
-  | 'learning'
-  | 'nightlife-social'
-  | 'family';
+  | 'FOOD_DRINK'
+  | 'ARTS_CULTURE'
+  | 'OUTDOOR_ADVENTURE'
+  | 'WELLNESS'
+  | 'LEARNING'
+  | 'NIGHTLIFE_SOCIAL'
+  | 'FAMILY';
 
 export const CATEGORY_LABELS: Record<ExperienceCategory, string> = {
-  'food-drink': 'Food & Drink',
-  'arts-culture': 'Arts & Culture',
-  'outdoor-adventure': 'Outdoor & Adventure',
-  'wellness': 'Wellness',
-  'learning': 'Learning',
-  'nightlife-social': 'Nightlife & Social',
-  'family': 'Family',
+  'FOOD_DRINK': 'Food & Drink',
+  'ARTS_CULTURE': 'Arts & Culture',
+  'OUTDOOR_ADVENTURE': 'Outdoor & Adventure',
+  'WELLNESS': 'Wellness',
+  'LEARNING': 'Learning',
+  'NIGHTLIFE_SOCIAL': 'Nightlife & Social',
+  'FAMILY': 'Family',
 };
 
 export const CATEGORY_ICONS: Record<ExperienceCategory, string> = {
-  'food-drink': '🍽️',
-  'arts-culture': '🎨',
-  'outdoor-adventure': '🏔️',
-  'wellness': '🧘',
-  'learning': '📚',
-  'nightlife-social': '🌃',
-  'family': '👨‍👩‍👧‍👦',
+  'FOOD_DRINK': '🍽️',
+  'ARTS_CULTURE': '🎨',
+  'OUTDOOR_ADVENTURE': '🏔️',
+  'WELLNESS': '🧘',
+  'LEARNING': '📚',
+  'NIGHTLIFE_SOCIAL': '🌃',
+  'FAMILY': '👨‍👩‍👧‍👦',
 };
 
 export interface Booking {
@@ -101,16 +101,17 @@ export interface Booking {
 }
 
 export type BookingStatus =
-  | 'pending'
-  | 'confirmed'
-  | 'cancelled'
-  | 'completed';
+  | 'PENDING' // Keep pending if used by backward compat for a moment, but prefer TENTATIVE
+  | 'TENTATIVE'
+  | 'CONFIRMED'
+  | 'CANCELLED'
+  | 'COMPLETED';
 
 export type PaymentStatus =
-  | 'pending'
-  | 'paid'
-  | 'refunded'
-  | 'failed';
+  | 'PENDING'
+  | 'PAID'
+  | 'REFUNDED'
+  | 'FAILED';
 
 export interface Review {
   id: string;

@@ -2,13 +2,13 @@ import { HOSTS, type Host, type HostExperience } from './data/hosts';
 
 // Category mappings for semantic understanding
 const CATEGORY_SYNONYMS: Record<string, string[]> = {
-  'food-drink': ['food', 'cooking', 'restaurant', 'cuisine', 'dining', 'eat', 'drink', 'wine', 'beer', 'coffee', 'culinary', 'chef', 'kitchen', 'taste', 'gastronomy', 'brunch', 'lunch', 'dinner', 'breakfast', 'market', 'foodie'],
-  'arts-culture': ['art', 'culture', 'museum', 'gallery', 'history', 'historic', 'heritage', 'traditional', 'architecture', 'monuments', 'landmarks', 'sightseeing', 'tourist spots', 'famous places', 'mural', 'street art', 'music', 'dance', 'theater', 'craft', 'artisan', 'local culture'],
-  'outdoor-adventure': ['outdoor', 'adventure', 'hiking', 'nature', 'mountain', 'beach', 'trek', 'climb', 'kayak', 'bike', 'cycling', 'walk', 'explore', 'scenic', 'park', 'forest', 'lake', 'river', 'sunrise', 'sunset'],
-  'nightlife-social': ['nightlife', 'bar', 'club', 'party', 'social', 'drinks', 'dancing', 'night', 'evening', 'late', 'live music', 'concert', 'fun', 'entertainment', 'rooftop'],
-  'wellness': ['wellness', 'spa', 'yoga', 'meditation', 'relax', 'relaxation', 'peaceful', 'zen', 'mindfulness', 'retreat', 'health', 'healing', 'calm', 'quiet', 'spiritual', 'temple'],
-  'learning': ['learn', 'learning', 'class', 'workshop', 'lesson', 'teach', 'skill', 'photography', 'language', 'craft', 'handmade', 'diy', 'education', 'course'],
-  'family': ['family', 'kids', 'children', 'child-friendly', 'educational', 'fun for all ages'],
+  'FOOD_DRINK': ['food', 'cooking', 'restaurant', 'cuisine', 'dining', 'eat', 'drink', 'wine', 'beer', 'coffee', 'culinary', 'chef', 'kitchen', 'taste', 'gastronomy', 'brunch', 'lunch', 'dinner', 'breakfast', 'market', 'foodie'],
+  'ARTS_CULTURE': ['art', 'culture', 'museum', 'gallery', 'history', 'historic', 'heritage', 'traditional', 'architecture', 'monuments', 'landmarks', 'sightseeing', 'tourist spots', 'famous places', 'mural', 'street art', 'music', 'dance', 'theater', 'craft', 'artisan', 'local culture'],
+  'OUTDOOR_ADVENTURE': ['outdoor', 'adventure', 'hiking', 'nature', 'mountain', 'beach', 'trek', 'climb', 'kayak', 'bike', 'cycling', 'walk', 'explore', 'scenic', 'park', 'forest', 'lake', 'river', 'sunrise', 'sunset'],
+  'NIGHTLIFE_SOCIAL': ['nightlife', 'bar', 'club', 'party', 'social', 'drinks', 'dancing', 'night', 'evening', 'late', 'live music', 'concert', 'fun', 'entertainment', 'rooftop'],
+  'WELLNESS': ['wellness', 'spa', 'yoga', 'meditation', 'relax', 'relaxation', 'peaceful', 'zen', 'mindfulness', 'retreat', 'health', 'healing', 'calm', 'quiet', 'spiritual', 'temple'],
+  'LEARNING': ['learn', 'learning', 'class', 'workshop', 'lesson', 'teach', 'skill', 'photography', 'language', 'craft', 'handmade', 'diy', 'education', 'course'],
+  'FAMILY': ['family', 'kids', 'children', 'child-friendly', 'educational', 'fun for all ages'],
 };
 
 // Interest synonyms for matching user intent to host interests
@@ -51,6 +51,9 @@ export interface ScoredExperience {
 export function scoreHost(host: Host, intent: SearchIntent): ScoredHost {
   let score = 0;
   const matchReasons: string[] = [];
+  
+  // Normalize intent categories to uppercase for matching
+  const normalizedCategories = intent.categories.map(c => c.toUpperCase().replace(/-/g, '_'));
 
   // Location match (high priority)
   if (intent.location) {
@@ -63,7 +66,9 @@ export function scoreHost(host: Host, intent: SearchIntent): ScoredHost {
   }
 
   // Category match via experience types
-  for (const category of intent.categories) {
+  for (const category of normalizedCategories) {
+    // Try to match exact uppercase category, or fall back to original for synonym lookup if needed
+    // But CATEGORY_SYNONYMS keys are now uppercase.
     const synonyms = CATEGORY_SYNONYMS[category] || [category];
     
     // Check host interests
@@ -79,7 +84,7 @@ export function scoreHost(host: Host, intent: SearchIntent): ScoredHost {
     for (const exp of host.experiences) {
       if (exp.category === category) {
         score += 20;
-        matchReasons.push(`Offers ${category.replace('-', ' ')} experiences`);
+        matchReasons.push(`Offers ${category.replace('_', ' ')} experiences`);
         break;
       }
     }
@@ -144,6 +149,9 @@ export function scoreExperience(
 ): ScoredExperience {
   let score = 0;
   const matchReasons: string[] = [];
+  
+  // Normalize intent categories
+  const normalizedCategories = intent.categories.map(c => c.toUpperCase().replace(/-/g, '_'));
 
   // Location match (high priority)
   if (intent.location) {
@@ -156,10 +164,10 @@ export function scoreExperience(
   }
 
   // Category match
-  for (const category of intent.categories) {
+  for (const category of normalizedCategories) {
     if (experience.category === category) {
       score += 25;
-      matchReasons.push(`${category.replace('-', ' ')} experience`);
+      matchReasons.push(`${category.replace('_', ' ')} experience`);
     }
     
     // Check synonyms

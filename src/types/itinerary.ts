@@ -1,22 +1,22 @@
 // Itinerary types for the visual builder
 
 export type ItineraryItemType = 
-  | 'activity' 
-  | 'meal' 
-  | 'transport' 
-  | 'accommodation' 
-  | 'localhost'
-  | 'EXPERIENCE'
-  | 'SIGHT';
+  | 'SIGHT' 
+  | 'EXPERIENCE' 
+  | 'MEAL' 
+  | 'FREE_TIME' 
+  | 'TRANSPORT' 
+  | 'NOTE' 
+  | 'LODGING';
 
 export const ITEM_TYPE_CONFIG: Record<ItineraryItemType, { label: string; icon: string; color: string }> = {
-  activity: { label: 'Activity', icon: '🎯', color: 'var(--blue-green)' },
-  meal: { label: 'Food & Drink', icon: '🍽️', color: 'var(--princeton-orange)' },
-  transport: { label: 'Transport', icon: '🚗', color: 'var(--muted)' },
-  accommodation: { label: 'Accommodation', icon: '🏨', color: 'var(--deep-space-blue)' },
-  localhost: { label: 'Localhost', icon: '👤', color: 'var(--amber-flame)' },
-  EXPERIENCE: { label: 'Experience', icon: '✨', color: 'var(--amber-flame)' },
   SIGHT: { label: 'Sight', icon: '👀', color: 'var(--blue-green)' },
+  EXPERIENCE: { label: 'Experience', icon: '✨', color: 'var(--amber-flame)' },
+  MEAL: { label: 'Food & Drink', icon: '🍽️', color: 'var(--princeton-orange)' },
+  FREE_TIME: { label: 'Free Time', icon: '🧘', color: 'var(--sky-blue)' },
+  TRANSPORT: { label: 'Transport', icon: '🚗', color: 'var(--muted)' },
+  NOTE: { label: 'Note', icon: '📝', color: 'var(--muted-foreground)' },
+  LODGING: { label: 'Accommodation', icon: '🏨', color: 'var(--deep-space-blue)' },
 };
 
 export interface ItineraryItem {

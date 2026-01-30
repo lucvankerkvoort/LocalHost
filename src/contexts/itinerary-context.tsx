@@ -118,7 +118,7 @@ export function ItineraryProvider({ children, initialPlan = null }: ItineraryPro
         category: experience.category,
         rating: experience.rating,
         reviewCount: experience.reviewCount,
-        photo: experience.photo,
+        photo: experience.photos[0],
       };
       
       return {

@@ -1,6 +1,8 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { setDestinations, setTripId } from './globe-slice';
+import { clearHostMarkers, clearItinerary, setDestinations, setTripId } from './globe-slice';
 import { convertTripToGlobeDestinations, ApiTrip } from '@/lib/api/trip-converter';
+import { convertPlanToGlobeData } from '@/lib/ai/plan-converter';
+import type { ItineraryPlan } from '@/lib/ai/types';
 import { RootState } from './store'; // Need to be careful with circular imports if store imports this. 
 // Ideally slice doesn't import thunks, components import thunks.
 
@@ -14,6 +16,7 @@ export const fetchActiveTrip = createAsyncThunk(
     // But usually we navigate via router, which unmounts.
     
     try {
+      dispatch(clearHostMarkers());
       let activeTrip: ApiTrip | null = null;
 
       // 1. If tripId provided, fetch that specific trip
@@ -69,9 +72,11 @@ export const fetchActiveTrip = createAsyncThunk(
       // Convert and update store
       if (activeTrip && activeTrip.id) {
           dispatch(setTripId(activeTrip.id));
-          if (activeTrip.stops) {
+          if (activeTrip.stops && activeTrip.stops.length > 0) {
               const globeDestinations = convertTripToGlobeDestinations(activeTrip);
               dispatch(setDestinations(globeDestinations));
+          } else {
+              dispatch(clearItinerary());
           }
           return activeTrip;
       }
@@ -221,6 +226,35 @@ export const saveTripPlan = createAsyncThunk(
             return true;
         } catch (error) {
             console.error('Error saving trip plan:', error);
+            throw error;
+        }
+    }
+);
+
+export const saveTripPlanForTrip = createAsyncThunk(
+    'globe/saveTripPlanForTrip',
+    async ({ tripId, plan }: { tripId: string; plan: ItineraryPlan }) => {
+        if (!tripId) return;
+
+        try {
+            const { destinations } = convertPlanToGlobeData(plan);
+            const payload = convertGlobeDestinationsToApiPayload(destinations);
+            
+            const res = await fetch(`/api/trips/${tripId}/plan`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const errorText = await res.text();
+                console.error('[saveTripPlanForTrip] Failed to save trip plan:', res.status, errorText);
+                throw new Error('Failed to save trip plan');
+            }
+
+            return true;
+        } catch (error) {
+            console.error('[saveTripPlanForTrip] Error:', error);
             throw error;
         }
     }

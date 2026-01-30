@@ -110,7 +110,7 @@ export function ExperienceDrawer({
                   {/* Experience Image */}
                   <div className="h-40 bg-[var(--muted)] relative">
                     <img
-                      src={experience.photo}
+                      src={experience.photos?.[0] || host.photo}
                       alt={experience.title}
                       className="w-full h-full object-cover"
                     />

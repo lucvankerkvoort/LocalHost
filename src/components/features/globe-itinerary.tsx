@@ -368,8 +368,8 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   const handleBookItem = async (dayId: string, item: ItineraryItem) => {
     console.log('[GlobeItinerary] handleBookItem called', { dayId, item, tripId });
     
-    // Validate Item Type (Handle both 'localhost' and backend 'EXPERIENCE' types)
-    const isLocalhostType = item.type === 'localhost' || item.type === 'EXPERIENCE';
+    // Validate Item Type (Handle 'EXPERIENCE' type)
+    const isLocalhostType = item.type === 'EXPERIENCE';
     
     if (!isLocalhostType || !item.hostId || !item.experienceId) {
       console.warn('[GlobeItinerary] Item validation failed:', { 
