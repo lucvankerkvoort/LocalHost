@@ -106,9 +106,9 @@ export const SAMPLE_DESTINATIONS: GlobeDestination[] = [
     lng: 139.6503,
     day: 1,
     activities: [
-      createItem('transport', 'Arrive at Narita', 0),
-      createItem('accommodation', 'Check in to hotel', 1),
-      createItem('activity', 'Explore Shibuya', 2)
+      createItem('TRANSPORT', 'Arrive at Narita', 0),
+      createItem('LODGING', 'Check in to hotel', 1),
+      createItem('SIGHT', 'Explore Shibuya', 2)
     ],
     color: DAY_COLORS[0],
   },
@@ -119,9 +119,9 @@ export const SAMPLE_DESTINATIONS: GlobeDestination[] = [
     lng: 135.7681,
     day: 3,
     activities: [
-      createItem('activity', 'Fushimi Inari', 0),
-      createItem('activity', 'Kinkaku-ji Temple', 1),
-      createItem('meal', 'Gion district dinner', 2)
+      createItem('SIGHT', 'Fushimi Inari', 0),
+      createItem('SIGHT', 'Kinkaku-ji Temple', 1),
+      createItem('MEAL', 'Gion district dinner', 2)
     ],
     color: DAY_COLORS[2],
   },
@@ -132,9 +132,9 @@ export const SAMPLE_DESTINATIONS: GlobeDestination[] = [
     lng: 135.5023,
     day: 5,
     activities: [
-      createItem('activity', 'Dotonbori', 0),
-      createItem('activity', 'Osaka Castle', 1),
-      createItem('meal', 'Street food tour', 2)
+      createItem('SIGHT', 'Dotonbori', 0),
+      createItem('SIGHT', 'Osaka Castle', 1),
+      createItem('MEAL', 'Street food tour', 2)
     ],
     color: DAY_COLORS[4],
   },

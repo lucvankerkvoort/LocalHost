@@ -12,6 +12,8 @@ interface RouteParams {
  * Get full chat thread for a booked candidate
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
+  return NextResponse.json({ error: 'Not implemented' }, { status: 501 });
+  /*
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -61,4 +63,5 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       { status: 500 }
     );
   }
+  */
 }

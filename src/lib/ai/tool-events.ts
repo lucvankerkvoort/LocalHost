@@ -101,7 +101,8 @@ function getToolPartResult(part: ToolPartLike) {
 export function ingestToolInvocations(
   dispatch: AppDispatch,
   toolInvocations: ToolInvocationLike[] | undefined,
-  source: ToolCallSource
+  source: ToolCallSource,
+  context?: { tripId?: string | null }
 ) {
   if (!Array.isArray(toolInvocations)) {
     console.log('[ToolEvents] No tool invocations to process');
@@ -121,12 +122,22 @@ export function ingestToolInvocations(
       result: tool.result,
     });
 
+    let result = tool.result;
+    if (
+      tool.toolName === 'generateItinerary' &&
+      context?.tripId &&
+      result &&
+      typeof result === 'object'
+    ) {
+      result = { ...(result as Record<string, unknown>), tripId: context.tripId };
+    }
+
     dispatch(
       toolCallReceived({
         toolName: tool.toolName,
         state: normalizedState,
         params: getParams(tool),
-        result: tool.result,
+        result,
         source,
       })
     );
@@ -168,7 +179,8 @@ export function ingestToolParts(
   dispatch: AppDispatch,
   parts: ToolPartLike[] | undefined,
   source: ToolCallSource,
-  seen?: Set<string>
+  seen?: Set<string>,
+  context?: { tripId?: string | null }
 ) {
   if (!Array.isArray(parts)) return;
 
@@ -193,11 +205,21 @@ export function ingestToolParts(
       seen.add(key);
     }
 
+    let result = getToolPartResult(part);
+    if (
+      toolName === 'generateItinerary' &&
+      context?.tripId &&
+      result &&
+      typeof result === 'object'
+    ) {
+      result = { ...(result as Record<string, unknown>), tripId: context.tripId };
+    }
+
     console.log(`[ingestToolParts] Dispatching tool:`, {
       toolName,
       state,
       params: part.input,
-      result: getToolPartResult(part),
+      result,
     });
 
     dispatch(
@@ -205,7 +227,7 @@ export function ingestToolParts(
         toolName,
         state,
         params: part.input,
-        result: getToolPartResult(part),
+        result,
         source,
       })
     );

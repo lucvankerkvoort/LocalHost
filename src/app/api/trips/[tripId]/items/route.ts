@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 
 export async function POST(
   req: Request,
-  { params }: { params: { tripId: string } }
+  { params }: { params: Promise<{ tripId: string }> }
 ) {
   try {
     const session = await auth();
@@ -62,12 +62,19 @@ export async function POST(
 
     // Transaction to create item and optional booking
     const result = await prisma.$transaction(async (tx) => {
+        const experience = experienceId
+            ? await tx.experience.findUnique({ where: { id: experienceId } })
+            : null;
+        if (experienceId && !experience) {
+            console.warn('[TRIP_ITEM_POST] Experience not found, creating item without experienceId:', experienceId);
+        }
+
         const item = await tx.itineraryItem.create({
             data: {
                 dayId,
                 type: type || 'EXPERIENCE',
                 title: title || 'New Item',
-                experienceId,
+                experienceId: experience ? experience.id : null,
                 locationName,
                 lat,
                 lng,
@@ -79,29 +86,23 @@ export async function POST(
         let createdBooking = null;
 
         // If this is an experience, create a tentative booking
-        if (experienceId) {
-            const experience = await tx.experience.findUnique({
-                where: { id: experienceId }
+        if (experience) {
+            // @ts-ignore - BookingStatus enum might be stale in types
+            createdBooking = await tx.booking.create({
+                data: {
+                    tripId,
+                    experienceId: experience.id,
+                    guestId: userId, 
+                    itemId: item.id,
+                    date: day.date || new Date(), 
+                    guests: 1, 
+                    totalPrice: experience.price,
+                    currency: experience.currency,
+                    status: 'TENTATIVE',
+                    paymentStatus: 'PENDING',
+                    chatUnlocked: true 
+                }
             });
-            
-            if (experience) {
-                // @ts-ignore - BookingStatus enum might be stale in types
-                createdBooking = await tx.booking.create({
-                    data: {
-                        tripId,
-                        experienceId,
-                        guestId: userId, 
-                        itemId: item.id,
-                        date: day.date || new Date(), 
-                        guests: 1, 
-                        totalPrice: experience.price,
-                        currency: experience.currency,
-                        status: 'TENTATIVE',
-                        paymentStatus: 'PENDING',
-                        chatUnlocked: true 
-                    }
-                });
-            }
         }
         
         return { item, booking: createdBooking };
@@ -118,7 +119,7 @@ export async function POST(
 // DELETE to remove item
 export async function DELETE(
     req: Request,
-    { params }: { params: { tripId: string } } // This route might be /api/trips/[tripId]/items/[itemId] ? 
+    { params }: { params: Promise<{ tripId: string }> } // This route might be /api/trips/[tripId]/items/[itemId] ? 
     // Or body? REST prefers resource URL. 
 ) {
     // Implementing DELETE in a separate file if using strict REST /items/[itemId]

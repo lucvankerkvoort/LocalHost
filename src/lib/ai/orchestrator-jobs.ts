@@ -23,7 +23,16 @@ export type OrchestratorJob = {
   error?: string;
 };
 
-const jobs = new Map<string, OrchestratorJob>();
+// Use globalThis to persist jobs across hot reloads in development
+const globalForJobs = globalThis as unknown as {
+  orchestratorJobs: Map<string, OrchestratorJob>;
+};
+
+if (!globalForJobs.orchestratorJobs) {
+  globalForJobs.orchestratorJobs = new Map<string, OrchestratorJob>();
+}
+
+const jobs = globalForJobs.orchestratorJobs;
 const JOB_TTL_MS = 1000 * 60 * 30;
 
 function scheduleCleanup(id: string) {

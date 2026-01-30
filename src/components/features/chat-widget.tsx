@@ -11,7 +11,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { ChatMessage } from './chat-message';
 import { OrchestratorJobStatus } from './orchestrator-job-status';
-import { useAppDispatch } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { ingestToolInvocations, ingestToolParts } from '@/lib/ai/tool-events';
 
 interface HostMatch {
@@ -98,6 +98,7 @@ export function ChatWidget() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const seenToolEventsRef = useRef<Set<string>>(new Set());
   const dispatch = useAppDispatch();
+  const activeTripId = useAppSelector((state) => state.globe.tripId);
   
   // Use the chatId to maintain separate conversations per intent
   const { messages, sendMessage, status, error } = useChat({ id: chatId }) as any;
@@ -243,14 +244,18 @@ export function ChatWidget() {
       );
 
     if (hasToolParts) {
-      ingestToolParts(dispatch, parts, 'chat', seenToolEventsRef.current);
+      ingestToolParts(dispatch, parts, 'chat', seenToolEventsRef.current, {
+        tripId: activeTripId,
+      });
       return;
     }
 
     if (lastMessage?.toolInvocations) {
-      ingestToolInvocations(dispatch, lastMessage.toolInvocations, 'chat');
+      ingestToolInvocations(dispatch, lastMessage.toolInvocations, 'chat', {
+        tripId: activeTripId,
+      });
     }
-  }, [dispatch, messages]);
+  }, [activeTripId, dispatch, messages]);
 
   // Listen for custom chat triggers (e.g. from "Add to Plan" buttons)
   useEffect(() => {

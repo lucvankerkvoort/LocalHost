@@ -9,7 +9,30 @@ import { semanticSearchHosts, semanticSearchExperiences, type SearchIntent } fro
 const SearchLocalhostsParams = z.object({
   query: z.string().describe('Natural language search query'),
   location: z.string().optional().describe('City or area to search in'),
-  category: z.enum(['food', 'art', 'culture', 'nature', 'adventure', 'nightlife', 'wellness', 'family'])
+  category: z
+    .enum([
+      'FOOD_DRINK',
+      'ARTS_CULTURE',
+      'OUTDOOR_ADVENTURE',
+      'NIGHTLIFE_SOCIAL',
+      'WELLNESS',
+      'LEARNING',
+      'FAMILY',
+      // Legacy/alias values still accepted for early-stage data.
+      'food',
+      'art',
+      'culture',
+      'nature',
+      'adventure',
+      'nightlife',
+      'wellness',
+      'learning',
+      'family',
+      'food-drink',
+      'arts-culture',
+      'outdoor-adventure',
+      'nightlife-social',
+    ])
     .optional()
     .describe('Filter by experience category'),
   searchType: z.enum(['hosts', 'experiences']).default('experiences').describe('Search for hosts or specific experiences'),
@@ -50,8 +73,27 @@ export const searchLocalhostsTool = createTool({
   async handler(params): Promise<ToolResult<SearchLocalhostsResult>> {
     try {
       // Convert params to SearchIntent format
+      const categoryAliasMap: Record<string, string> = {
+        food: 'FOOD_DRINK',
+        'food-drink': 'FOOD_DRINK',
+        art: 'ARTS_CULTURE',
+        culture: 'ARTS_CULTURE',
+        'arts-culture': 'ARTS_CULTURE',
+        nature: 'OUTDOOR_ADVENTURE',
+        adventure: 'OUTDOOR_ADVENTURE',
+        'outdoor-adventure': 'OUTDOOR_ADVENTURE',
+        nightlife: 'NIGHTLIFE_SOCIAL',
+        'nightlife-social': 'NIGHTLIFE_SOCIAL',
+        wellness: 'WELLNESS',
+        learning: 'LEARNING',
+        family: 'FAMILY',
+      };
+      const normalizedCategory = params.category
+        ? categoryAliasMap[params.category] || params.category
+        : undefined;
+
       const intent: SearchIntent = {
-        categories: params.category ? [params.category] : [],
+        categories: normalizedCategory ? [normalizedCategory] : [],
         keywords: params.query.split(/\s+/).filter(w => w.length > 2),
         location: params.location,
         preferences: [],
@@ -89,7 +131,7 @@ export const searchLocalhostsTool = createTool({
               type: 'experience' as const,
               name: r.experience.title,
               description: r.experience.description,
-              photo: r.experience.photo,
+              photo: r.experience.photos[0] || r.experience.hostPhoto,
               score: r.score,
               matchReasons: r.matchReasons,
               hostName: r.experience.hostName,

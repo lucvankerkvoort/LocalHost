@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
-import { ConditionalChatWidget } from "@/components/features";
-import { Header } from "@/components/layout/header";
+import { ConditionalChatWidget, Navbar } from "@/components/features";
 import { GlobalUI } from "@/components/layout/global-ui";
 import "./globals.css";
 
@@ -40,8 +39,8 @@ export default function RootLayout({
       >
         <Providers>
           <GlobalUI />
-          <Header />
-          <main className="flex-1 relative overflow-y-auto overflow-x-hidden flex flex-col">
+          <Navbar />
+          <main className="flex-1 relative overflow-y-auto overflow-x-hidden flex flex-col pt-16">
             {children}
           </main>
           <ConditionalChatWidget />

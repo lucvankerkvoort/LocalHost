@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 
 export async function GET(
     req: Request,
-    { params }: { params: { bookingId: string } }
+    { params }: { params: Promise<{ bookingId: string }> }
 ) {
     try {
         const session = await auth();
@@ -45,7 +45,7 @@ export async function GET(
 
 export async function POST(
     req: Request,
-    { params }: { params: { bookingId: string } }
+    { params }: { params: Promise<{ bookingId: string }> }
 ) {
     try {
         const session = await auth();

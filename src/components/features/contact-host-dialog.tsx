@@ -56,7 +56,7 @@ export function ContactHostDialog({
         {/* Header with Experience Image */}
         <div className="relative h-32 bg-[var(--muted)]">
           <img
-            src={experience.photo}
+            src={experience.photos?.[0] || host.photo}
             alt={experience.title}
             className="w-full h-full object-cover"
           />

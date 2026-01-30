@@ -12,6 +12,8 @@ import { HOSTS } from '@/lib/data/hosts';
  * In production, this would process payment before confirming.
  */
 export async function POST(request: NextRequest) {
+  return NextResponse.json({ error: 'Not implemented' }, { status: 501 });
+  /*
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -112,6 +114,7 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+  */
 }
 
 /**
@@ -119,6 +122,8 @@ export async function POST(request: NextRequest) {
  * Get all bookings for the current user
  */
 export async function GET(request: NextRequest) {
+  return NextResponse.json({ error: 'Not implemented' }, { status: 501 });
+  /*
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -173,4 +178,5 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+  */
 }

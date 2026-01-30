@@ -162,7 +162,7 @@ function HostCardWithExperiences({
               >
                 <div className="flex gap-3">
                   <img
-                    src={exp.photo}
+                    src={exp.photos?.[0] || host.photo}
                     alt={exp.title}
                     className="w-16 h-12 rounded-lg object-cover flex-shrink-0"
                   />

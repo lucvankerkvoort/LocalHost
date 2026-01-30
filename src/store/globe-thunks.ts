@@ -1,54 +1,83 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { setDestinations, setTripId } from './globe-slice';
+import { clearHostMarkers, clearItinerary, setDestinations, setTripId } from './globe-slice';
 import { convertTripToGlobeDestinations, ApiTrip } from '@/lib/api/trip-converter';
+import { convertPlanToGlobeData } from '@/lib/ai/plan-converter';
+import type { ItineraryPlan } from '@/lib/ai/types';
 import { RootState } from './store'; // Need to be careful with circular imports if store imports this. 
 // Ideally slice doesn't import thunks, components import thunks.
 
 // Fetch the user's active trip (or create one)
 export const fetchActiveTrip = createAsyncThunk(
   'globe/fetchActiveTrip',
-  async (_, { dispatch }) => {
+  async (tripId: string | undefined | null, { dispatch }) => {
+    // Clear previous state immediately to prevent stale data
+    // dispatch(clearItinerary()); // This might cause flashing. Let component handle unmount clearing.
+    // Actually, if we switch trips directly (no unmount), we need to clear.
+    // But usually we navigate via router, which unmounts.
+    
     try {
-      // 1. Get trips
-      const res = await fetch('/api/trips');
-      
-      // Handle Guest / Unauthorized gracefully
-      if (res.status === 401 || res.status === 403) {
-          console.log('[fetchActiveTrip] Guest user detected, starting in local mode');
-          return null; // No trip, but no error. UI remains in "Local Mode"
-      }
+      dispatch(clearHostMarkers());
+      let activeTrip: ApiTrip | null = null;
 
-      if (!res.ok) throw new Error('Failed to fetch trips');
-      const data = await res.json();
-      
-      let activeTrip: ApiTrip;
-
-      if (data.trips && data.trips.length > 0) {
-        activeTrip = data.trips[0];
-        const detailRes = await fetch(`/api/trips/${activeTrip.id}`);
+      // 1. If tripId provided, fetch that specific trip
+      if (tripId) {
+        const detailRes = await fetch(`/api/trips/${tripId}`);
+        if (detailRes.status === 401 || detailRes.status === 403) {
+            console.log('[fetchActiveTrip] Unauthorized/Guest accessing trip');
+            return null; 
+        }
         if (detailRes.ok) {
             activeTrip = await detailRes.json();
-        } 
+        } else {
+             console.error('[fetchActiveTrip] Failed to fetch specific trip:', tripId);
+             // Fallback? Or just fail? Fail for now.
+             return null;
+        }
       } else {
-        // Create a default trip
-        const createRes = await fetch('/api/trips', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                title: 'My First Trip', 
-                startDate: new Date().toISOString(),
-                endDate: new Date(Date.now() + 7 * 86400000).toISOString()
-            })
-        });
-        if (!createRes.ok) throw new Error('Failed to create trip');
-        activeTrip = await createRes.json();
+        // 2. Default behavior: Get first trip or create default
+        const res = await fetch('/api/trips');
+        
+        // Handle Guest / Unauthorized gracefully
+        if (res.status === 401 || res.status === 403) {
+            console.log('[fetchActiveTrip] Guest user detected, starting in local mode');
+            return null; // No trip, but no error. UI remains in "Local Mode"
+        }
+
+        if (!res.ok) throw new Error('Failed to fetch trips');
+        const data = await res.json();
+        
+        if (data.trips && data.trips.length > 0) {
+            // Fetch detail for the first one
+            const firstTrip = data.trips[0];
+            const detailRes = await fetch(`/api/trips/${firstTrip.id}`);
+            if (detailRes.ok) {
+                activeTrip = await detailRes.json();
+            } 
+        } else {
+            // Create a default trip
+            const createRes = await fetch('/api/trips', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    title: 'My First Trip', 
+                    startDate: new Date().toISOString(),
+                    endDate: new Date(Date.now() + 7 * 86400000).toISOString()
+                })
+            });
+            if (!createRes.ok) throw new Error('Failed to create trip');
+            activeTrip = await createRes.json();
+        }
       }
 
       // Convert and update store
-      if (activeTrip && activeTrip.stops) {
+      if (activeTrip && activeTrip.id) {
           dispatch(setTripId(activeTrip.id));
-          const globeDestinations = convertTripToGlobeDestinations(activeTrip);
-          dispatch(setDestinations(globeDestinations));
+          if (activeTrip.stops && activeTrip.stops.length > 0) {
+              const globeDestinations = convertTripToGlobeDestinations(activeTrip);
+              dispatch(setDestinations(globeDestinations));
+          } else {
+              dispatch(clearItinerary());
+          }
           return activeTrip;
       }
       return null;
@@ -165,6 +194,68 @@ export const removeExperienceFromTrip = createAsyncThunk(
         } catch (error) {
              console.error('Error removing experience:', error);
              throw error;
+        }
+    }
+);
+
+import { convertGlobeDestinationsToApiPayload } from '@/lib/api/trip-converter';
+
+export const saveTripPlan = createAsyncThunk(
+    'globe/saveTripPlan',
+    async (_, { getState }) => {
+        const state = getState() as any; // Cast to access root state
+        const tripId = state.globe.tripId;
+        const destinations = state.globe.destinations;
+
+        if (!tripId) return; 
+
+        try {
+            const payload = convertGlobeDestinationsToApiPayload(destinations);
+            
+            const res = await fetch(`/api/trips/${tripId}/plan`, {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                console.error('Failed to auto-save trip plan');
+                throw new Error('Failed to save trip');
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('Error saving trip plan:', error);
+            throw error;
+        }
+    }
+);
+
+export const saveTripPlanForTrip = createAsyncThunk(
+    'globe/saveTripPlanForTrip',
+    async ({ tripId, plan }: { tripId: string; plan: ItineraryPlan }) => {
+        if (!tripId) return;
+
+        try {
+            const { destinations } = convertPlanToGlobeData(plan);
+            const payload = convertGlobeDestinationsToApiPayload(destinations);
+            
+            const res = await fetch(`/api/trips/${tripId}/plan`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const errorText = await res.text();
+                console.error('[saveTripPlanForTrip] Failed to save trip plan:', res.status, errorText);
+                throw new Error('Failed to save trip plan');
+            }
+
+            return true;
+        } catch (error) {
+            console.error('[saveTripPlanForTrip] Error:', error);
+            throw error;
         }
     }
 );

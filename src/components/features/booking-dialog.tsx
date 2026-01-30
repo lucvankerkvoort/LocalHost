@@ -81,7 +81,7 @@ export function BookingDialog({
           {/* Experience info */}
           <div className="flex gap-4 mb-6">
             <Image
-              src={experience.photo || host.photo}
+              src={experience.photos?.[0] || host.photo}
               alt={experience.title}
               width={80}
               height={80}

@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { tripId: string; itemId: string } }
+  { params }: { params: Promise<{ tripId: string; itemId: string }> }
 ) {
   try {
     const session = await auth();

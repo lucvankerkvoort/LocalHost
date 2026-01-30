@@ -111,7 +111,7 @@ async function fetchNominatimResults(
 
   const response = await fetch(url.toString(), {
     headers: {
-      'User-Agent': 'Localhost-Travel-App/1.0 (contact@localhost.dev)',
+      'User-Agent': 'LocalhostTravelApp/1.0 (https://localhost.dev; contact@localhost.dev)',
     },
   });
 
@@ -270,8 +270,9 @@ export const resolvePlaceTool = createTool({
           console.warn(`[resolve_place] Error for "${searchQuery}":`, error);
         }
 
-        // Small delay between variants
-        await new Promise(resolve => setTimeout(resolve, 350));
+        // Small delay between variants to respect rate limits (1 req/sec)
+        // If the first query failed to find results, we must wait > 1s before trying the next
+        await new Promise(resolve => setTimeout(resolve, 1200));
       }
 
       console.warn(`[resolve_place] No results for: ${params.name}`);

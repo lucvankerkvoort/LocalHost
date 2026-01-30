@@ -11,7 +11,7 @@ interface AddItemModalProps {
 }
 
 export function AddItemModal({ isOpen, onClose, onSave, editingItem }: AddItemModalProps) {
-  const [type, setType] = useState<ItineraryItemType>('activity');
+  const [type, setType] = useState<ItineraryItemType>('SIGHT');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
@@ -28,7 +28,7 @@ export function AddItemModal({ isOpen, onClose, onSave, editingItem }: AddItemMo
       setStartTime(editingItem.startTime || '');
       setEndTime(editingItem.endTime || '');
     } else {
-      setType('activity');
+      setType('SIGHT');
       setTitle('');
       setDescription('');
       setLocation('');

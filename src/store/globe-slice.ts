@@ -106,6 +106,7 @@ const globeSlice = createSlice({
       state.routeMarkers = [];
       state.selectedDestination = null;
       state.visualTarget = null;
+      state.hostMarkers = [];
       state.placeMarkers = [];
     },
     setItineraryFromPlan(state, action: PayloadAction<ItineraryPlan>) {
@@ -203,6 +204,16 @@ const globeSlice = createSlice({
         result.success &&
         result.plan
       ) {
+        const resultTripId =
+          typeof (result as { tripId?: unknown }).tripId === 'string'
+            ? ((result as { tripId: string }).tripId)
+            : null;
+        if (resultTripId && state.tripId && resultTripId !== state.tripId) {
+          return;
+        }
+        if (resultTripId && !state.tripId) {
+          state.tripId = resultTripId;
+        }
         applyPlan(state, result.plan as ItineraryPlan);
         if (Array.isArray(result.hostMarkers)) {
           state.hostMarkers = result.hostMarkers as HostMarkerData[];
