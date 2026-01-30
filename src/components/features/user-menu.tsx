@@ -68,6 +68,13 @@ export function UserMenu() {
               Your Profile
             </Link>
             <Link
+              href="/trips"
+              onClick={() => setIsOpen(false)}
+              className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--sand-beige)] transition-colors"
+            >
+              My Trips
+            </Link>
+            <Link
               href="/bookings"
               onClick={() => setIsOpen(false)}
               className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--sand-beige)] transition-colors"
