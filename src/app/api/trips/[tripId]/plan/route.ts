@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 
 export async function POST(
   req: Request,
-  { params }: { params: { tripId: string } }
+  { params }: { params: Promise<{ tripId: string }> }
 ) {
   try {
     const session = await auth();

@@ -134,6 +134,7 @@ export function ItineraryBuilder({
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
+              onBookItem={() => {}} // Booking not supported in builder yet
             />
           ))}
         </div>

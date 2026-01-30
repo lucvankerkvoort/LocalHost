@@ -24,7 +24,20 @@ interface ApiItineraryDay {
   items: ApiItineraryItem[]; // Update reference
 }
 
-// ... (ApiTripStop and ApiTrip remain same)
+export interface ApiTripStop {
+  id: string;
+  city: string;
+  lat: number;
+  lng: number;
+  days: ApiItineraryDay[];
+}
+
+export interface ApiTrip {
+  id: string;
+  userId: string;
+  title: string;
+  stops: ApiTripStop[];
+}
 
 export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[] {
   const destinations: GlobeDestination[] = [];

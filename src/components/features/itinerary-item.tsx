@@ -1,14 +1,14 @@
 'use client';
 
-import { ItineraryItem as ItineraryItemType, ITEM_TYPE_CONFIG } from '@/types/itinerary';
+import { ItineraryItem as ItineraryItemData, ItineraryItemType, ITEM_TYPE_CONFIG } from '@/types/itinerary';
 
 interface ItineraryItemProps {
-  item: ItineraryItemType;
+  item: ItineraryItemData;
   dayId: string;
-  onEdit: (item: ItineraryItemType) => void;
+  onEdit: (item: ItineraryItemData) => void;
   onDelete: (dayId: string, itemId: string) => void;
-  onDragStart: (e: React.DragEvent, dayId: string, item: ItineraryItemType) => void;
-  onBook: (dayId: string, item: ItineraryItemType) => void;
+  onDragStart: (e: React.DragEvent, dayId: string, item: ItineraryItemData) => void;
+  onBook: (dayId: string, item: ItineraryItemData) => void;
 }
 
 export function ItineraryItem({ 

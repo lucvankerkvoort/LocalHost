@@ -51,7 +51,7 @@ export async function POST() {
       );
     }
 
-    if (draft.stops.length === 0) {
+    if ((draft as any).stops.length === 0) {
       return NextResponse.json(
         { error: 'Experience must have at least one stop' },
         { status: 400 }
@@ -74,7 +74,7 @@ export async function POST() {
 
     // Create stops for the published experience
     await prisma.experienceStop.createMany({
-      data: draft.stops.map((stop) => ({
+      data: (draft as any).stops.map((stop: any) => ({
         experienceId: experience.id,
         name: stop.name,
         description: stop.description,

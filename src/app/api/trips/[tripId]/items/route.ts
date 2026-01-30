@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 
 export async function POST(
   req: Request,
-  { params }: { params: { tripId: string } }
+  { params }: { params: Promise<{ tripId: string }> }
 ) {
   try {
     const session = await auth();
@@ -118,7 +118,7 @@ export async function POST(
 // DELETE to remove item
 export async function DELETE(
     req: Request,
-    { params }: { params: { tripId: string } } // This route might be /api/trips/[tripId]/items/[itemId] ? 
+    { params }: { params: Promise<{ tripId: string }> } // This route might be /api/trips/[tripId]/items/[itemId] ? 
     // Or body? REST prefers resource URL. 
 ) {
     // Implementing DELETE in a separate file if using strict REST /items/[itemId]

@@ -5,7 +5,9 @@ export type ItineraryItemType =
   | 'meal' 
   | 'transport' 
   | 'accommodation' 
-  | 'localhost';
+  | 'localhost'
+  | 'EXPERIENCE'
+  | 'SIGHT';
 
 export const ITEM_TYPE_CONFIG: Record<ItineraryItemType, { label: string; icon: string; color: string }> = {
   activity: { label: 'Activity', icon: '🎯', color: 'var(--blue-green)' },
@@ -13,6 +15,8 @@ export const ITEM_TYPE_CONFIG: Record<ItineraryItemType, { label: string; icon: 
   transport: { label: 'Transport', icon: '🚗', color: 'var(--muted)' },
   accommodation: { label: 'Accommodation', icon: '🏨', color: 'var(--deep-space-blue)' },
   localhost: { label: 'Localhost', icon: '👤', color: 'var(--amber-flame)' },
+  EXPERIENCE: { label: 'Experience', icon: '✨', color: 'var(--amber-flame)' },
+  SIGHT: { label: 'Sight', icon: '👀', color: 'var(--blue-green)' },
 };
 
 export interface ItineraryItem {
