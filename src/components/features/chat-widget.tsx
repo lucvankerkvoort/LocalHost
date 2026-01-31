@@ -88,7 +88,10 @@ const INTENT_UI_CONFIG = {
 export function ChatWidget() {
   const pathname = usePathname();
   // Fix: Check startsWith to handle /become-host/[id]
-  const intent = pathname?.startsWith('/become-host') ? 'become_host' : 'general';
+  const isHostContext =
+    pathname?.startsWith('/become-host') ||
+    (pathname?.startsWith('/experiences/') && pathname?.endsWith('/availability'));
+  const intent = isHostContext ? 'become_host' : 'general';
   const uiConfig = INTENT_UI_CONFIG[intent];
   
   // Stable chat ID per intent - conversations persist when switching routes

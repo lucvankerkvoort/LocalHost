@@ -115,6 +115,8 @@ export async function saveExperienceDraft(
     currency?: string;
     stops?: any[]; 
     city?: string;
+    cityLat?: number;
+    cityLng?: number;
     duration?: number;
   }
 ): Promise<{ success: boolean; error?: string }> {
@@ -147,6 +149,8 @@ export async function saveExperienceDraft(
           price: data.price,
           currency: data.currency,
           city: data.city,
+          cityLat: data.cityLat,
+          cityLng: data.cityLng,
           duration: data.duration,
           updatedAt: new Date(),
         }
@@ -182,5 +186,35 @@ export async function saveExperienceDraft(
   } catch (error) {
     console.error('Failed to save draft:', error);
     return { success: false, error: 'Failed to save draft' };
+  }
+}
+
+export async function deleteExperience(id: string, type: 'DRAFT' | 'PUBLISHED'): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const userId = session.user.id;
+
+    if (type === 'DRAFT') {
+      const draft = await prisma.experienceDraft.findUnique({ where: { id } });
+      if (!draft || draft.userId !== userId) {
+        return { success: false, error: 'Draft not found or unauthorized' };
+      }
+      await prisma.experienceDraft.delete({ where: { id } });
+    } else {
+      const published = await prisma.hostExperience.findUnique({ where: { id } });
+      if (!published || published.hostId !== userId) {
+        return { success: false, error: 'Experience not found or unauthorized' };
+      }
+      await prisma.hostExperience.delete({ where: { id } });
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to delete experience:', error);
+    return { success: false, error: 'Failed to delete experience' };
   }
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getUserExperiences, type MyExperience } from '@/actions/experiences';
+import { getUserExperiences, deleteExperience, type MyExperience } from '@/actions/experiences';
 import { ExperienceCard } from './experience-card';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
@@ -14,6 +14,7 @@ export function ExperienceList() {
 
   useEffect(() => {
     async function load() {
+      // ... same load logic
       try {
         const result = await getUserExperiences();
         if (result.success && result.data) {
@@ -29,14 +30,28 @@ export function ExperienceList() {
   }, []);
 
   const handleRefine = (id: string) => {
-    // Navigate to editor with specific ID
     router.push(`/become-host/${id}`);
   };
 
+  const handleDelete = async (id: string, type: 'DRAFT' | 'PUBLISHED') => {
+    if (!confirm('Are you sure you want to delete this experience? This cannot be undone.')) return;
+
+    // Optimistic update
+    setExperiences(prev => prev.filter(e => e.id !== id));
+
+    const result = await deleteExperience(id, type);
+    if (!result.success) {
+      // Revert if failed
+      alert('Failed to delete experience');
+      const loadResult = await getUserExperiences();
+      if (loadResult.success && loadResult.data) {
+        setExperiences(loadResult.data);
+      }
+    }
+  };
+
   const handleView = (id: string) => {
-    // Navigate to preview
-    // router.push(`/experiences/${id}`);
-    console.log('View', id);
+    router.push(`/experiences/${id}/availability`);
   };
 
   if (loading) {
@@ -80,6 +95,7 @@ export function ExperienceList() {
           experience={exp}
           onRefine={handleRefine}
           onView={handleView}
+          onDelete={handleDelete}
           onShare={(id) => {
             if (navigator.share) {
               navigator.share({ title: exp.title, url: window.location.origin + `/experiences/${id}` });

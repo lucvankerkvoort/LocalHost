@@ -7,8 +7,9 @@ import {
   MapPin, 
   Clock, 
   Sparkles, 
-  Eye, 
-  Share2 
+  Calendar,
+  Share2,
+  Trash2
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -17,13 +18,15 @@ interface ExperienceCardProps {
   onRefine?: (id: string) => void;
   onView?: (id: string) => void;
   onShare?: (id: string) => void;
+  onDelete?: (id: string, type: 'DRAFT' | 'PUBLISHED') => void;
 }
 
 export function ExperienceCard({ 
   experience, 
   onRefine, 
   onView, 
-  onShare 
+  onShare,
+  onDelete
 }: ExperienceCardProps) {
   // Color logic for status
   const isPublished = experience.type === 'PUBLISHED';
@@ -83,8 +86,8 @@ export function ExperienceCard({
           onClick={() => onView?.(experience.id)}
           className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]/50 transition-colors"
         >
-          <Eye className="w-4 h-4 text-[var(--blue-green)]" />
-          View
+          <Calendar className="w-4 h-4 text-[var(--blue-green)]" />
+          Availability
         </button>
 
         <div className="w-px bg-[var(--border)]/50 my-2" />
@@ -95,6 +98,16 @@ export function ExperienceCard({
         >
           <Share2 className="w-4 h-4" />
           Share
+        </button>
+
+        <div className="w-px bg-[var(--border)]/50 my-2" />
+
+        <button
+          onClick={() => onDelete?.(experience.id, experience.type)}
+          className="flex items-center justify-center gap-2 py-3 px-4 text-sm font-medium text-red-500 hover:bg-red-500/10 transition-colors"
+          title="Delete"
+        >
+          <Trash2 className="w-4 h-4" />
         </button>
       </div>
     </div>

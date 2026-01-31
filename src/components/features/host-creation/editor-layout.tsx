@@ -31,6 +31,8 @@ export function EditorLayout({ draftId, initialData }: EditorLayoutProps) {
       dispatch(setDraft({
         stops: initialData.stops || [],
         city: initialData.city,
+        cityLat: initialData.cityLat,
+        cityLng: initialData.cityLng,
         title: initialData.title,
         shortDesc: initialData.shortDesc,
         longDesc: initialData.longDesc,
@@ -54,6 +56,8 @@ export function EditorLayout({ draftId, initialData }: EditorLayoutProps) {
         shortDesc: debouncedState.shortDesc || undefined,
         longDesc: debouncedState.longDesc || undefined,
         city: debouncedState.city || undefined,
+        cityLat: debouncedState.cityLat || undefined,
+        cityLng: debouncedState.cityLng || undefined,
         duration: debouncedState.duration || undefined,
         sections: {
            stops: debouncedState.stops

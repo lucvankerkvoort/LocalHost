@@ -11,7 +11,7 @@ export default function MyExperiencesPage() {
         {/* Header */}
         <div className="p-6 pt-12 pb-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-[var(--foreground)]">My Experiences</h1>
-          <Link href="/become-host">
+          <Link href="/become-host?new=true">
             <Button size="sm" className="rounded-full bg-gradient-to-r from-[var(--princeton-orange)] to-red-500 hover:opacity-90 text-white shadow-lg shadow-orange-500/20 border-0 gap-1.5 pl-3 pr-4">
               <Plus className="w-4 h-4" />
               <span>Create</span>

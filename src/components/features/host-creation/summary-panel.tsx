@@ -2,9 +2,13 @@
 
 import { useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { selectHostCreation, updateDraft } from '@/store/host-creation-slice';
+import { selectHostCreation, updateDraft, updateStop, moveStop, removeStop } from '@/store/host-creation-slice';
 import { useRouter } from 'next/navigation';
 import { saveExperienceDraft } from '@/actions/experiences';
+import { ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableStopCard } from './sortable-stop-card';
 
 interface SummaryPanelProps {
   draftId?: string;
@@ -16,6 +20,21 @@ export function SummaryPanel({ draftId }: SummaryPanelProps) {
   const [isPublishing, setIsPublishing] = useState(false);
   const { city, stops, title, shortDesc, longDesc, duration, status } = useAppSelector(selectHostCreation);
   
+  // DnD Sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+       dispatch(moveStop({ activeId: active.id as string, overId: over?.id as string }));
+    }
+  };
+
   // Mock host info for MVP
   const host = {
     name: 'Luc V.',
@@ -98,32 +117,78 @@ export function SummaryPanel({ draftId }: SummaryPanelProps) {
           )}
         </section>
 
-        {/* 3. Stops */}
+        {/* 3. Stops (Editable) */}
         <section>
           <h3 className="text-xs uppercase tracking-wide font-semibold text-[var(--muted-foreground)] mb-3">Stops ({stops.length})</h3>
           
           {stops.length > 0 ? (
-            <div className="space-y-2 relative">
+            <div className="space-y-4 relative">
               {/* Connecting line */}
               <div className="absolute left-[15px] top-4 bottom-4 w-0.5 bg-[var(--border)] -z-10" />
               
               {stops.map((stop, idx) => (
-                <div key={stop.id} className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--princeton-orange)] text-white flex items-center justify-center text-sm font-bold shadow-sm">
+                <div key={stop.id} className="flex gap-3 group relative">
+                  {/* Number Badge */}
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--princeton-orange)] text-white flex items-center justify-center text-sm font-bold shadow-sm z-10 transition-transform group-hover:scale-110">
                     {idx + 1}
                   </div>
-                  <div className="flex-1 px-3 py-2 bg-[var(--card)] rounded-lg border border-[var(--border)] shadow-sm">
-                    <p className="font-medium text-sm">{stop.name}</p>
-                    {stop.description && (
-                      <p className="text-xs text-[var(--muted-foreground)] mt-1">{stop.description}</p>
-                    )}
+
+                  {/* Editable Card */}
+                  <div className="flex-1 bg-[var(--card)] rounded-xl border border-[var(--border)] shadow-sm overflow-hidden transition-all hover:shadow-md hover:border-[var(--princeton-orange)]/30">
+                    {/* Header: Name + Actions */}
+                    <div className="p-3 bg-[var(--muted)]/30 border-b border-[var(--border)] flex items-start gap-2">
+                      <input 
+                        type="text"
+                        value={stop.name}
+                        onChange={(e) => dispatch(updateStop({ id: stop.id, changes: { name: e.target.value } }))}
+                        className="flex-1 bg-transparent font-medium text-sm outline-none placeholder:text-[var(--muted-foreground)]"
+                        placeholder="Stop Name"
+                      />
+                      
+                      {/* Actions */}
+                      <div className="flex items-center gap-1">
+                         <button 
+                            onClick={() => dispatch(reorderStop({ id: stop.id, direction: 'up' }))}
+                            disabled={idx === 0}
+                            className="p-1 hover:bg-[var(--background)] rounded text-[var(--muted-foreground)] disabled:opacity-30"
+                            title="Move Up"
+                         >
+                           <ChevronUp className="w-3 h-3" />
+                         </button>
+                         <button 
+                            onClick={() => dispatch(reorderStop({ id: stop.id, direction: 'down' }))}
+                            disabled={idx === stops.length - 1}
+                            className="p-1 hover:bg-[var(--background)] rounded text-[var(--muted-foreground)] disabled:opacity-30"
+                            title="Move Down"
+                         >
+                           <ChevronDown className="w-3 h-3" />
+                         </button>
+                         <button 
+                            onClick={() => dispatch(removeStop(stop.id))}
+                            className="p-1 hover:bg-red-50 hover:text-red-500 rounded text-[var(--muted-foreground)] ml-1"
+                            title="Remove Stop"
+                         >
+                           <Trash2 className="w-3 h-3" />
+                         </button>
+                      </div>
+                    </div>
+
+                    {/* Body: Description */}
+                    <div className="p-3">
+                      <textarea 
+                        value={stop.description || ''}
+                        onChange={(e) => dispatch(updateStop({ id: stop.id, changes: { description: e.target.value } }))}
+                        placeholder="Describe what happens here..."
+                        className="w-full bg-transparent text-xs text-[var(--muted-foreground)] outline-none resize-none min-h-[40px] placeholder:text-[var(--muted-foreground)]/50"
+                      />
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
             <div className="px-4 py-3 bg-[var(--muted)]/20 rounded-xl border border-dashed border-[var(--border)] text-[var(--muted-foreground)] text-sm italic">
-              No stops added yet
+              No stops added yet. Chat with the agent to create them!
             </div>
           )}
         </section>
