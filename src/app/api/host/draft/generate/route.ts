@@ -33,7 +33,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { city, country, stopNames } = body;
+    const { draftId, city, country, stopNames } = body;
+
+    if (!draftId) {
+       return NextResponse.json({ error: 'Draft ID is required' }, { status: 400 });
+    }
+
+    // Verify ownership first
+    const existingDraft = await prisma.experienceDraft.findUnique({
+      where: { id: draftId }
+    });
+    
+    if (!existingDraft || existingDraft.userId !== session.user.id) {
+       return NextResponse.json({ error: 'Draft not found or unauthorized' }, { status: 404 });
+    }
 
     if (!city || !stopNames || !Array.isArray(stopNames) || stopNames.length === 0) {
       return NextResponse.json(
@@ -63,19 +76,9 @@ The tone should be warm, personal, and authentic - like a local friend sharing t
     });
 
     // Update the draft with generated content
-    const draft = await prisma.experienceDraft.upsert({
-      where: { userId: session.user.id },
-      create: {
-        userId: session.user.id,
-        city,
-        country,
-        title: generatedContent.title,
-        shortDesc: generatedContent.shortDesc,
-        longDesc: generatedContent.longDesc,
-        duration: generatedContent.duration,
-        status: 'AI_GENERATED',
-      },
-      update: {
+    const draft = await prisma.experienceDraft.update({
+      where: { id: draftId },
+      data: {
         city,
         country,
         title: generatedContent.title,

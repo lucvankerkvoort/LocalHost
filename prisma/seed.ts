@@ -1,7 +1,17 @@
 import 'dotenv/config';
-import { ExperienceCategory } from '@prisma/client';
-import { prisma } from '../src/lib/prisma';
+import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL is required to run the seed script.');
+}
+
+const prisma = new PrismaClient({
+  // @ts-ignore
+  accelerateUrl: databaseUrl,
+  log: ['info', 'warn', 'error'],
+});
 
 async function main() {
   console.log('🌱 Seeding database...');
@@ -84,7 +94,7 @@ async function main() {
       country: 'USA',
       languages: ['English'],
       interests: ['Travel', 'Food', 'Culture'],
-      isHost: false,
+      isHost: true,
       isVerified: true,
       verificationTier: 'VERIFIED',
       trustScore: 75,
@@ -208,6 +218,39 @@ What makes this special:
     },
   });
 
+  const experience4 = await prisma.experience.create({
+    data: {
+      hostId: demoGuest.id,
+      title: 'Golden Gate Morning Coffee Walk',
+      description: `Start your day with a relaxed walk along the Embarcadero with coffee and views of the Bay Bridge.
+
+We’ll take a scenic loop, stop at my favorite local café, and end with a quick photo stop near the Ferry Building.
+
+What to expect:
+• Easy, flat walk (45–60 min)
+• Local coffee + pastries
+• Neighborhood tips for the rest of your day`,
+      category: 'ARTS_CULTURE',
+      neighborhood: 'Embarcadero',
+      city: 'San Francisco',
+      country: 'USA',
+      duration: 90,
+      minGroupSize: 1,
+      maxGroupSize: 6,
+      price: 3500,
+      currency: 'USD',
+      includedItems: ['Coffee or tea', 'Pastry', 'Local tips'],
+      excludedItems: ['Transportation'],
+      photos: [
+        'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=800&h=600&fit=crop',
+        'https://images.unsplash.com/photo-1444927714506-8492d94b4e3d?w=800&h=600&fit=crop',
+      ],
+      rating: 4.7,
+      reviewCount: 18,
+      isActive: true,
+    },
+  });
+
   console.log('✓ Created experiences');
 
   // Create availability for experiences
@@ -247,6 +290,19 @@ What makes this special:
           startTime: '05:00',
           endTime: '09:00',
           spotsLeft: 4,
+        },
+      });
+    }
+
+    // Experience 4 availability (weekday mornings)
+    if (date.getDay() >= 1 && date.getDay() <= 5) {
+      await prisma.experienceAvailability.create({
+        data: {
+          experienceId: experience4.id,
+          date: date,
+          startTime: '08:00',
+          endTime: '10:00',
+          spotsLeft: 6,
         },
       });
     }

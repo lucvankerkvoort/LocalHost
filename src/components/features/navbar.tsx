@@ -110,6 +110,13 @@ export function Navbar() {
                 My Trips
               </Link>
               <Link 
+                href="/experiences" 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="text-lg font-medium text-[var(--foreground)] hover:text-[var(--princeton-orange)] transition-colors"
+              >
+                My Experiences
+              </Link>
+              <Link 
                 href={ctaLink.href} 
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="text-lg font-medium text-[var(--foreground)] hover:text-[var(--princeton-orange)] transition-colors"

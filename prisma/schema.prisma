@@ -50,7 +50,7 @@ model User {
   reviewsReceived   Review[]     @relation("RevieweeReviews")
   messagesSent      Message[]    @relation("SentMessages")
   trips             Trip[]
-  experienceDraft   ExperienceDraft?
+  experienceDrafts  ExperienceDraft[]
   hostExperience    HostExperience?
   
   createdAt DateTime @default(now())
@@ -155,9 +155,13 @@ model ExperienceAvailability {
   experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
   
   date         DateTime
-  startTime    String   // "09:00"
-  endTime      String   // "12:00"
-  spotsLeft    Int
+  startTime    String?  // "09:00"
+  endTime      String?  // "12:00"
+  spotsLeft    Int?     // Optional for date-only availability
+  timezone     String?  // IANA TZ, e.g. "Europe/Rome"
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
   
   @@index([experienceId, date])
 }
@@ -291,6 +295,9 @@ model Booking {
   
   // Details
   date          DateTime
+  startTime     String?
+  endTime       String?
+  timezone      String?
   guests        Int
   totalPrice    Int      // in cents
   currency      String   @default("USD")
@@ -433,23 +440,30 @@ enum ReviewType {
 
 model ExperienceDraft {
   id          String   @id @default(cuid())
-  userId      String   @unique  // Only one draft per user (MVP)
+  userId      String   // Removed @unique to allow multiple drafts
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   // Location
   city        String?
   country     String?
+  cityLat     Float?
+  cityLng     Float?
   
   // Content (AI-generated, host-editable)
   title       String?
   shortDesc   String?  @db.Text  // Marketing-facing
   longDesc    String?  @db.Text  // Narrative description
   
+  // Flexible sections for AI generation (e.g. house rules, amenities)
+  sections    Json?    @default("{}")
+
   // Stops
   stops       ExperienceStop[] @relation("DraftStops")
   
   // Metadata
   duration    Int?     // Estimated minutes
+  price       Int?     // Cents
+  currency    String?  @default("USD")
   status      DraftStatus @default(IN_PROGRESS)
   
   createdAt   DateTime @default(now())

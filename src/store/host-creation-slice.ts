@@ -49,17 +49,54 @@ export const hostCreationSlice = createSlice({
     removeStop: (state, action: PayloadAction<string>) => {
       state.stops = state.stops.filter((s) => s.id !== action.payload);
     },
-    reorderStops: (state, action: PayloadAction<{ id: string; newOrder: number }[]>) => {
-      // Logic would be here
+    updateStop: (state, action: PayloadAction<{ id: string; changes: Partial<HostCreationStop> }>) => {
+      const stop = state.stops.find((s) => s.id === action.payload.id);
+      if (stop) {
+        Object.assign(stop, action.payload.changes);
+      }
+    },
+    reorderStop: (state, action: PayloadAction<{ id: string; direction: 'up' | 'down' }>) => {
+      const index = state.stops.findIndex((s) => s.id === action.payload.id);
+      if (index === -1) return;
+
+      const newIndex = action.payload.direction === 'up' ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= state.stops.length) return;
+
+      const stop = state.stops[index];
+      state.stops.splice(index, 1);
+      state.stops.splice(newIndex, 0, stop);
+      
+      // Update order property
+      state.stops.forEach((s, i) => {
+        s.order = i + 1;
+      });
+    },
+    moveStop: (state, action: PayloadAction<{ activeId: string; overId: string }>) => {
+      const oldIndex = state.stops.findIndex((s) => s.id === action.payload.activeId);
+      const newIndex = state.stops.findIndex((s) => s.id === action.payload.overId);
+      
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const stop = state.stops[oldIndex];
+        state.stops.splice(oldIndex, 1);
+        state.stops.splice(newIndex, 0, stop);
+        
+        // Update order property
+        state.stops.forEach((s, i) => {
+          s.order = i + 1;
+        });
+      }
     },
     updateDraft: (state, action: PayloadAction<Partial<HostCreationState>>) => {
-      return { ...state, ...action.payload };
+      Object.assign(state, action.payload);
+    },
+    setDraft: (state, action: PayloadAction<Partial<HostCreationState>>) => {
+      return { ...initialState, ...action.payload };
     },
     resetDraft: () => initialState,
   },
 });
 
-export const { setCity, addStop, removeStop, updateDraft, resetDraft } = hostCreationSlice.actions;
+export const { setCity, addStop, removeStop, updateStop, reorderStop, moveStop, updateDraft, setDraft, resetDraft } = hostCreationSlice.actions;
 
 export const selectHostCreation = (state: RootState) => state.hostCreation;
 
