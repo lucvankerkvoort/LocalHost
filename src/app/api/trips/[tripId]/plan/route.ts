@@ -53,6 +53,11 @@ export async function POST(
     // For now, let's implement the wipe-and-replace approach for the plan content,
     // assuming the frontend sends the *complete* authoritative state.
 
+    // 56: await prisma.$transaction(async (tx) => {
+    
+    // Map to store new day IDs: { dayIndex: dayId }
+    const dayIdMap: Record<number, string> = {};
+
     await prisma.$transaction(async (tx) => {
         // Clear old plan
         await tx.tripStop.deleteMany({
@@ -83,6 +88,9 @@ export async function POST(
                             suggestedHosts: day.suggestedHosts ?? [],
                         }
                     });
+
+                    // Store mapping
+                    dayIdMap[day.dayIndex] = createdDay.id;
 
                     if (day.items && Array.isArray(day.items)) {
                         for (const item of day.items) {
@@ -115,7 +123,7 @@ export async function POST(
         });
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, dayIdMap });
   } catch (error) {
     console.error('[TRIP_PLAN_POST]', error);
     return new NextResponse('Internal Error', { status: 500 });

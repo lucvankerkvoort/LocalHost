@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/auth'; // Assuming auth helper is available
+import { auth } from '@/auth'; 
 
 export async function GET(req: Request) {
   try {
@@ -37,6 +37,17 @@ export async function POST(req: Request) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
+    // Verify user exists in DB to prevent Foreign Key errors with stale sessions
+    const userExists = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { id: true }
+    });
+
+    if (!userExists) {
+        console.warn(`[TRIPS_POST] User ID ${session.user.id} from session not found in DB. Stale session?`);
+        return new NextResponse('User not found. Please sign out and sign in again.', { status: 401 });
+    }
+
     const body = await req.json();
     const { title, startDate, endDate, preferences } = body;
 
@@ -58,6 +69,6 @@ export async function POST(req: Request) {
     return NextResponse.json(trip);
   } catch (error) {
     console.error('[TRIPS_POST]', error);
-    return new NextResponse('Internal Error', { status: 500 });
+    return new NextResponse(`Internal Error: ${error instanceof Error ? error.message : 'Unknown'}`, { status: 500 });
   }
 }

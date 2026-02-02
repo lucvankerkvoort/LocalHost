@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { ChevronLeft, ChevronRight, Map as MapIcon } from 'lucide-react';
 import { 
   CityMarkerData,
   GlobeDestination, 
@@ -21,6 +22,7 @@ import { ProposalDialog } from './proposal-dialog';
 
 import { initThread, sendChatMessage } from '@/store/p2p-chat-slice';
 import { BookingDialog } from './booking-dialog';
+import { PaymentModal } from './payment/payment-modal';
 import { ItineraryDayColumn } from './itinerary-day';
 import { HostPanel } from './host-panel';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -31,6 +33,10 @@ import {
   setItineraryData,
   setSelectedDestination,
   clearItinerary,
+  setHoveredItemId,
+  setActiveItemId,
+  setFocusedItemId,
+  setVisualTarget,
 } from '@/store/globe-slice';
 import { 
   fetchActiveTrip, 
@@ -107,16 +113,13 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   const placeMarkers = useAppSelector((state) => state.globe.placeMarkers);
   const tripIdState = useAppSelector((state) => state.globe.tripId);
   const allHosts = useAppSelector(selectAllHosts);
+  const activeItemId = useAppSelector((state) => state.globe.activeItemId);
+  const hoveredItemId = useAppSelector((state) => state.globe.hoveredItemId);
 
-  // Use prop ID if available (priority), otherwise state ID (if already set?), but typically fetchActiveTrip sets state.
-  // Actually, we should just pass propTripId to fetchActiveTrip.
+  // Use prop ID if available (priority), otherwise state ID
   
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
-    // If we have a new tripId, we should clear the previous state to avoid flashing old data
-    // However, if we preserve state for smooth transitions, we might trigger a loading state instead.
-    // For now, let's clear on mount if tripId changes/is set.
-    
     dispatch(fetchActiveTrip(propTripId));
 
     return () => {
@@ -125,10 +128,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   }, [dispatch, propTripId]);
   /* eslint-enable react-hooks/exhaustive-deps */
   
-  const tripId = propTripId || tripIdState; // Prefer prop if we force it? Or state once loaded?
-  // tripIdState is what the store says. fetchActiveTrip updates it.
-  // The rest of the component uses 'tripId' variable mainly for "is guest" check.
-  // Let's rely on state.globe.tripId (tripIdState) since fetchActiveTrip updates it.
+  const tripId = propTripId || tripIdState; 
 
   const selectedDestData = useMemo(() => {
     if (!selectedDestination) return null;
@@ -145,6 +145,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   }, [selectedDestData]);
 
   const [showTimeline, setShowTimeline] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   
   // Localhost drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -260,11 +261,45 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
 
   }, [restoreItineraryState, router, searchParamsString]);
 
+  // Scroll Sync Logic
+  const listRef = useRef<HTMLDivElement>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleListScroll = useCallback(() => {
+    if (scrollTimeoutRef.current) return;
+
+    scrollTimeoutRef.current = setTimeout(() => {
+      scrollTimeoutRef.current = null;
+      
+      if (!listRef.current) return;
+      
+      const rect = listRef.current.getBoundingClientRect();
+      const midY = rect.top + rect.height / 3; // Focus closer to top third like a timeline
+      const x = rect.left + 50; // Inset slightly
+      
+      const elements = document.elementsFromPoint(x, midY);
+      // Find the specific item card
+      const itemEl = elements.find(el => el.hasAttribute('data-item-id'));
+      
+      if (itemEl) {
+        const itemId = itemEl.getAttribute('data-item-id');
+        if (itemId) {
+            dispatch(setFocusedItemId(itemId));
+        }
+      }
+    }, 100); // 100ms throttle
+  }, [dispatch]);
+
   // Booking State
   const [bookingDialogState, setBookingDialogState] = useState<{
     isOpen: boolean;
     candidate: any | null;
   }>({ isOpen: false, candidate: null });
+
+  const [paymentModalState, setPaymentModalState] = useState<{
+    isOpen: boolean;
+    bookingId: string;
+  }>({ isOpen: false, bookingId: '' });
 
   // Load sample data for demo
   const loadSampleData = () => {
@@ -289,11 +324,9 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
 
   // Proposal Dialog State
   const [pendingProposal, setPendingProposal] = useState<{
-    host: { id: string; name: string; photo?: string }; // Make photo optional in type
+    host: { id: string; name: string; photo?: string }; 
     experience: any;
   } | null>(null);
-
-
 
   const handleConfirmProposal = (message: string) => {
     if (!pendingProposal) return;
@@ -371,15 +404,13 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     // Validate Item Type (Handle 'EXPERIENCE' type)
     const isLocalhostType = item.type === 'EXPERIENCE';
     
-    if (!isLocalhostType || !item.hostId || !item.experienceId) {
+    if (!isLocalhostType || !item.hostId) {
       console.warn('[GlobeItinerary] Item validation failed:', { 
           type: item.type, 
           hostId: item.hostId, 
           expId: item.experienceId,
           isLocalhostType
       });
-      // Temporary Alert for debugging
-      // alert(`Debug: Validation Failed. Type: ${item.type}`);
       return;
     }
 
@@ -387,12 +418,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     if (!tripId) {
         const confirmSave = window.confirm("You need to save your itinerary and sign in to book this experience. Would you like to save now?");
         if (confirmSave) {
-            // Trigger Save Flow (which leads to Login)
-            // For now, we can redirect to login, or simpler: just alert. 
-            // In a real app, we'd dispatch a save action or open a dialog.
-            // Let's redirect to signin with a callback? 
-            // Better: We need a 'saveTrip' function. For now, let's just redirect.
-            window.location.href = '/auth/signin?callbackUrl=/'; // Rudimentary
+            window.location.href = '/auth/signin?callbackUrl=/'; 
         }
         return;
     }
@@ -415,11 +441,22 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            tripId, // Add tripId
             hostId: item.hostId,
             experienceId: item.experienceId,
+            dayId, // Add dayId explicitly
             dayNumber: dest.day,
-            date: null, // Could infer from dest.date/day if available
+            date: null,
             timeSlot: null,
+            // Pass experience details for on-the-fly creation if needed
+            experienceData: {
+              title: item.title,
+              description: item.description || '',
+              price: 5000, // Default price in cents
+              city: dest.name,
+              lat: item.place?.location?.lat,
+              lng: item.place?.location?.lng,
+            }
           }),
         });
 
@@ -435,28 +472,6 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
         candidateId = candidateData.id;
 
         // Update item with candidateId
-        const nextDestinations = destinations.map(d => {
-          if (d.id === dayId) {
-            return {
-              ...d,
-              activities: d.activities.map(i => 
-                i.id === item.id ? { ...i, candidateId: candidateId, status: 'PENDING' as const } : i
-              )
-            };
-          }
-          return dest; // WARNING: BUG HERE originally? "return d;" was correct. "return dest" invalid ref? 
-          // Wait, dest is from map(d => ...). Correct is "return d".
-          // In previous code:
-          /*
-          const nextDestinations = destinations.map(d => {
-            if (d.id === dayId) { ... }
-            return d;
-          });
-          */
-          // I must ensure I don't introduce a bug.
-        });
-        
-        // Let's rewrite the map clearly in the ReplacementContent
         const updatedDestinations = destinations.map(d => {
             if (d.id === dayId) {
                 return {
@@ -489,48 +504,29 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
 
     } catch (error) {
       console.error('Booking flow error:', error);
-      alert('Failed to start booking flow. Check console for details.');
+      // Check if it's a "not found" error for mock experiences
+      const errorMessage = error instanceof Error ? error.message : '';
+      if (errorMessage.includes('Experience not found') || errorMessage.includes('404')) {
+        alert('This experience is a demo preview and cannot be booked yet. Try booking one of the featured experiences!');
+      } else {
+        alert('Failed to start booking flow. Please try again.');
+      }
     }
   };
 
   const handleConfirmBooking = async (candidateId: string) => {
-      console.log('[GlobeItinerary] Confirming booking:', candidateId);
-    try {
-      const res = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidateId }),
-      });
+    console.log('[GlobeItinerary] Confirming booking via candidate (which IS a booking):', candidateId);
+    // Candidate IS the booking in TENTATIVE status - no need to call /api/bookings
+    // Just open the payment modal with the candidateId (which is the bookingId)
+    setBookingDialogState({ isOpen: false, candidate: null });
+    setPaymentModalState({ isOpen: true, bookingId: candidateId });
+  };
 
-      if (!res.ok) {
-        throw new Error('Booking failed');
-      }
-
-      const data = await res.json();
-
-      // Update item status locally
-      const nextDestinations = destinations.map(dest => {
-        return {
-          ...dest,
-          activities: dest.activities.map(item => {
-             if (item.candidateId === candidateId) {
-               return { ...item, status: 'BOOKED' as const };
-             }
-             return item;
-          })
-        };
-      });
-      dispatch(setDestinations(nextDestinations));
-      
-      // Close dialog
-      setBookingDialogState({ isOpen: false, candidate: null });
-      
-      // Optionally show success message or redirect to chat
-      
-    } catch (error) {
-      console.error('Confirm booking error:', error);
-      throw error; // Dialog will handle error state
-    }
+  const handlePaymentSuccess = () => {
+      setPaymentModalState({ isOpen: false, bookingId: '' });
+      // Refresh to update statuses
+      if (tripId) dispatch(fetchActiveTrip(tripId));
+      alert('Payment Successful!');
   };
 
   // Itinerary Item Handlers
@@ -577,7 +573,6 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
       if (sourceDayId === targetDayId) return; // Reordering within list not fully implemented here yet
 
       // For now, mostly handling simple drops or just reordering
-      // Implementing basic reorder within same list:
       const nextDestinations = destinations.map(dest => {
         if (dest.id === targetDayId) {
           // Move to end if dropped on day (simplified)
@@ -596,8 +591,6 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
       console.error('Drop failed', err);
     }
   };
-
-
 
   const cityMarkers = useMemo<CityMarkerData[]>(() => {
     if (destinations.length === 0) return [];
@@ -743,6 +736,36 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     }));
   }, [selectedDestData, allHosts]);
 
+  // --- List <-> Globe Sync Handlers ---
+  
+  const handleItemHover = useCallback((itemId: string | null) => {
+    dispatch(setHoveredItemId(itemId));
+  }, [dispatch]);
+
+  const handleItemClick = useCallback((itemId: string, dayId: string, lat?: number, lng?: number) => {
+    dispatch(setActiveItemId(itemId));
+    
+    // Select the day this item belongs to
+    if (dayId !== selectedDestination) {
+      dispatch(setSelectedDestination(dayId));
+    }
+
+    // Fly to location if coordinates exist
+    if (lat && lng) {
+      dispatch(setVisualTarget({ lat, lng, height: 5000 }));
+    }
+  }, [dispatch, selectedDestination]);
+
+  const handleDaySelect = useCallback((dayId: string) => {
+    dispatch(setSelectedDestination(dayId));
+    dispatch(setActiveItemId(null)); // Clear specific item selection when selecting a day
+    
+    const dest = destinations.find(d => d.id === dayId);
+    if (dest) {
+        dispatch(setVisualTarget({ lat: dest.lat, lng: dest.lng, height: 50000 }));
+    }
+  }, [dispatch, destinations]);
+
   return (
     <div className="h-full w-full flex flex-col bg-[var(--deep-space-blue)]">
       {/* Header */}
@@ -787,31 +810,130 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
             onCityMarkerClick={handleCityMarkerClick}
             onHostClick={(host) => setSelectedHost(host)}
             visualTarget={visualTarget}
+            activeItemId={activeItemId}
+            hoveredItemId={hoveredItemId}
+            onItemHover={handleItemHover}
           />
           
-          {/* Itinerary Panel for Selected Day */}
-          {selectedDestData && (
-             <div className="absolute top-4 left-4 z-10 max-h-[calc(100vh-120px)] overflow-y-auto hidden-scrollbar">
-                <ItineraryDayColumn 
-                  day={{
-                      id: selectedDestData.id,
-                      date: `Day ${selectedDestData.day}`, // Mapping for display
-                      dayNumber: selectedDestData.day,
-                      items: selectedDestData.activities
-                  }}
-                  onAddItem={() => {
-                      setDrawerCity(selectedDestData.name);
-                      setDrawerOpen(true);
-                  }}
-                  onEditItem={handleEditItem}
-                  onDeleteItem={handleDeleteItem}
-                  onDragStart={handleDragStart}
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
-                  onBookItem={handleBookItem}
-                />
+          
+          {/* Left Itinerary Panel - Only show if destinations exist */}
+          <div 
+             className={`absolute top-0 left-0 bottom-0 z-10 transition-all duration-300 ease-in-out flex flex-col border-r border-white/10 ${
+               showTimeline && destinations.length > 0 ? (isCollapsed ? 'w-[60px]' : 'w-[360px]') : '-translate-x-full absolute'
+             } bg-[rgba(12,16,24,0.2)] backdrop-blur-[6px]`}
+          >
+             {/* Sticky Header */}
+             <div className="p-4 border-b border-white/10 flex items-center justify-between bg-[rgba(12,16,24,0.2)] backdrop-blur-[6px] sticky top-0 z-20 h-[60px]">
+                {!isCollapsed ? (
+                    <>
+                        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                           <span className="text-[var(--princeton-orange)]">●</span> Your Itinerary
+                        </h2>
+                        <div className="flex items-center gap-2">
+                            <div className="text-xs text-[var(--muted-foreground)]">
+                               {destinations.length} Days
+                            </div>
+                            <button 
+                                onClick={() => setIsCollapsed(true)}
+                                className="p-1 hover:bg-white/10 rounded-md text-white/70 transition-colors"
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </>
+                ) : (
+                    <div className="flex flex-col items-center w-full gap-4">
+                        <button 
+                            onClick={() => setIsCollapsed(false)}
+                            className="p-1 hover:bg-white/10 rounded-md text-white/70 transition-colors"
+                        >
+                            <ChevronRight className="w-4 h-4" />
+                        </button>
+                        <div className="text-[var(--princeton-orange)]">●</div>
+                    </div>
+                )}
              </div>
-          )}
+
+             {/* Scrollable Timeline List (Hidden when collapsed) */}
+             {!isCollapsed && (
+             <div 
+                className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent p-4 space-y-8"
+                ref={listRef}
+                onScroll={handleListScroll}
+             >
+                {destinations.length === 0 ? (
+                   <div className="text-center text-[var(--muted-foreground)] py-12">
+                      <p>No destinations yet.</p>
+                      <button onClick={loadSampleData} className="mt-4 text-[var(--princeton-orange)] hover:underline">
+                         Load Demo Data
+                      </button>
+                   </div>
+                ) : (
+                   destinations.map((day) => (
+                      <ItineraryDayColumn
+                         key={day.id}
+                         dayId={day.id}
+                         dayNumber={day.day}
+                         title={day.name}
+                         date={day.date}
+                         activities={day.activities}
+                         onAddActivity={(dayId) => {
+                            if (dayId) dispatch(setSelectedDestination(dayId));
+                            setDrawerCity(day.name);
+                            setDrawerOpen(true);
+                         }}
+                         isSpaceOptimized={false}
+                         isActive={day.id === selectedDestination}
+                         onSelect={() => handleDaySelect(day.id)}
+                         onItemClick={(item) => handleItemClick(
+                             item.id, 
+                             day.id, 
+                             item.place?.location?.lat, 
+                             item.place?.location?.lng
+                         )}
+                         onItemHover={(itemId) => handleItemHover(itemId)}
+                         onEditItem={(item) => handleEditItem(day.id, item)}
+                         onDeleteItem={(itemId) => handleDeleteItem(day.id, itemId)}
+                         onBookItem={(item) => handleBookItem(day.id, item)}
+                      />
+                   ))
+                )}
+             </div>
+             )}
+             
+             {isCollapsed && (
+                 <div className="flex-1 flex flex-col items-center py-4 gap-4 opacity-50">
+                     {/* Slim rail icons or indicators could go here */}
+                     {destinations.map(d => (
+                         <div key={d.id} className="w-1.5 h-1.5 rounded-full bg-white/20" />
+                     ))}
+                 </div>
+             )}
+
+             {/* Bottom Action */}
+             <div className="p-4 border-t border-white/10 bg-[rgba(12,16,24,0.2)] backdrop-blur-[6px]">
+                {!isCollapsed ? (
+                    <button
+                       onClick={() => {
+                            // Open drawer for the currently selected city or first city
+                            const targetCity = selectedDestData?.name || destinations[0]?.name || 'San Francisco';
+                            setDrawerCity(targetCity);
+                            setDrawerOpen(true);
+                       }}
+                       className="w-full py-2.5 bg-[var(--princeton-orange)] hover:bg-[var(--princeton-dark)] text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-orange-500/20 flex items-center justify-center gap-2"
+                    >
+                       <span>+ Add Activity</span>
+                    </button>
+                ) : (
+                    <button
+                        onClick={() => setIsCollapsed(false)}
+                        className="w-full flex justify-center py-2 text-[var(--princeton-orange)] hover:bg-white/5 rounded-md"
+                    >
+                        <span className="text-xl">+</span>
+                    </button>
+                )}
+             </div>
+          </div>
           
           {/* Host Selection Popup */}
           {selectedHost && (
@@ -953,6 +1075,13 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
           onConfirm={handleConfirmBooking}
         />
       )}
+
+      <PaymentModal
+        isOpen={paymentModalState.isOpen}
+        bookingId={paymentModalState.bookingId}
+        onClose={() => setPaymentModalState({ isOpen: false, bookingId: '' })}
+        onSuccess={handlePaymentSuccess}
+      />
     </div>
   );
 }

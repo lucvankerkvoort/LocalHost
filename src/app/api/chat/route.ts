@@ -1,6 +1,7 @@
 import { convertToModelMessages } from 'ai';
 import { agentRouter } from '@/lib/conversation/router';
 import { conversationController } from '@/lib/conversation/controller';
+import { validateAgentOutput, withExecution } from '@/lib/agent-constraints';
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -30,7 +31,43 @@ export async function POST(req: Request) {
   console.log(`[API] Routing to agent: ${agent.name} (intent: ${intent})`);
 
   // Delegate processing to the agent
-  const result = await agent.process(modelMessages, { sessionId: id });
+  const execution = body.execution as {
+    activeAgent: string;
+    enabledSkills: string[];
+    expectedOutput?: string;
+  } | undefined;
+  const strictConstraints = process.env.AGENT_CONSTRAINTS_STRICT === 'true';
+
+  if (strictConstraints && !execution) {
+    return new Response(JSON.stringify({ error: 'Execution contract required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (execution && execution.activeAgent !== agent.name) {
+    return new Response(JSON.stringify({ error: 'Active agent mismatch', expected: agent.name, provided: execution.activeAgent }), {
+      status: 409,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const runAgent = () => agent.process(modelMessages, { sessionId: id });
+  const result = execution ? await withExecution(execution, runAgent) : await runAgent();
+
+  if (execution || strictConstraints) {
+    const output = await result.text;
+    const validation = validateAgentOutput(execution?.activeAgent || agent.name, output);
+    if (!validation.ok) {
+      return new Response(JSON.stringify({ error: 'Output contract violation', details: validation.failure }), {
+        status: 422,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return new Response(output, {
+      status: 200,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
+  }
 
   // Return the stream response
   return result.toUIMessageStreamResponse();

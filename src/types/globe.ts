@@ -37,6 +37,7 @@ export interface GlobeDestination {
   lat: number;
   lng: number;
   day: number;
+  date?: string;
   activities: ItineraryItem[];
   color: string;
   suggestedHosts?: unknown[];

@@ -16,6 +16,10 @@ interface GlobeState {
   selectedDestination: string | null;
   hostMarkers: HostMarkerData[];
   placeMarkers: PlaceMarkerData[];
+  // Sync state for list <-> map interaction
+  hoveredItemId: string | null;
+  activeItemId: string | null;
+  focusedItemId: string | null;
 }
 
 const initialState: GlobeState = {
@@ -27,6 +31,9 @@ const initialState: GlobeState = {
   selectedDestination: null,
   hostMarkers: [],
   placeMarkers: [],
+  hoveredItemId: null,
+  activeItemId: null,
+  focusedItemId: null,
 };
 
 function applyPlan(state: GlobeState, plan: ItineraryPlan) {
@@ -37,6 +44,9 @@ function applyPlan(state: GlobeState, plan: ItineraryPlan) {
   state.selectedDestination = destinations[0]?.id ?? null;
   state.visualTarget = null;
   state.placeMarkers = [];
+  state.hoveredItemId = null;
+  state.activeItemId = null;
+  state.focusedItemId = null; 
   // Note: Localhost AI generated plans don't strictly have a DB TripID yet unless saved.
 }
 
@@ -182,6 +192,37 @@ const globeSlice = createSlice({
         // Force update reference to trigger re-renders if needed (Immer handles this usually)
       }
     },
+    updateDayIds(
+      state, 
+      action: PayloadAction<Record<number, string>>
+    ) {
+        const dayIdMap = action.payload;
+        if (!dayIdMap) return;
+
+        state.destinations = state.destinations.map(d => {
+            if (dayIdMap[d.day]) {
+                return { ...d, id: dayIdMap[d.day] };
+            }
+            return d;
+        });
+
+        if (state.selectedDestination) {
+            // (Keep selection logic if needed, or rely on activeItemId)
+        }
+    },
+    setHoveredItemId(state, action: PayloadAction<string | null>) {
+      state.hoveredItemId = action.payload;
+    },
+    setActiveItemId(state, action: PayloadAction<string | null>) {
+      state.activeItemId = action.payload;
+      // Also focus it if activated
+      if (action.payload) {
+        state.focusedItemId = action.payload;
+      }
+    },
+    setFocusedItemId(state, action: PayloadAction<string | null>) {
+      state.focusedItemId = action.payload;
+    }
   },
   extraReducers: (builder) => {
     builder.addCase(toolCallReceived, (state, action: PayloadAction<ToolCallEvent>) => {
@@ -292,6 +333,10 @@ export const {
   setItineraryData,
   hydrateGlobeState,
   addLocalExperience,
+  updateDayIds,
+  setHoveredItemId,
+  setActiveItemId,
+  setFocusedItemId
 } = globeSlice.actions;
 
 export default globeSlice.reducer;

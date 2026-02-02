@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { HOSTS } from '../src/lib/data/hosts';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -22,68 +23,48 @@ async function main() {
   await prisma.booking.deleteMany();
   await prisma.experienceAvailability.deleteMany();
   await prisma.experience.deleteMany();
+  await prisma.experienceStop.deleteMany();
+  await prisma.experienceDraft.deleteMany();
+  await prisma.hostExperience.deleteMany();
+  await prisma.trip.deleteMany();
   await prisma.session.deleteMany();
   await prisma.account.deleteMany();
   await prisma.user.deleteMany();
 
   console.log('✓ Cleared existing data');
 
-  // Create demo users
   const password = await bcrypt.hash('password', 10);
 
-  const host1 = await prisma.user.create({
-    data: {
-      email: 'maria@localhost.com',
-      name: 'Maria Rossi',
-      bio: 'Born and raised in Rome. I love sharing my family\'s traditional recipes with travelers from around the world.',
-      image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop',
-      city: 'Rome',
-      country: 'Italy',
-      languages: ['Italian', 'English'],
-      interests: ['Cooking', 'Wine', 'History'],
-      isHost: true,
-      isVerified: true,
-      verificationTier: 'TRUSTED',
-      trustScore: 95,
-      password,
-    },
-  });
+  const hostUsers = new Map<string, { id: string }>();
 
-  const host2 = await prisma.user.create({
-    data: {
-      email: 'carlos@localhost.com',
-      name: 'Carlos Mendez',
-      bio: 'Street art enthusiast and local historian. Let me show you the hidden murals that tell the story of our city.',
-      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop',
-      city: 'Mexico City',
-      country: 'Mexico',
-      languages: ['Spanish', 'English'],
-      interests: ['Street Art', 'History', 'Photography'],
-      isHost: true,
-      isVerified: true,
-      verificationTier: 'VERIFIED',
-      trustScore: 88,
-      password,
-    },
-  });
-
-  const host3 = await prisma.user.create({
-    data: {
-      email: 'yuki@localhost.com',
-      name: 'Yuki Tanaka',
-      bio: 'Nature lover and certified hiking guide. Join me for sunrise hikes with traditional Japanese breakfast.',
-      image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop',
-      city: 'Kyoto',
-      country: 'Japan',
-      languages: ['Japanese', 'English'],
-      interests: ['Hiking', 'Nature', 'Tea Ceremony'],
-      isHost: true,
-      isVerified: true,
-      verificationTier: 'TRUSTED',
-      trustScore: 92,
-      password,
-    },
-  });
+  for (const host of HOSTS) {
+    const accountId = `acct_test_${host.id.replace(/[^a-z0-9]/gi, '')}`;
+    const user = await prisma.user.create({
+      data: {
+        id: host.id,
+        email: `${host.id}@localhost.com`,
+        name: host.name,
+        bio: host.bio,
+        quote: host.quote,
+        responseTime: host.responseTime,
+        image: host.photo,
+        city: host.city,
+        country: host.country,
+        languages: host.languages,
+        interests: host.interests,
+        isHost: true,
+        isVerified: true,
+        verificationTier: 'VERIFIED',
+        trustScore: 80,
+        stripeConnectedAccountId: accountId,
+        stripeOnboardingStatus: 'COMPLETE',
+        payoutsEnabled: true,
+        chargesEnabled: true,
+        password,
+      },
+    });
+    hostUsers.set(host.id, { id: user.id });
+  }
 
   const demoGuest = await prisma.user.create({
     data: {
@@ -102,206 +83,155 @@ async function main() {
     },
   });
 
-  console.log('✓ Created users');
-
-  // Create experiences
-  const experience1 = await prisma.experience.create({
+  const traveler = await prisma.user.create({
     data: {
-      hostId: host1.id,
-      title: 'Sunset Cooking Class with Nonna Maria',
-      description: `Join me in my family home for an authentic Italian cooking experience. We'll prepare a traditional Roman dinner together—fresh pasta from scratch, classic cacio e pepe, and my grandmother's secret tiramisù recipe.
-
-The evening starts at golden hour on my rooftop terrace with an aperitivo while I share stories of my family's culinary traditions. Then we'll head to my kitchen where you'll learn techniques passed down through four generations.
-
-This isn't just a cooking class—it's an invitation into my family's home and heritage.
-
-What to expect:
-• Hands-on pasta making from scratch
-• Traditional Roman recipes
-• Stories and tips from a local
-• A full meal with wine pairing
-• Recipes to take home`,
-      category: 'FOOD_DRINK',
-      neighborhood: 'Trastevere',
-      city: 'Rome',
-      country: 'Italy',
-      duration: 180, // 3 hours
-      minGroupSize: 2,
-      maxGroupSize: 6,
-      price: 7500, // $75
-      currency: 'USD',
-      includedItems: ['All ingredients', 'Wine pairing', 'Recipe cards', 'Apron to keep'],
-      excludedItems: ['Transportation to venue'],
-      photos: [
-        'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=800&h=600&fit=crop',
-      ],
-      rating: 4.9,
-      reviewCount: 127,
-      isActive: true,
-    },
-  });
-
-  const experience2 = await prisma.experience.create({
-    data: {
-      hostId: host2.id,
-      title: 'Hidden Murals Walking Tour',
-      description: `Discover the stories painted on the walls of Mexico City's most vibrant neighborhoods. As a local street art historian, I'll take you beyond the tourist spots to see murals that tell the real story of our city.
-
-We'll explore hidden alleys, meet local artists, and learn about the political and cultural movements that inspired these works. Each mural has a story, and I know them all.
-
-What we'll see:
-• Historic murals from the 1920s-present
-• Hidden artist studios
-• Underground galleries
-• Local street food stops
-
-This tour is perfect for photography lovers—I'll show you the best angles and times for capturing these incredible works.`,
-      category: 'ARTS_CULTURE',
-      neighborhood: 'Roma Norte',
-      city: 'Mexico City',
-      country: 'Mexico',
-      duration: 150, // 2.5 hours
-      minGroupSize: 1,
-      maxGroupSize: 8,
-      price: 3500, // $35
-      currency: 'USD',
-      includedItems: ['Local snacks', 'Bottled water', 'Digital photo album'],
-      excludedItems: ['Transportation', 'Lunch'],
-      photos: [
-        'https://images.unsplash.com/photo-1518998053901-5348d3961a04?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1499781350541-7783f6c6a0c8?w=800&h=600&fit=crop',
-      ],
-      rating: 4.8,
-      reviewCount: 89,
-      isActive: true,
-    },
-  });
-
-  const experience3 = await prisma.experience.create({
-    data: {
-      hostId: host3.id,
-      title: 'Mountain Sunrise Hike & Breakfast',
-      description: `Experience the magic of a Japanese mountain sunrise followed by a traditional breakfast in nature.
-
-We'll start early (5am pickup) to hike up Mount Daimonji as the first light appears. The trail is moderate and suitable for most fitness levels. At the summit, we'll watch the sun rise over Kyoto's ancient temples.
-
-After descending, we'll enjoy a traditional Japanese breakfast I've prepared—rice, miso soup, grilled fish, pickles, and freshly brewed green tea—all while overlooking the city.
-
-What makes this special:
-• Certified hiking guide (safety first!)
-• Authentic Japanese breakfast
-• Small groups only
-• Sunrise meditation (optional)
-• Photography tips for capturing the moment`,
-      category: 'OUTDOOR_ADVENTURE',
-      neighborhood: 'Higashiyama',
-      city: 'Kyoto',
-      country: 'Japan',
-      duration: 240, // 4 hours
-      minGroupSize: 2,
-      maxGroupSize: 4,
-      price: 5000, // $50
-      currency: 'USD',
-      includedItems: ['Traditional breakfast', 'Green tea', 'Hiking poles', 'First aid kit'],
-      excludedItems: ['Hotel pickup outside central Kyoto'],
-      photos: [
-        'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&h=600&fit=crop',
-      ],
-      rating: 5.0,
-      reviewCount: 64,
-      isActive: true,
-    },
-  });
-
-  const experience4 = await prisma.experience.create({
-    data: {
-      hostId: demoGuest.id,
-      title: 'Golden Gate Morning Coffee Walk',
-      description: `Start your day with a relaxed walk along the Embarcadero with coffee and views of the Bay Bridge.
-
-We’ll take a scenic loop, stop at my favorite local café, and end with a quick photo stop near the Ferry Building.
-
-What to expect:
-• Easy, flat walk (45–60 min)
-• Local coffee + pastries
-• Neighborhood tips for the rest of your day`,
-      category: 'ARTS_CULTURE',
-      neighborhood: 'Embarcadero',
+      id: 'guest-traveler',
+      email: 'guest@localhost.com',
+      name: 'Guest Traveler',
+      bio: 'Curious traveler testing Localhost.',
       city: 'San Francisco',
       country: 'USA',
-      duration: 90,
-      minGroupSize: 1,
-      maxGroupSize: 6,
-      price: 3500,
-      currency: 'USD',
-      includedItems: ['Coffee or tea', 'Pastry', 'Local tips'],
-      excludedItems: ['Transportation'],
-      photos: [
-        'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=800&h=600&fit=crop',
-        'https://images.unsplash.com/photo-1444927714506-8492d94b4e3d?w=800&h=600&fit=crop',
-      ],
-      rating: 4.7,
-      reviewCount: 18,
-      isActive: true,
+      languages: ['English'],
+      interests: ['Travel', 'Food', 'Culture'],
+      isHost: false,
+      isVerified: true,
+      verificationTier: 'BASIC',
+      trustScore: 40,
+      password,
     },
   });
+
+  console.log('✓ Created users');
+
+  const experienceRecords = new Map<
+    string,
+    { id: string; hostId: string; price: number; currency: string; neighborhood: string; city: string; country: string }
+  >();
+
+  for (const host of HOSTS) {
+    for (const exp of host.experiences) {
+      const experience = await prisma.experience.create({
+        data: {
+          id: exp.id,
+          hostId: host.id,
+          title: exp.title,
+          description: exp.description,
+          category: exp.category,
+          neighborhood: host.city,
+          city: host.city,
+          country: host.country,
+          duration: exp.duration,
+          minGroupSize: 1,
+          maxGroupSize: 6,
+          price: exp.price,
+          currency: 'USD',
+          includedItems: [],
+          excludedItems: [],
+          photos: exp.photos,
+          rating: exp.rating,
+          reviewCount: exp.reviewCount,
+          isActive: true,
+        },
+      });
+      experienceRecords.set(exp.id, {
+        id: experience.id,
+        hostId: experience.hostId,
+        price: experience.price,
+        currency: experience.currency,
+        neighborhood: experience.neighborhood,
+        city: experience.city,
+        country: experience.country,
+      });
+    }
+  }
 
   console.log('✓ Created experiences');
 
-  // Create availability for experiences
+  for (const host of HOSTS) {
+    const primary = host.experiences[0];
+    if (!primary) continue;
+    await prisma.hostExperience.create({
+      data: {
+        id: primary.id,
+        hostId: host.id,
+        city: host.city,
+        country: host.country,
+        title: primary.title,
+        shortDesc: primary.description,
+        longDesc: primary.description,
+        duration: primary.duration,
+        price: primary.price,
+        status: 'PUBLISHED',
+        stops: {
+          create: [
+            {
+              name: `${host.city} experience`,
+              description: primary.description,
+              address: host.city,
+              lat: null,
+              lng: null,
+              order: 1,
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  const maria = HOSTS.find((host) => host.id === 'maria-rome');
+  if (maria) {
+    await prisma.experienceDraft.create({
+      data: {
+        id: 'draft-maria',
+        userId: maria.id,
+        title: 'Rome Market Morning',
+        shortDesc: 'A relaxed market stroll with tastings and local tips.',
+        longDesc: 'We meet at the market entrance and taste seasonal favorites while sharing stories about Roman food culture.',
+        city: maria.city,
+        country: maria.country,
+        cityLat: 41.9028,
+        cityLng: 12.4964,
+        duration: 120,
+        price: 6500,
+        currency: 'USD',
+        status: 'READY_TO_PUBLISH',
+        stops: {
+          create: [
+            {
+              name: 'Campo de’ Fiori',
+              description: 'Fresh produce and local specialties.',
+              address: 'Campo de’ Fiori',
+              lat: 41.8956,
+              lng: 12.4722,
+              order: 1,
+            },
+            {
+              name: 'Coffee stop',
+              description: 'Quick espresso and a pastry.',
+              address: 'Trastevere',
+              lat: 41.89,
+              lng: 12.47,
+              order: 2,
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  console.log('✓ Created host experience + draft');
+
   const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
   for (let i = 1; i <= 14; i++) {
     const date = new Date(today);
-    date.setDate(today.getDate() + i);
+    date.setUTCDate(today.getUTCDate() + i);
 
-    // Experience 1 availability (evenings)
-    await prisma.experienceAvailability.create({
-      data: {
-        experienceId: experience1.id,
-        date: date,
-        startTime: '17:00',
-        endTime: '20:00',
-        spotsLeft: 6,
-      },
-    });
-
-    // Experience 2 availability (mornings and afternoons)
-    await prisma.experienceAvailability.create({
-      data: {
-        experienceId: experience2.id,
-        date: date,
-        startTime: '10:00',
-        endTime: '12:30',
-        spotsLeft: 8,
-      },
-    });
-
-    // Experience 3 availability (early mornings, only weekends)
-    if (date.getDay() === 0 || date.getDay() === 6) {
+    for (const experience of experienceRecords.values()) {
       await prisma.experienceAvailability.create({
         data: {
-          experienceId: experience3.id,
+          experienceId: experience.id,
           date: date,
-          startTime: '05:00',
-          endTime: '09:00',
-          spotsLeft: 4,
-        },
-      });
-    }
-
-    // Experience 4 availability (weekday mornings)
-    if (date.getDay() >= 1 && date.getDay() <= 5) {
-      await prisma.experienceAvailability.create({
-        data: {
-          experienceId: experience4.id,
-          date: date,
-          startTime: '08:00',
-          endTime: '10:00',
           spotsLeft: 6,
         },
       });
@@ -310,44 +240,157 @@ What to expect:
 
   console.log('✓ Created availability');
 
-  // Create a sample booking
-  const booking = await prisma.booking.create({
+  const tripStart = new Date();
+  tripStart.setUTCHours(0, 0, 0, 0);
+  tripStart.setUTCDate(tripStart.getUTCDate() + 7);
+  const tripEnd = new Date(tripStart);
+  tripEnd.setUTCDate(tripEnd.getUTCDate() + 2);
+
+  const seedExperience = experienceRecords.get('1') ?? experienceRecords.values().next().value;
+  if (!seedExperience) {
+    throw new Error('No experiences found to seed a trip.');
+  }
+  const seedHostId = seedExperience.hostId;
+
+  const trip = await prisma.trip.create({
     data: {
-      experienceId: experience1.id,
-      guestId: demoGuest.id,
-      date: new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
+      id: 'trip-demo',
+      userId: traveler.id,
+      title: 'Rome Weekend',
+      startDate: tripStart,
+      endDate: tripEnd,
+      status: 'DRAFT',
+      stops: {
+        create: [
+          {
+            city: seedExperience.city,
+            country: seedExperience.country,
+            lat: 41.9028,
+            lng: 12.4964,
+            order: 0,
+            days: {
+              create: [
+                {
+                  dayIndex: 1,
+                  date: tripStart,
+                  title: seedExperience.city,
+                  items: {
+                    create: [
+                      {
+                        type: 'EXPERIENCE',
+                        title: 'Seeded Experience',
+                        description: 'Seeded itinerary item for booking flow testing.',
+                        experienceId: seedExperience.id,
+                        hostId: seedHostId,
+                        locationName: seedExperience.neighborhood,
+                        lat: 41.9028,
+                        lng: 12.4964,
+                        orderIndex: 0,
+                        createdByAI: false,
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    include: {
+      stops: {
+        include: {
+          days: {
+            include: {
+              items: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const tripItem = trip.stops[0]?.days[0]?.items[0];
+  if (!tripItem) {
+    throw new Error('Seed trip item was not created');
+  }
+
+  const baseAmount = seedExperience.price * 2;
+
+  await prisma.booking.create({
+    data: {
+      tripId: trip.id,
+      itemId: tripItem.id,
+      experienceId: seedExperience.id,
+      guestId: traveler.id,
+      hostId: seedHostId,
+      date: tripStart,
       guests: 2,
-      totalPrice: 15000, // $150 for 2 people
-      currency: 'USD',
+      totalPrice: baseAmount,
+      amountSubtotal: baseAmount,
+      currency: seedExperience.currency,
+      status: 'TENTATIVE',
+      paymentStatus: 'PENDING',
+      chatUnlocked: false,
+    },
+  });
+
+  const confirmedBooking = await prisma.booking.create({
+    data: {
+      experienceId: seedExperience.id,
+      guestId: traveler.id,
+      hostId: seedHostId,
+      date: new Date(tripStart.getTime() + 24 * 60 * 60 * 1000),
+      guests: 2,
+      totalPrice: baseAmount,
+      amountSubtotal: baseAmount,
+      platformFee: Math.round(baseAmount * 0.1),
+      hostNetAmount: baseAmount - Math.round(baseAmount * 0.1),
+      currency: seedExperience.currency,
       status: 'CONFIRMED',
       paymentStatus: 'PAID',
+      chatUnlocked: true,
     },
   });
 
-  console.log('✓ Created sample booking');
+  await prisma.message.createMany({
+    data: [
+      {
+        bookingId: confirmedBooking.id,
+        senderId: traveler.id,
+        content: 'Hi! Excited to meet. Any prep needed?',
+      },
+      {
+        bookingId: confirmedBooking.id,
+        senderId: seedHostId,
+        content: 'So happy to host you! Just bring your appetite.',
+      },
+    ],
+  });
 
-  // Create sample reviews
+  console.log('✓ Created trip, bookings, and messages');
+
   await prisma.review.create({
     data: {
-      bookingId: booking.id,
-      experienceId: experience1.id,
-      reviewerId: demoGuest.id,
-      revieweeId: host1.id,
+      bookingId: confirmedBooking.id,
+      experienceId: seedExperience.id,
+      reviewerId: traveler.id,
+      revieweeId: seedHostId,
       type: 'GUEST_TO_HOST',
       rating: 5,
-      content: 'Absolutely magical evening! Maria welcomed us like family, and her pasta is the best I\'ve ever had. The stories about her grandmother brought tears to my eyes. A must-do experience in Rome!',
+      content: 'Fantastic experience! Highly recommended.',
     },
   });
 
   await prisma.review.create({
     data: {
-      bookingId: booking.id,
-      experienceId: experience1.id,
-      reviewerId: host1.id,
-      revieweeId: demoGuest.id,
+      bookingId: confirmedBooking.id,
+      experienceId: seedExperience.id,
+      reviewerId: seedHostId,
+      revieweeId: traveler.id,
       type: 'HOST_TO_GUEST',
       rating: 5,
-      content: 'Wonderful guests! They were curious, engaged, and really appreciated the traditions I shared. Would love to host them again.',
+      content: 'Wonderful guest. Would host again!',
     },
   });
 
@@ -357,8 +400,9 @@ What to expect:
   console.log('🎉 Seeding complete!');
   console.log('');
   console.log('Demo credentials:');
-  console.log('  Email: demo@localhost.com');
-  console.log('  (Use credentials login in development)');
+  console.log('  Host example: maria-rome@localhost.com / password');
+  console.log('  Guest: guest@localhost.com / password');
+  console.log('  Demo: demo@localhost.com / password');
 }
 
 main()

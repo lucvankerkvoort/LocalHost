@@ -39,6 +39,12 @@ model User {
   verificationTier  VerificationTier @default(BASIC)
   trustScore        Int     @default(0)
   
+  // Stripe Connect
+  stripeConnectedAccountId String?
+  stripeOnboardingStatus   StripeOnboardingStatus @default(NOT_STARTED)
+  payoutsEnabled           Boolean  @default(false)
+  chargesEnabled           Boolean  @default(false)
+  
   // Auth
   accounts      Account[]
   sessions      Session[]
@@ -46,6 +52,7 @@ model User {
   // Relations
   hostedExperiences Experience[] @relation("HostedExperiences")
   bookings          Booking[]    @relation("GuestBookings")
+  hostBookings      Booking[]    @relation("HostBookings")
   reviewsGiven      Review[]     @relation("ReviewerReviews")
   reviewsReceived   Review[]     @relation("RevieweeReviews")
   messagesSent      Message[]    @relation("SentMessages")
@@ -242,6 +249,7 @@ model ItineraryItem {
   
   experienceId String?
   experience   Experience?       @relation(fields: [experienceId], references: [id])
+  hostId       String?           // Direct host reference for mock experiences
   
   orderIndex   Int
   createdByAI  Boolean           @default(true)
@@ -290,6 +298,10 @@ model Booking {
   guestId       String
   guest         User     @relation("GuestBookings", fields: [guestId], references: [id])
   
+  // Denormalized Host ID for easier payouts
+  hostId        String?
+  host          User?    @relation("HostBookings", fields: [hostId], references: [id])
+  
   itemId        String?
   itineraryItem ItineraryItem? @relation("ItemBookings", fields: [itemId], references: [id])
   
@@ -299,17 +311,24 @@ model Booking {
   endTime       String?
   timezone      String?
   guests        Int
-  totalPrice    Int      // in cents
-  currency      String   @default("USD")
   
-  status        BookingStatus   @default(TENTATIVE) // Changed default to match new flow
+  totalPrice    Int      @default(0) // Re-added for backward compatibility
+  amountSubtotal  Int    @default(0)
+  platformFee     Int    @default(0)
+  hostNetAmount   Int    @default(0)
+  currency        String @default("USD")
+  
+  stripePaymentId String?
+  stripeTransferId String?
+  stripeRefundId   String?
+  
+  status        BookingStatus   @default(TENTATIVE)
   paymentStatus PaymentStatus   @default(PENDING)
+  payoutStatus  PayoutStatus    @default(NOT_ELIGIBLE)
+  payoutEligibleAt DateTime?
   
   // Features
   chatUnlocked  Boolean       @default(false)
-  
-  // Payment details
-  stripePaymentId String?
   
   // Communication
   messages      Message[]
@@ -395,8 +414,37 @@ model Message {
 }
 
 // ============================================
+// PAYMENT AUDIT
+// ============================================
+
+model PaymentEvent {
+  id           String   @id @default(cuid())
+  bookingId    String?
+  type         String   // e.g. PAYMENT_INTENT_SUCCEEDED, TRANSFER_CREATED
+  payload      Json
+  createdAt    DateTime @default(now())
+  
+  @@index([bookingId])
+}
+
+// ============================================
 // ENUMS
 // ============================================
+
+enum StripeOnboardingStatus {
+  NOT_STARTED
+  PENDING
+  COMPLETE
+  RESTRICTED
+}
+
+enum PayoutStatus {
+  NOT_ELIGIBLE
+  ELIGIBLE
+  RELEASED
+  BLOCKED
+  REFUNDED
+}
 
 enum VerificationTier {
   BASIC     // Email verified

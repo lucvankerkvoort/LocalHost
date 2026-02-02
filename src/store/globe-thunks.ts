@@ -5,7 +5,8 @@ import {
   clearHostMarkers, 
   clearItinerary, 
   setDestinations, 
-  setTripId 
+  setTripId,
+  updateDayIds
 } from './globe-slice';
 import { convertTripToGlobeDestinations, ApiTrip } from '@/lib/api/trip-converter';
 import { convertPlanToGlobeData, generateMarkersFromDestinations } from '@/lib/ai/plan-converter';
@@ -71,7 +72,11 @@ export const fetchActiveTrip = createAsyncThunk(
                     endDate: new Date(Date.now() + 7 * 86400000).toISOString()
                 })
             });
-            if (!createRes.ok) throw new Error('Failed to create trip');
+            if (!createRes.ok) {
+                const errorText = await createRes.text();
+                console.error('[fetchActiveTrip] Failed to create default trip:', createRes.status, errorText);
+                throw new Error(`Failed to create trip: ${createRes.status} ${errorText}`);
+            }
             activeTrip = await createRes.json();
         }
       }
@@ -118,6 +123,7 @@ export const addExperienceToTrip = createAsyncThunk(
                 type: 'EXPERIENCE',
                 title: experience.title,
                 experienceId: experience.id,
+                hostId: host.id, // Add hostId
                 locationName: host.city,
                 lat: host.lat,
                 lng: host.lng,
@@ -141,6 +147,7 @@ export const addExperienceToTrip = createAsyncThunk(
                 body: JSON.stringify({
                     dayId,
                     experienceId: experience.id,
+                    hostId: host.id, // Pass hostId for storage even if experience not in DB
                     title: experience.title,
                     type: 'EXPERIENCE',
                     locationName: host.city, // Rough approximation
@@ -160,6 +167,7 @@ export const addExperienceToTrip = createAsyncThunk(
                     type: 'EXPERIENCE',
                     title: experience.title,
                     experienceId: experience.id,
+                    hostId: host.id, // Add hostId for booking validation
                     locationName: host.city,
                     lat: host.lat,
                     lng: host.lng,
@@ -216,7 +224,7 @@ import { convertGlobeDestinationsToApiPayload } from '@/lib/api/trip-converter';
 
 export const saveTripPlan = createAsyncThunk(
     'globe/saveTripPlan',
-    async (_, { getState }) => {
+    async (_, { getState, dispatch }) => {
         const state = getState() as any; // Cast to access root state
         const tripId = state.globe.tripId;
         const destinations = state.globe.destinations;
@@ -237,6 +245,16 @@ export const saveTripPlan = createAsyncThunk(
                 throw new Error('Failed to save trip');
             }
             
+            // Handle Day ID Sync
+            try {
+                const data = await res.json();
+                if (data.dayIdMap) {
+                     dispatch(updateDayIds(data.dayIdMap));
+                }
+            } catch (e) {
+                // Ignore parsing errors, assume success if status ok
+            }
+            
             return true;
         } catch (error) {
             console.error('Error saving trip plan:', error);
@@ -247,7 +265,7 @@ export const saveTripPlan = createAsyncThunk(
 
 export const saveTripPlanForTrip = createAsyncThunk(
     'globe/saveTripPlanForTrip',
-    async ({ tripId, plan }: { tripId: string; plan: ItineraryPlan }) => {
+    async ({ tripId, plan }: { tripId: string; plan: ItineraryPlan }, { dispatch }) => {
         if (!tripId) return;
 
         try {
@@ -265,6 +283,14 @@ export const saveTripPlanForTrip = createAsyncThunk(
                 console.error('[saveTripPlanForTrip] Failed to save trip plan:', res.status, errorText);
                 throw new Error('Failed to save trip plan');
             }
+
+            // Sync Day IDs for immediate use
+            try {
+                const data = await res.json();
+                if (data.dayIdMap) {
+                     dispatch(updateDayIds(data.dayIdMap));
+                }
+            } catch(e) {}
 
             return true;
         } catch (error) {

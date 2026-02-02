@@ -83,11 +83,17 @@ export function ExperienceCard({
         <div className="w-px bg-[var(--border)]/50 my-2" />
 
         <button
-          onClick={() => onView?.(experience.id)}
-          className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]/50 transition-colors"
+          onClick={() => isPublished && onView?.(experience.id)}
+          disabled={!isPublished}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
+            isPublished 
+              ? 'text-[var(--foreground)] hover:bg-[var(--muted)]/50' 
+              : 'text-[var(--muted-foreground)] cursor-not-allowed opacity-50'
+          }`}
+          title={isPublished ? 'Manage availability' : 'Publish to enable availability'}
         >
           <Calendar className="w-4 h-4 text-[var(--blue-green)]" />
-          Availability
+          {isPublished ? 'Availability' : 'Publish first'}
         </button>
 
         <div className="w-px bg-[var(--border)]/50 my-2" />

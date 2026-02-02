@@ -79,6 +79,39 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
       continue;
     }
     const anchorLocation = day.anchorLocation;
+    // Create items first to preserve IDs
+    const dayItems = day.activities.map((act, idx): ItineraryItem => {
+        // Map category to item type
+        let type: any = 'EXPERIENCE'; // Default to Anchor/Experience
+        const cat = act.place.category?.toLowerCase();
+        
+        if (cat === 'landmark' || cat === 'museum' || cat === 'park' || cat === 'sight') {
+            type = 'SIGHT'; // Context Stop
+        } else if (cat === 'restaurant' || cat === 'cafe' || cat === 'food') {
+            type = 'MEAL';
+        }
+
+        // Assign a host if available and appropriate
+        let hostId: string | undefined;
+        if ((type === 'EXPERIENCE' || type === 'MEAL') && day.suggestedHosts && day.suggestedHosts.length > 0) {
+            // Simple logic: cycle through hosts based on index to distribute them
+            const hostIndex = idx % day.suggestedHosts.length;
+            hostId = day.suggestedHosts[hostIndex].id;
+        }
+
+        return createItem(type, act.place.name, idx, {
+          description: act.notes,
+          location: act.place.description || act.place.address || `${act.timeSlot}`,
+          place: {
+            id: act.place.id || `place-${idx}`,
+            name: act.place.name,
+            location: act.place.location
+          },
+          category: act.place.category, // Use place category
+          hostId, // Assign the host
+        });
+    });
+
     // Create destination from anchor location
     const destination: GlobeDestination = {
       id: generateId(),
@@ -86,33 +119,29 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
       lat: anchorLocation.location.lat,
       lng: anchorLocation.location.lng,
       day: day.dayNumber,
-      activities: day.activities.map((act, idx): ItineraryItem =>
-        createItem('SIGHT', act.place.name, idx, {
-          description: act.notes,
-          location: act.place.description || act.place.address || `${act.timeSlot}`,
-          place: {
-            id: act.place.id || `place-${idx}`,
-            name: act.place.name,
-            location: act.place.location
-          }
-        })
-      ),
+      date: undefined, // Plan doesn't inherently have dates yet
+      activities: dayItems,
       color: getColorForDay(day.dayNumber),
       suggestedHosts: day.suggestedHosts,
       city: extractCityName(anchorLocation),
     };
     destinations.push(destination);
 
-    // Add markers for ALL activities in this day to ensure they appear on the map
-    // (even if no explicit navigation route exists between them)
-    day.activities.forEach((act) => {
-      if (act.place && act.place.location) {
-        addRouteMarker(
-          `activity-marker-${act.place.name}`, // Pseudo-route ID for standalone markers
-          'end', // distinct as a 'stop'
-          act.place,
-          day.dayNumber
-        );
+    // Add markers for ALL activities using the item ID
+    dayItems.forEach((item) => {
+      if (item.place && item.place.location) {
+        const { lat, lng } = item.place.location;
+        if (isValidCoordinate(lat, lng)) {
+            routeMarkers.push({
+              id: item.id, // Direct match with item ID
+              routeId: `full-day-${day.dayNumber}`,
+              kind: 'end',
+              lat,
+              lng,
+              name: item.place.name,
+              dayNumber: day.dayNumber,
+            });
+        }
       }
     });
 

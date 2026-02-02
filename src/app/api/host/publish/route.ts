@@ -84,6 +84,34 @@ export async function POST(request: Request) {
       },
     });
 
+    // Create matching Experience row (marketplace record) with the SAME ID
+    // This allows /api/host/availability and booking flows to find the experience
+    await prisma.experience.create({
+      data: {
+        id: experience.id, // Use same ID as HostExperience
+        hostId: session.user.id,
+        title: draft.title!,
+        description: draft.longDesc!,
+        category: 'ARTS_CULTURE', // Default category for MVP
+        neighborhood: draft.city!, // Use city as neighborhood default
+        city: draft.city!,
+        country: draft.country || 'Unknown',
+        duration: draft.duration!,
+        minGroupSize: 1,
+        maxGroupSize: 6,
+        price: draft.price || 5000, // Default price in cents
+        currency: draft.currency || 'USD',
+        includedItems: [],
+        excludedItems: [],
+        photos: [],
+        rating: 0,
+        reviewCount: 0,
+        isActive: true,
+        latitude: draft.cityLat || null,
+        longitude: draft.cityLng || null,
+      },
+    });
+
     // Create stops for the published experience
     await prisma.experienceStop.createMany({
       data: (draft as any).stops.map((stop: any) => ({

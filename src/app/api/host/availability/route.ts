@@ -27,7 +27,45 @@ export async function GET(request: NextRequest) {
       select: { id: true, hostId: true },
     });
 
-    if (!experience || experience.hostId !== session.user.id) {
+    if (!experience) {
+      // Check if it's a HostExperience that wasn't synced to Experience table
+      const hostExperience = await prisma.hostExperience.findUnique({
+        where: { id: experienceId },
+        select: { id: true, hostId: true },
+      });
+
+      if (hostExperience) {
+        // HostExperience exists but Experience doesn't - needs sync/republish
+        if (hostExperience.hostId !== session.user.id) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+        return NextResponse.json({ 
+          error: 'Experience needs to be republished to enable availability',
+          code: 'REPUBLISH_REQUIRED'
+        }, { status: 409 });
+      }
+
+      // Check if it's a draft
+      const draft = await prisma.experienceDraft.findUnique({
+        where: { id: experienceId },
+        select: { id: true, userId: true },
+      });
+
+      if (draft) {
+        if (draft.userId !== session.user.id) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+        return NextResponse.json({ 
+          error: 'Publish your experience first to manage availability',
+          code: 'PUBLISH_REQUIRED'
+        }, { status: 409 });
+      }
+
+      // Nothing found
+      return NextResponse.json({ error: 'Experience not found' }, { status: 404 });
+    }
+
+    if (experience.hostId !== session.user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -51,19 +89,32 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { experienceId, slots } = body as {
+    
+    // Support both new dates[] format and legacy slots[] format
+    const { experienceId, dates, spotsLeft, timezone, slots } = body as {
       experienceId?: string;
-      slots?: Array<{
-        date: string;
-        startTime?: string | null;
-        endTime?: string | null;
-        spotsLeft?: number | null;
-        timezone?: string | null;
-      }>;
+      dates?: string[];
+      spotsLeft?: number | null;
+      timezone?: string | null;
+      slots?: Array<{ date: string; spotsLeft?: number | null; timezone?: string | null }>;
     };
 
-    if (!experienceId || !Array.isArray(slots) || slots.length === 0) {
-      return NextResponse.json({ error: 'Missing experienceId or slots' }, { status: 400 });
+    // Normalize to dates array
+    let dateStrings: string[] = [];
+    let slotSpotsLeft = spotsLeft;
+    let slotTimezone = timezone;
+
+    if (dates && Array.isArray(dates) && dates.length > 0) {
+      dateStrings = dates;
+    } else if (slots && Array.isArray(slots) && slots.length > 0) {
+      // Legacy support: extract dates from slots
+      dateStrings = slots.map(s => s.date);
+      slotSpotsLeft = slotSpotsLeft ?? slots[0]?.spotsLeft;
+      slotTimezone = slotTimezone ?? slots[0]?.timezone;
+    }
+
+    if (!experienceId || dateStrings.length === 0) {
+      return NextResponse.json({ error: 'Missing experienceId or dates' }, { status: 400 });
     }
 
     const experience = await prisma.experience.findUnique({
@@ -75,20 +126,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const data = slots.map((slot) => ({
-      experienceId,
-      date: parseDate(slot.date),
-      startTime: slot.startTime || null,
-      endTime: slot.endTime || null,
-      spotsLeft: typeof slot.spotsLeft === 'number' ? slot.spotsLeft : null,
-      timezone: slot.timezone || null,
-    }));
+    // Parse dates to UTC midnight
+    const parsedDates = dateStrings.map(d => parseDate(d));
 
-    const created = await prisma.experienceAvailability.createMany({
-      data,
+    // Check for existing records (idempotency)
+    const existing = await prisma.experienceAvailability.findMany({
+      where: {
+        experienceId,
+        date: { in: parsedDates },
+      },
+      select: { date: true },
     });
 
-    return NextResponse.json({ created: created.count });
+    const existingDates = new Set(existing.map(e => e.date.toISOString()));
+
+    // Filter out duplicates
+    const newDates = parsedDates.filter(d => !existingDates.has(d.toISOString()));
+
+    let createdCount = 0;
+    if (newDates.length > 0) {
+      const data = newDates.map((date) => ({
+        experienceId,
+        date,
+        startTime: null, // Date-only: always null
+        endTime: null,   // Date-only: always null
+        spotsLeft: typeof slotSpotsLeft === 'number' ? slotSpotsLeft : null,
+        timezone: slotTimezone || null,
+      }));
+
+      const created = await prisma.experienceAvailability.createMany({
+        data,
+      });
+      createdCount = created.count;
+    }
+
+    return NextResponse.json({ 
+      created: createdCount, 
+      skipped: parsedDates.length - newDates.length 
+    });
   } catch (error) {
     console.error('[host/availability] POST error:', error);
     return NextResponse.json({ error: 'Failed to save availability' }, { status: 500 });
