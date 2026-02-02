@@ -50,7 +50,10 @@ export function ItineraryDayColumn({
 }: ItineraryDayProps) {
   
   return (
-    <div className={`relative pl-8 ${isActive ? 'opacity-100' : 'opacity-70 hover:opacity-100'} transition-opacity`}>
+    <div 
+      data-testid="day-card"
+      className={`relative pl-8 ${isActive ? 'opacity-100' : 'opacity-70 hover:opacity-100'} transition-opacity`}
+    >
       {/* Timeline Line */}
       <div className="absolute left-[15px] top-0 bottom-0 w-px bg-white/10" />
       

@@ -76,6 +76,7 @@ export function Header({ onToggleTimeline, showTimeline }: HeaderProps) {
 
           {/* P2P Chat Button */}
           <button
+            data-testid="chat-toggle"
             onClick={() => dispatch(setP2PChatOpen(!isP2PChatOpen))}
             className={`relative p-2 rounded-lg transition-colors cursor-pointer ${
               isP2PChatOpen 
@@ -97,6 +98,7 @@ export function Header({ onToggleTimeline, showTimeline }: HeaderProps) {
           {/* Profile Link (visible if not creating host) */}
           {!isBecomeHost && (
              <Link
+              data-testid="user-menu"
               href="/profile"
               className={`relative p-2 rounded-lg transition-colors ${
                 isProfile 

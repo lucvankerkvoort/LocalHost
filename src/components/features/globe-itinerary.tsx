@@ -799,7 +799,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Globe */}
-        <div className="flex-1 relative">
+        <div data-testid="globe-container" className="flex-1 relative">
           <CesiumGlobe
             destinations={destinations}
             cityMarkers={cityMarkers}
@@ -818,6 +818,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
           
           {/* Left Itinerary Panel - Only show if destinations exist */}
           <div 
+             data-testid="itinerary-panel"
              className={`absolute top-0 left-0 bottom-0 z-10 transition-all duration-300 ease-in-out flex flex-col border-r border-white/10 ${
                showTimeline && destinations.length > 0 ? (isCollapsed ? 'w-[60px]' : 'w-[360px]') : '-translate-x-full absolute'
              } bg-[rgba(12,16,24,0.2)] backdrop-blur-[6px]`}

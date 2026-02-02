@@ -9,6 +9,12 @@
     "lint": "eslint",
     "test": "tsx --test $(find src -name '*.test.ts' -print)",
     "test:chunk:globe-slice": "tsx --test src/store/globe-slice.test.ts",
+    "test:chunk:hosts-slice": "tsx --test src/store/hosts-slice.test.ts",
+    "test:chunk:host-creation-slice": "tsx --test src/store/host-creation-slice.test.ts",
+    "test:chunk:utils": "tsx --test src/lib/utils.test.ts",
+    "test:chunk:tool-calls-slice": "tsx --test src/store/tool-calls-slice.test.ts",
+    "test:chunk:type-helpers": "tsx --test src/types/globe.test.ts src/types/itinerary.test.ts",
+    "test:chunk:orchestrator-ui-slices": "tsx --test src/store/orchestrator-slice.test.ts src/store/ui-slice.test.ts",
     "postinstall": "rm -f public/cesium && ln -sf ../node_modules/cesium/Build/Cesium public/cesium",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
@@ -52,6 +58,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.1",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
