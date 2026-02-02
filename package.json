@@ -7,6 +7,8 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "tsx --test $(find src -name '*.test.ts' -print)",
+    "test:chunk:globe-slice": "tsx --test src/store/globe-slice.test.ts",
     "postinstall": "rm -f public/cesium && ln -sf ../node_modules/cesium/Build/Cesium public/cesium",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",

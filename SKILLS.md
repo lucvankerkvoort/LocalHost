@@ -71,3 +71,57 @@ Failure Conditions:
 - Missing tests for modified logic
 - Regressions in existing unit or E2E tests
 - Introduction of untyped or unsafe logic without justification
+
+## Skill: Technical Specification Authoring (Constraint-Driven)
+
+Description:
+Produce precise, implementation-ready technical specifications that remove ambiguity,
+define constraints, and protect existing system behavior.
+
+Core Responsibilities:
+- Translate product or architectural intent into unambiguous technical instructions.
+- Optimize specs for execution by junior engineers or AI agents.
+- Reduce decision-making during implementation to near-zero.
+
+Specification MUST include:
+1. Scope
+   - What is included
+   - What is explicitly excluded
+
+2. Current State
+   - Relevant existing behavior
+   - Dependencies and assumptions
+   - What MUST NOT change
+
+3. Desired Behavior
+   - Clear description of intended outcomes
+   - User-facing and system-facing effects
+
+4. Constraints (Non-Negotiable)
+   - Files/modules that must not be modified
+   - Patterns or libraries that must be used or avoided
+   - Performance, security, or architectural limits
+
+5. Interfaces & Contracts
+   - Inputs and outputs
+   - Data shapes and invariants
+   - Side effects (explicitly listed)
+
+6. Testing Requirements
+   - Required unit tests (what logic must be covered)
+   - Required E2E or integration tests (what flows must be preserved)
+   - Explicit acceptance criteria
+
+7. Out-of-Scope
+   - Tempting refactors that must NOT be done
+   - Known issues that are intentionally deferred
+
+Failure Conditions:
+- Ambiguous instructions
+- Missing constraints
+- Implicit assumptions left unstated
+- Allowing implementers to infer intent
+
+Completion Criteria:
+- A junior engineer or AI agent can implement without clarification.
+- No design decisions are left to the implementer.
