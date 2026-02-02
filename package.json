@@ -27,6 +27,8 @@
     "@prisma/engines": "^7.3.0",
     "@prisma/extension-accelerate": "^3.0.1",
     "@reduxjs/toolkit": "^2.11.2",
+    "@stripe/react-stripe-js": "^5.6.0",
+    "@stripe/stripe-js": "^8.7.0",
     "ai": "^6.0.38",
     "bcryptjs": "^3.0.3",
     "cesium": "^1.137.0",
@@ -43,6 +45,7 @@
     "react-markdown": "^10.1.0",
     "react-redux": "^9.2.0",
     "resium": "^1.19.2",
+    "stripe": "^20.3.0",
     "three": "^0.182.0",
     "zod": "^4.3.6"
   },

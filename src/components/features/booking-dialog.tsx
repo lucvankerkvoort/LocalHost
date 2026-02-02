@@ -3,11 +3,32 @@
 import { useState } from 'react';
 import Image from 'next/image';
 
-import { HOSTS } from '@/lib/data/hosts';
-import type { ExperienceCandidateData } from './experience-candidate-card';
+// Type for candidate with embedded experience and host from API
+interface BookingCandidateWithData {
+  id: string;
+  hostId: string;
+  experienceId: string;
+  dayNumber?: number;
+  date?: string | null;
+  timeSlot?: string | null;
+  experience: {
+    id: string;
+    title: string;
+    price: number;
+    duration: number;
+    rating?: number;
+    reviewCount?: number;
+    photos?: string[];
+  };
+  host: {
+    id: string;
+    name: string;
+    image?: string | null;
+  };
+}
 
 interface BookingDialogProps {
-  candidate: ExperienceCandidateData;
+  candidate: BookingCandidateWithData;
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (candidateId: string) => Promise<void>;
@@ -22,8 +43,9 @@ export function BookingDialog({
   const [isBooking, setIsBooking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const host = HOSTS.find(h => h.id === candidate.hostId);
-  const experience = host?.experiences.find(e => e.id === candidate.experienceId);
+  // Use embedded data from API response
+  const experience = candidate.experience;
+  const host = candidate.host;
 
   const handleConfirm = async () => {
     setIsBooking(true);
@@ -39,7 +61,7 @@ export function BookingDialog({
     }
   };
 
-  if (!isOpen || !host || !experience) return null;
+  if (!isOpen || !experience || !host) return null;
 
   const formatDate = (date: string | null | undefined) => {
     if (!date) return 'Date to be confirmed';
@@ -81,7 +103,7 @@ export function BookingDialog({
           {/* Experience info */}
           <div className="flex gap-4 mb-6">
             <Image
-              src={experience.photos?.[0] || host.photo}
+              src={experience.photos?.[0] || host.image || '/placeholder-host.jpg'}
               alt={experience.title}
               width={80}
               height={80}

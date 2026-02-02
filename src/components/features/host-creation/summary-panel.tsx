@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { selectHostCreation, updateDraft, updateStop, moveStop, removeStop } from '@/store/host-creation-slice';
+import { selectHostCreation, updateDraft, updateStop, moveStop, removeStop, reorderStop } from '@/store/host-creation-slice';
 import { useRouter } from 'next/navigation';
 import { saveExperienceDraft } from '@/actions/experiences';
 import { ChevronUp, ChevronDown, Trash2 } from 'lucide-react';

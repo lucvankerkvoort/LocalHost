@@ -86,6 +86,9 @@ interface CesiumGlobeProps {
   onCityMarkerClick?: (marker: CityMarkerData) => void;
   onHostClick?: (host: HostMarkerData) => void;
   visualTarget?: { lat: number; lng: number; height?: number } | null;
+  activeItemId?: string | null;
+  hoveredItemId?: string | null;
+  onItemHover?: (itemId: string | null) => void;
 }
 
 // Helper to create circular avatar image from URL
@@ -158,6 +161,9 @@ export default function CesiumGlobe({
   onCityMarkerClick,
   onHostClick,
   visualTarget,
+  activeItemId,
+  hoveredItemId,
+  onItemHover,
 }: CesiumGlobeProps) {
   const viewerRef = useRef<CesiumViewer | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -241,10 +247,19 @@ export default function CesiumGlobe({
             return;
           }
         }
+
+        // Check for route markers (Itinerary Items)
+        if (entityId?.startsWith('route-marker-')) {
+           const markerId = entityId.replace('route-marker-', '');
+           onItemHover?.(markerId);
+           setHoveredHost(null); // items are not hosts
+           return;
+        }
       }
       
       setHoveredHost(null);
       setHoverPosition(null);
+      onItemHover?.(null); // Clear item hover if not over a marker
     }, ScreenSpaceEventType.MOUSE_MOVE);
 
     return () => {
@@ -253,7 +268,7 @@ export default function CesiumGlobe({
         handlerRef.current = null;
       }
     };
-  }, [isReady, hostMarkers]);
+  }, [isReady, hostMarkers, onItemHover]);
 
   // Handle explicit visual target (e.g. from chat command)
   useEffect(() => {
@@ -366,6 +381,9 @@ export default function CesiumGlobe({
           />
           );
         })}
+        
+        {/* Route Lines */}
+
 
         {/* Route markers */}
         {filteredRouteMarkers
@@ -377,6 +395,14 @@ export default function CesiumGlobe({
           })
           .map((marker) => {
             const markerColor = Color.fromCssColorString(getRouteMarkerColor(marker));
+            const isActive = activeItemId === marker.id;
+            const isHovered = hoveredItemId === marker.id;
+            
+            // Visual state priority: Active > Hovered > Default
+            const size = isActive ? 16 : (isHovered ? 12 : ROUTE_MARKER_SIZE);
+            const alpha = isActive ? 0.9 : (isHovered ? 0.7 : ROUTE_MARKER_FILL_ALPHA);
+            const outlineWidth = isActive ? 4 : (isHovered ? 3 : 2);
+            
             return (
               <Entity
                 key={`route-marker-${marker.id}`}
@@ -384,25 +410,25 @@ export default function CesiumGlobe({
                 name={marker.name ?? 'Route marker'}
                 position={Cartesian3.fromDegrees(marker.lng, marker.lat, 0)}
                 point={{
-                  pixelSize: ROUTE_MARKER_SIZE,
-                  color: markerColor.withAlpha(ROUTE_MARKER_FILL_ALPHA),
+                  pixelSize: size,
+                  color: markerColor.withAlpha(alpha),
                   outlineColor: markerColor,
-                  outlineWidth: 2,
+                  outlineWidth: outlineWidth,
                   heightReference: HeightReference.CLAMP_TO_GROUND,
                   disableDepthTestDistance: MARKER_DEPTH_TEST_DISTANCE,
                 }}
                 label={{
                   text: marker.name ?? '',
-                  font: '11px sans-serif',
+                  font: isActive ? 'bold 14px sans-serif' : '11px sans-serif',
                   fillColor: markerColor.withAlpha(0.95),
                   outlineColor: Color.WHITE,
                   outlineWidth: 2,
                   style: 2, // FILL_AND_OUTLINE
                   verticalOrigin: VerticalOrigin.BOTTOM,
-                  pixelOffset: new Cartesian2(0, -12),
+                  pixelOffset: new Cartesian2(0, isActive ? -20 : -12),
                   heightReference: HeightReference.CLAMP_TO_GROUND,
                   disableDepthTestDistance: MARKER_DEPTH_TEST_DISTANCE,
-                  show: Boolean(marker.name),
+                  show: Boolean(marker.name) || isActive || isHovered,
                 }}
               />
             );

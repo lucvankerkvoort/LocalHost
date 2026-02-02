@@ -41,6 +41,8 @@ export interface ItineraryItem {
     };
     category?: string;
   };
+  duration?: number; // duration in minutes
+  category?: string; // specific category if different from type
 }
 
 export interface ItineraryDay {

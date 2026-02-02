@@ -29,6 +29,11 @@ export async function GET(
             return new NextResponse('Forbidden', { status: 403 });
         }
 
+        // Chat access gate: only allow access if booking is CONFIRMED or COMPLETED
+        if (booking.status !== 'CONFIRMED' && booking.status !== 'COMPLETED') {
+            return new NextResponse('Chat is locked until booking is confirmed', { status: 403 });
+        }
+
         const messages = await prisma.message.findMany({
             where: { bookingId },
             orderBy: { createdAt: 'asc' },
@@ -70,6 +75,11 @@ export async function POST(
 
         if (booking.guestId !== session.user.id && booking.experience.hostId !== session.user.id) {
              return new NextResponse('Forbidden', { status: 403 });
+        }
+
+        // Chat access gate: only allow access if booking is CONFIRMED or COMPLETED
+        if (booking.status !== 'CONFIRMED' && booking.status !== 'COMPLETED') {
+            return new NextResponse('Chat is locked until booking is confirmed', { status: 403 });
         }
 
         const message = await prisma.message.create({

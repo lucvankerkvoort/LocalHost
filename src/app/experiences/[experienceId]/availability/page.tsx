@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Calendar, Plus, Trash2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Calendar, Trash2, Sparkles } from 'lucide-react';
 
 type AvailabilitySlot = {
   id: string;
@@ -13,6 +13,8 @@ type AvailabilitySlot = {
   timezone: string | null;
 };
 
+type OwnershipStatus = 'loading' | 'owner' | 'not-owner' | 'publish-required';
+
 export default function ExperienceAvailabilityPage() {
   const params = useParams<{ experienceId: string }>();
   const router = useRouter();
@@ -21,9 +23,9 @@ export default function ExperienceAvailabilityPage() {
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [ownershipStatus, setOwnershipStatus] = useState<OwnershipStatus>('loading');
   const [rangeStart, setRangeStart] = useState('');
   const [rangeEnd, setRangeEnd] = useState('');
-  const [timeSlots, setTimeSlots] = useState<Array<{ start: string; end: string }>>([]);
   const [spotsLeft, setSpotsLeft] = useState('');
   const [timezone, setTimezone] = useState('');
   const [weekdays, setWeekdays] = useState<Record<string, boolean>>({
@@ -47,8 +49,22 @@ export default function ExperienceAvailabilityPage() {
     setIsLoading(true);
     try {
       const res = await fetch(`/api/host/availability?experienceId=${encodeURIComponent(experienceId)}`);
+      if (res.status === 403) {
+        setOwnershipStatus('not-owner');
+        return;
+      }
+      if (res.status === 409) {
+        // Experience needs to be published first
+        setOwnershipStatus('publish-required');
+        return;
+      }
+      if (res.status === 404) {
+        setOwnershipStatus('not-owner');
+        return;
+      }
       const data = await res.json();
       if (res.ok) {
+        setOwnershipStatus('owner');
         setSlots(data.availability || []);
       }
     } finally {
@@ -93,43 +109,19 @@ export default function ExperienceAvailabilityPage() {
         6: 'Sat',
       };
 
-      const slots: Array<{
-        date: string;
-        startTime?: string | null;
-        endTime?: string | null;
-        spotsLeft?: number | null;
-        timezone?: string | null;
-      }> = [];
+      // Generate date-only list
+      const dates: string[] = [];
 
       const cursor = new Date(startDate);
       while (cursor <= endDate) {
         const weekdayKey = weekdayMap[cursor.getUTCDay()];
         if (activeWeekdays.size === 0 || activeWeekdays.has(weekdayKey)) {
-          const dateString = cursor.toISOString().split('T')[0];
-          if (timeSlots.length === 0) {
-            slots.push({
-              date: dateString,
-              startTime: null,
-              endTime: null,
-              spotsLeft: spotsLeft ? Number(spotsLeft) : null,
-              timezone: timezone || null,
-            });
-          } else {
-            for (const slot of timeSlots) {
-              slots.push({
-                date: dateString,
-                startTime: slot.start || null,
-                endTime: slot.end || null,
-                spotsLeft: spotsLeft ? Number(spotsLeft) : null,
-                timezone: timezone || null,
-              });
-            }
-          }
+          dates.push(cursor.toISOString().split('T')[0]);
         }
         cursor.setUTCDate(cursor.getUTCDate() + 1);
       }
 
-      if (slots.length === 0) {
+      if (dates.length === 0) {
         throw new Error('No dates matched your range/weekday selection');
       }
 
@@ -138,7 +130,9 @@ export default function ExperienceAvailabilityPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           experienceId,
-          slots,
+          dates,
+          spotsLeft: spotsLeft ? Number(spotsLeft) : null,
+          timezone: timezone || null,
         }),
       });
 
@@ -149,7 +143,6 @@ export default function ExperienceAvailabilityPage() {
 
       setRangeStart('');
       setRangeEnd('');
-      setTimeSlots([]);
       setSpotsLeft('');
       setTimezone('');
       await loadAvailability();
@@ -173,6 +166,72 @@ export default function ExperienceAvailabilityPage() {
     }
   };
 
+  // Ownership gate: show friendly message if not the owner
+  if (ownershipStatus === 'not-owner') {
+    return (
+      <div className="min-h-screen bg-[var(--background)] pb-24">
+        <div className="max-w-xl mx-auto px-6 pt-12">
+          <button
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-2 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+
+          <div className="mt-12 text-center">
+            <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
+              <Calendar className="w-8 h-8 text-amber-600" />
+            </div>
+            <h1 className="text-xl font-bold text-[var(--foreground)]">This isn't your experience</h1>
+            <p className="text-sm text-[var(--muted-foreground)] mt-2 mb-6">
+              Only the host can edit availability.
+            </p>
+            <button
+              onClick={() => router.push('/experiences')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--princeton-orange)] text-white font-medium text-sm hover:bg-[var(--princeton-dark)]"
+            >
+              Back to My Experiences
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Publish-required gate: show friendly message to publish first
+  if (ownershipStatus === 'publish-required') {
+    return (
+      <div className="min-h-screen bg-[var(--background)] pb-24">
+        <div className="max-w-xl mx-auto px-6 pt-12">
+          <button
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-2 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+
+          <div className="mt-12 text-center">
+            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
+              <Calendar className="w-8 h-8 text-blue-600" />
+            </div>
+            <h1 className="text-xl font-bold text-[var(--foreground)]">Publish your experience first</h1>
+            <p className="text-sm text-[var(--muted-foreground)] mt-2 mb-6">
+              You can set availability after publishing your experience.
+            </p>
+            <button
+              onClick={() => router.push('/experiences')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--princeton-orange)] text-white font-medium text-sm hover:bg-[var(--princeton-dark)]"
+            >
+              Back to My Experiences
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[var(--background)] pb-24">
       <div className="max-w-xl mx-auto px-6 pt-12">
@@ -191,7 +250,7 @@ export default function ExperienceAvailabilityPage() {
           <div>
             <h1 className="text-2xl font-bold">Availability</h1>
             <p className="text-sm text-[var(--muted-foreground)]">
-              Add date-only availability or optional time slots.
+              Set which dates you're available to host.
             </p>
           </div>
         </div>
@@ -199,9 +258,9 @@ export default function ExperienceAvailabilityPage() {
         <form onSubmit={handleAddSlot} className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold">Bulk add availability</h2>
+              <h2 className="text-sm font-semibold">Add available dates</h2>
               <p className="text-xs text-[var(--muted-foreground)]">
-                Add date ranges with optional time slots.
+                Select a date range and which days of the week.
               </p>
             </div>
             <button
@@ -263,61 +322,7 @@ export default function ExperienceAvailabilityPage() {
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-medium">Time slots (optional)</div>
-              <button
-                type="button"
-                onClick={() => setTimeSlots((prev) => [...prev, { start: '', end: '' }])}
-                className="inline-flex items-center gap-1 text-xs text-[var(--blue-green)] hover:text-[var(--princeton-dark)]"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Add slot
-              </button>
-            </div>
-            {timeSlots.length === 0 ? (
-              <p className="text-xs text-[var(--muted-foreground)]">
-                No time slots = all‑day availability.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {timeSlots.map((slot, idx) => (
-                  <div key={`${slot.start}-${idx}`} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
-                    <input
-                      type="time"
-                      value={slot.start}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setTimeSlots((prev) =>
-                          prev.map((s, i) => (i === idx ? { ...s, start: value } : s))
-                        );
-                      }}
-                      className="rounded-lg border border-[var(--border)] px-2 py-2 text-sm"
-                    />
-                    <input
-                      type="time"
-                      value={slot.end}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setTimeSlots((prev) =>
-                          prev.map((s, i) => (i === idx ? { ...s, end: value } : s))
-                        );
-                      }}
-                      className="rounded-lg border border-[var(--border)] px-2 py-2 text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setTimeSlots((prev) => prev.filter((_, i) => i !== idx))}
-                      className="rounded-lg p-2 text-red-500 hover:bg-red-50"
-                      title="Remove slot"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Time slots removed — date-only availability */}
 
           <div className="grid grid-cols-2 gap-4">
             <label className="text-sm font-medium">

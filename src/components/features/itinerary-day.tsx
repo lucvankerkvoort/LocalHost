@@ -1,112 +1,159 @@
 'use client';
 
-import { useState } from 'react';
-import { ItineraryDay as ItineraryDayType, ItineraryItem as ItineraryItemType } from '@/types/itinerary';
-import { ItineraryItem } from './itinerary-item';
+import { ItineraryItem as ItineraryItemType } from '@/types/itinerary';
+import { Calendar, MapPin, Clock } from 'lucide-react';
 
 interface ItineraryDayProps {
-  day: ItineraryDayType;
-  onAddItem: (dayId: string) => void;
-  onEditItem: (dayId: string, item: ItineraryItemType) => void;
-  onDeleteItem: (dayId: string, itemId: string) => void;
-  onDragStart: (e: React.DragEvent, dayId: string, item: ItineraryItemType) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent, dayId: string) => void;
-  onBookItem: (dayId: string, item: ItineraryItemType) => void;
+  dayId: string;
+  dayNumber: number;
+  title?: string;
+  date?: string;
+  activities: ItineraryItemType[];
+  isSpaceOptimized?: boolean;
+  isActive?: boolean;
+  
+  onAddActivity: (dayId: string) => void;
+  onSelect?: () => void;
+  onItemClick?: (item: ItineraryItemType) => void;
+  onItemHover?: (itemId: string | null) => void;
+  onEditItem?: (item: ItineraryItemType) => void;
+  onDeleteItem?: (itemId: string) => void;
+  onBookItem?: (item: ItineraryItemType) => void;
 }
 
-function formatDate(dateString: string): string {
-  const date = new Date(dateString + 'T00:00:00');
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+function formatDate(dateString?: string): string {
+  if (!dateString) return 'Unscheduled';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Unscheduled';
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  } catch (e) {
+    return 'Unscheduled';
+  }
 }
 
 export function ItineraryDayColumn({
-  day,
-  onAddItem,
+  dayId,
+  dayNumber,
+  title,
+  date,
+  activities = [],
+  isSpaceOptimized = false,
+  isActive = false,
+  onAddActivity,
+  onSelect,
+  onItemClick,
+  onItemHover,
   onEditItem,
   onDeleteItem,
-  onDragStart,
-  onDragOver,
-  onDrop,
   onBookItem,
 }: ItineraryDayProps) {
-  const [isDragOver, setIsDragOver] = useState(false);
   
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-    onDragOver(e);
-  };
-  
-  const handleDragLeave = () => {
-    setIsDragOver(false);
-  };
-  
-  const handleDrop = (e: React.DragEvent) => {
-    setIsDragOver(false);
-    onDrop(e, day.id);
-  };
-
   return (
-    <div 
-      className={`flex-shrink-0 w-72 bg-[var(--sky-blue-lighter)]/30 rounded-xl p-3 
-                  transition-all duration-200 ${isDragOver ? 'ring-2 ring-[var(--blue-green)] bg-[var(--sky-blue-lighter)]/50' : ''}`}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
+    <div className={`relative pl-8 ${isActive ? 'opacity-100' : 'opacity-70 hover:opacity-100'} transition-opacity`}>
+      {/* Timeline Line */}
+      <div className="absolute left-[15px] top-0 bottom-0 w-px bg-white/10" />
+      
       {/* Day Header */}
-      <div className="mb-3">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-[var(--princeton-orange)] uppercase tracking-wide">
-            Day {day.dayNumber}
-          </span>
-          <span className="text-xs text-[var(--muted-foreground)]">
-            {day.items.length} {day.items.length === 1 ? 'item' : 'items'}
-          </span>
-        </div>
-        <h3 className="font-semibold text-[var(--foreground)] mt-0.5">
-          {formatDate(day.date)}
-        </h3>
-      </div>
-      
-      {/* Items */}
-      <div className="space-y-2 min-h-[100px]">
-        {day.items.length === 0 ? (
-          <div className="text-center py-8 text-[var(--muted-foreground)] text-sm">
-            <p>No activities yet</p>
-            <p className="text-xs mt-1">Add your first item!</p>
-          </div>
-        ) : (
-          [...day.items]
-            .sort((a, b) => a.position - b.position)
-            .map(item => (
-              <ItineraryItem
-                key={item.id}
-                item={item}
-                dayId={day.id}
-                onEdit={(item) => onEditItem(day.id, item)}
-                onDelete={onDeleteItem}
-                onDragStart={onDragStart}
-                onBook={onBookItem}
-              />
-            ))
-        )}
-      </div>
-      
-      {/* Add Item Button */}
-      <button
-        onClick={() => onAddItem(day.id)}
-        className="mt-3 w-full py-2 px-3 rounded-lg border-2 border-dashed border-[var(--border)] 
-                   text-[var(--muted-foreground)] text-sm font-medium
-                   hover:border-[var(--blue-green)] hover:text-[var(--blue-green)] hover:bg-white/50
-                   transition-all duration-200 flex items-center justify-center gap-1"
+      <div 
+        className="relative mb-4 cursor-pointer group"
+        onClick={onSelect}
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-        Add Item
-      </button>
+        <div className={`absolute -left-[39px] top-0 w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-colors ${
+           isActive 
+             ? 'bg-[var(--princeton-orange)] border-[var(--princeton-orange)] text-white' 
+             : 'bg-[var(--deep-space-blue)] border-white/20 text-[var(--muted-foreground)] group-hover:border-[var(--princeton-orange)]'
+        }`}>
+           {dayNumber}
+        </div>
+        
+        <div className="flex flex-col">
+            <span className="text-sm font-bold text-white group-hover:text-[var(--princeton-orange)] transition-colors">
+                {formatDate(date)}
+            </span>
+            <span className="text-xs text-[var(--muted-foreground)]">
+                {activities.length} Stops • {title || `Day ${dayNumber}`}
+            </span>
+        </div>
+      </div>
+      
+      {/* Activities List */}
+      <div className="space-y-3">
+        {activities.map((item) => {
+            const isAnchor = item.type === 'EXPERIENCE' || item.type === 'MEAL';
+            const isContext = item.type === 'SIGHT' || item.type === 'FREE_TIME';
+            
+            return (
+            <div 
+                key={item.id}
+                data-item-id={item.id}
+                className={`group/card relative rounded-lg p-3 transition-all cursor-pointer border ${
+                    isAnchor 
+                        ? 'bg-white/10 hover:bg-white/15 border-l-4 border-l-[var(--princeton-orange)] border-y-transparent border-r-transparent' 
+                        : 'bg-white/5 hover:bg-white/10 border-transparent hover:border-white/10 opacity-80 hover:opacity-100'
+                }`}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onItemClick?.(item);
+                }}
+                onMouseEnter={() => onItemHover?.(item.id)}
+                onMouseLeave={() => onItemHover?.(null)}
+            >
+                <div className="flex justify-between items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                            {isAnchor && item.hostId && (
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--princeton-orange)] bg-[var(--princeton-orange)]/10 px-1.5 py-0.5 rounded-sm">
+                                    Hosted
+                                </span>
+                            )}
+                            {item.category && (
+                                <span className="text-[10px] uppercase tracking-wider text-[var(--muted-foreground)]">
+                                    {item.category.replace('_', ' ')}
+                                </span>
+                            )}
+                        </div>
+                        <h4 className={`font-medium text-white truncate pr-6 ${isAnchor ? 'text-sm' : 'text-xs'}`}>
+                            {item.title}
+                        </h4>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-[var(--muted-foreground)]">
+                           {item.duration && (
+                               <span className="flex items-center gap-1">
+                                   <Clock className="w-3 h-3" />
+                                   {Math.round(item.duration / 60) > 0 ? `${Math.round(item.duration / 60)}h` : `${item.duration}m`}
+                               </span>
+                           )}
+                        </div>
+                    </div>
+                </div>
+                
+                {/* Actions (hover only) */}
+                <div className="absolute top-2 right-2 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center gap-1">
+                     {onBookItem && isAnchor && (
+                         <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onBookItem(item);
+                            }}
+                            className="px-2 py-1 rounded-md bg-[var(--princeton-orange)] text-white text-xs font-bold hover:bg-[var(--princeton-dark)]"
+                            title="Book Experience"
+                         >
+                            Book
+                         </button>
+                     )}
+                </div>
+            </div>
+            );
+        })}
+        
+        {/* Add Item Placeholder */}
+        <button
+            onClick={() => onAddActivity(dayId)}
+            className="w-full py-2 border border-dashed border-white/10 rounded-lg text-xs text-[var(--muted-foreground)] hover:text-white hover:border-white/30 transition-colors flex items-center justify-center gap-1"
+        >
+            <span>+</span> Add to Day {dayNumber}
+        </button>
+      </div>
     </div>
   );
 }

@@ -164,26 +164,12 @@ export function useExperienceCandidates(): UseExperienceCandidatesReturn {
     }
   }, []);
 
-  // Book a candidate
-  const bookCandidate = useCallback(async (candidateId: string): Promise<boolean> => {
-    try {
-      const res = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidateId }),
-      });
-      
-      if (!res.ok) return false;
-      
-      // Update local state
-      setCandidates(prev => prev.map(c => 
-        c.id === candidateId ? { ...c, status: 'BOOKED' as CandidateStatus } : c
-      ));
-      
-      return true;
-    } catch (e) {
-      return false;
-    }
+  // bookCandidate removed - candidates ARE bookings in TENTATIVE status
+  // Payment flow uses candidateId directly as bookingId
+  // This function is kept as a no-op for backwards compatibility
+  const bookCandidate = useCallback(async (_candidateId: string): Promise<boolean> => {
+    console.warn('[useExperienceCandidates] bookCandidate is deprecated. Candidate IS the booking.');
+    return true; // No-op - candidate is already a booking
   }, []);
 
   // Load chat messages for a candidate

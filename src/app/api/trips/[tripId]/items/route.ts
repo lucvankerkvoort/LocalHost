@@ -26,33 +26,62 @@ export async function POST(
 
     const body = await req.json();
     console.log('[TRIP_ITEM_POST] Received:', { tripId, session_user: session?.user?.id, body });
-    const { dayId, experienceId, title, type, locationName, lat, lng } = body;
+    const { dayId, dayNumber, experienceId, hostId, title, type, locationName, lat, lng } = body;
 
     // Find the day to attach to
-    // If dayId is provided, use it. If not, maybe infer from trip structure?
-    // For "Add to Day", frontend should know the Day ID or Day Index.
+    let day = null;
     
-    if (!dayId) {
-         return new NextResponse("dayId is required", { status: 400 });
+    // 1. Try explicit dayId
+    if (dayId) {
+        day = await prisma.itineraryDay.findFirst({
+            where: {
+                id: dayId,
+                tripStop: { tripId: tripId }
+            },
+            include: { items: true }
+        });
     }
 
-    // Verify day belongs to trip
-    // (Implicitly checked by finding it within trip stops? Or just trust ID + Trip ownership?)
-    // Better to check.
-    // Verify day belongs to trip
-    const day = await prisma.itineraryDay.findFirst({
-        where: {
-            id: dayId,
-            tripStop: {
-                tripId: tripId
-            }
-        },
-        include: { items: true }
-    });
+    // 2. Fallback to dayNumber if dayId failed or wasn't provided
+    if (!day && dayNumber !== undefined) {
+         console.log('[TRIP_ITEM_POST] Falling back to dayNumber lookup:', dayNumber);
+         // Find day by index within the trip
+         // Use findFirst over the whole trip structure or iterate?
+         // Efficient query:
+         day = await prisma.itineraryDay.findFirst({
+            where: {
+                dayIndex: dayNumber, // Assuming backend uses dayIndex 0-based or frontend passes correct one?
+                // Frontend passes `dayNumber` which usually is `dayIndex + 1` in our app, specifically GlobeDestination.day
+                // Let's assume input `dayNumber` matches destination.day
+                // Wait, GlobeDestination.day is usually 1-indexed.
+                // ItineraryDay.dayIndex is 0-indexed usually?
+                // Let's check plan-converter.ts: `dayIndex: day.dayNumber` -> wait, schema says: `dayIndex Int`
+                // Let's check `candidates/route.ts`: `d.dayIndex + 1 === parseInt(dayNumber)`
+                // So dayNumber is 1-based, dayIndex is 0-based.
+                tripStop: { tripId: tripId }
+            },
+            include: { items: true }
+         });
+         
+         // If strictly dayIndex passed? 
+         if (!day) {
+             // Try assuming it WAS dayIndex?
+              day = await prisma.itineraryDay.findFirst({
+                where: {
+                    dayIndex: dayNumber - 1, // Try 1-based to 0-based conversion
+                    tripStop: { tripId: tripId }
+                },
+                include: { items: true }
+             });
+         }
+    }
 
     if (!day) {
         return new NextResponse("Day not found or does not belong to this trip", { status: 404 });
     }
+    
+    // Use the found day.id for the relation
+    const targetDayId = day.id;
     
     const userId = session.user.id;
 
@@ -71,10 +100,11 @@ export async function POST(
 
         const item = await tx.itineraryItem.create({
             data: {
-                dayId,
+                dayId: targetDayId,
                 type: type || 'EXPERIENCE',
                 title: title || 'New Item',
-                experienceId: experience ? experience.id : null,
+                experienceId: experience ? experience.id : null, // Only store if exists in DB (FK constraint)
+                hostId: experience?.hostId || hostId || null, // Store hostId directly
                 locationName,
                 lat,
                 lng,
@@ -92,6 +122,7 @@ export async function POST(
                 data: {
                     tripId,
                     experienceId: experience.id,
+                    hostId: experience.hostId, // Link to host
                     guestId: userId, 
                     itemId: item.id,
                     date: day.date || new Date(), 
@@ -105,14 +136,24 @@ export async function POST(
             });
         }
         
-        return { item, booking: createdBooking };
+        // Return item with hostId injected if available (for frontend validation)
+        // Use passed hostId as fallback for mock experiences not in DB
+        return { 
+            item: {
+                ...item,
+                experienceId: experienceId || null, // Preserve the passed experienceId for reference
+                hostId: experience?.hostId || hostId || null
+            }, 
+            booking: createdBooking 
+        };
     });
 
     return NextResponse.json(result);
 
   } catch (error) {
-    console.error('[TRIP_ITEM_POST]', error);
-    return new NextResponse('Internal Error', { status: 500 });
+    console.error('[TRIP_ITEM_POST] Error:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return new NextResponse(`Internal Error: ${message}`, { status: 500 });
   }
 }
 

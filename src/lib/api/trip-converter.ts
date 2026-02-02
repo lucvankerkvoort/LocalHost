@@ -8,6 +8,7 @@ interface ApiItineraryItem {
   title: string;
   description: string | null;
   experienceId: string | null;
+  hostId?: string | null; // Some items may have hostId directly
   locationName: string | null;
   lat: number | null;
   lng: number | null;
@@ -52,7 +53,7 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
                 type: item.type as any, 
                 category: item.type.toLowerCase(), 
                 title: item.title,
-                hostId: item.experience?.hostId, 
+                hostId: item.experience?.hostId || item.hostId || undefined, 
                 experienceId: item.experienceId,
                 position: item.orderIndex,
                 timeSlot: 'Flexible', 
