@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 
 // Use a placeholder if missing (for build time), but warn.
-const apiKey = process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder_for_build';
+const apiKey = process.env.STRIPE_SECRET_KEY || 'stripe_key_placeholder_for_build';
 
 if (!process.env.STRIPE_SECRET_KEY) {
   console.warn('STRIPE_SECRET_KEY is missing in environment variables. Using placeholder for build.');

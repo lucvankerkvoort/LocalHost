@@ -11,7 +11,10 @@ const prisma = new PrismaClient({
 
 async function main() {
   const email = 'demo@localhost.com';
-  const password = 'password';
+  const password = process.env.DEMO_USER_PASSWORD;
+  if (!password) {
+    throw new Error('DEMO_USER_PASSWORD is required.');
+  }
   const hashedPassword = await bcrypt.hash(password, 10);
 
   console.log(`Creating demo user: ${email}`);
@@ -36,7 +39,7 @@ async function main() {
 
   console.log(`✅ Demo user ready!`);
   console.log(`📧 Email: ${email}`);
-  console.log(`🔑 Password: ${password}`);
+  console.log(`🔑 Password: [loaded from DEMO_USER_PASSWORD]`);
 }
 
 main()
