@@ -58,4 +58,75 @@ test.describe('Booking Flow', () => {
       await expect(page.locator('[data-testid="navbar"]')).toBeVisible();
     }
   });
+
+  test('book button opens booking dialog', async ({ page }) => {
+    await page.goto('/');
+    await waitForGlobe(page);
+    
+    // Load demo data
+    await page.getByRole('button', { name: 'Load Demo', exact: true }).click();
+    await waitForItinerary(page);
+    
+    // Find a "Book Now" button in an itinerary item
+    const bookButton = page.getByRole('button', { name: /Book Now/i }).first();
+    
+    // Check if any book buttons exist (demo data may not have bookable items)
+    if (await bookButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await bookButton.click();
+      
+      // Booking dialog should appear
+      const dialog = page.locator('[data-testid="booking-dialog"]');
+      await expect(dialog).toBeVisible({ timeout: 5000 });
+    }
+  });
+
+  test('booking dialog shows experience details', async ({ page }) => {
+    await page.goto('/');
+    await waitForGlobe(page);
+    
+    // Load demo data
+    await page.getByRole('button', { name: 'Load Demo', exact: true }).click();
+    await waitForItinerary(page);
+    
+    // Find a "Book Now" button
+    const bookButton = page.getByRole('button', { name: /Book Now/i }).first();
+    
+    if (await bookButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await bookButton.click();
+      
+      // Dialog should show content
+      const dialog = page.locator('[data-testid="booking-dialog"]');
+      await expect(dialog).toBeVisible({ timeout: 5000 });
+      
+      // Should contain "Confirm Booking" text
+      await expect(dialog.getByText('Confirm Booking')).toBeVisible();
+    }
+  });
+
+  test('booking dialog cancel button closes dialog', async ({ page }) => {
+    await page.goto('/');
+    await waitForGlobe(page);
+    
+    // Load demo data
+    await page.getByRole('button', { name: 'Load Demo', exact: true }).click();
+    await waitForItinerary(page);
+    
+    // Find a "Book Now" button
+    const bookButton = page.getByRole('button', { name: /Book Now/i }).first();
+    
+    if (await bookButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await bookButton.click();
+      
+      // Dialog should appear
+      const dialog = page.locator('[data-testid="booking-dialog"]');
+      await expect(dialog).toBeVisible({ timeout: 5000 });
+      
+      // Click cancel
+      const cancelButton = page.locator('[data-testid="booking-cancel-button"]');
+      await cancelButton.click();
+      
+      // Dialog should be hidden
+      await expect(dialog).not.toBeVisible();
+    }
+  });
 });

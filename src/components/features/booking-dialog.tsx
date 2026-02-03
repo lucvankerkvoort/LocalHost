@@ -87,7 +87,7 @@ export function BookingDialog({
       />
       
       {/* Dialog */}
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div data-testid="booking-dialog" className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="px-6 py-5 border-b border-[var(--border)]">
           <h2 className="text-xl font-semibold text-[var(--foreground)]">
@@ -172,6 +172,7 @@ export function BookingDialog({
             <button
               onClick={onClose}
               disabled={isBooking}
+              data-testid="booking-cancel-button"
               className="flex-1 px-4 py-3 border border-[var(--border)] text-[var(--foreground)] rounded-xl font-medium hover:bg-[var(--background)] transition-colors disabled:opacity-50"
             >
               Cancel

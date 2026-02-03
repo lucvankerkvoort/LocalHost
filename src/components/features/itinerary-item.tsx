@@ -122,6 +122,7 @@ export function ItineraryItem({
                       opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={() => onEdit(item)}
+          data-testid="item-edit-button"
           className="p-1.5 rounded-md hover:bg-[var(--sky-blue-lighter)] text-[var(--muted-foreground)] 
                      hover:text-[var(--blue-green)] transition-colors"
           title="Edit"
@@ -133,6 +134,7 @@ export function ItineraryItem({
         </button>
         <button
           onClick={() => onDelete(dayId, item.id)}
+          data-testid="item-delete-button"
           className="p-1.5 rounded-md hover:bg-red-50 text-[var(--muted-foreground)] 
                      hover:text-red-600 transition-colors"
           title="Delete"
