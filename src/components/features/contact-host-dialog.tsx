@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Location01Icon } from 'hugeicons-react';
 import type { Host, HostExperience } from '@/lib/data/hosts';
 
 interface ContactHostDialogProps {
@@ -87,8 +88,8 @@ export function ContactHostDialog({
             />
             <div>
               <p className="font-medium text-[var(--foreground)]">{host.name}</p>
-              <p className="text-sm text-[var(--muted-foreground)]">
-                📍 {host.city}, {host.country}
+              <p className="flex items-center gap-1 text-[var(--muted-foreground)] text-sm">
+                <Location01Icon className="w-3.5 h-3.5" /> {host.city}, {host.country}
               </p>
             </div>
           </div>

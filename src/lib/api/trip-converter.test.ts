@@ -118,6 +118,202 @@ test('convertTripToGlobeDestinations resolves host id from experience fallback',
   assert.equal(destinations[0].activities[0].hostId, 'host-from-experience');
 });
 
+test('convertTripToGlobeDestinations preserves itinerary item status', () => {
+  const trip: ApiTrip = {
+    id: 'trip-status',
+    userId: 'user-1',
+    title: 'Status trip',
+    stops: [
+      {
+        id: 'stop-1',
+        city: 'Rome',
+        lat: 41.9,
+        lng: 12.5,
+        days: [
+          {
+            id: 'day-1',
+            dayIndex: 1,
+            title: 'Day 1',
+            items: [
+              {
+                id: 'item-booked',
+                type: 'EXPERIENCE',
+                title: 'Booked class',
+                description: null,
+                status: 'BOOKED',
+                experienceId: 'exp-booked',
+                hostId: 'host-1',
+                locationName: 'Studio',
+                lat: 41.91,
+                lng: 12.51,
+                orderIndex: 0,
+                experience: null,
+              },
+            ],
+            suggestedHosts: [],
+          },
+        ],
+      },
+    ],
+  };
+
+  const destinations = convertTripToGlobeDestinations(trip);
+  assert.equal(destinations[0].activities[0].status, 'BOOKED');
+});
+
+test('convertTripToGlobeDestinations derives BOOKED status from confirmed bookings', () => {
+  const trip: ApiTrip = {
+    id: 'trip-booked-by-booking',
+    userId: 'user-1',
+    title: 'Booking status trip',
+    stops: [
+      {
+        id: 'stop-1',
+        city: 'Rome',
+        lat: 41.9,
+        lng: 12.5,
+        days: [
+          {
+            id: 'day-1',
+            dayIndex: 1,
+            title: 'Day 1',
+            items: [
+              {
+                id: 'item-booked',
+                type: 'EXPERIENCE',
+                title: 'Booked class',
+                description: null,
+                status: 'DRAFT',
+                experienceId: 'exp-booked',
+                hostId: 'host-1',
+                locationName: 'Studio',
+                lat: 41.91,
+                lng: 12.51,
+                orderIndex: 0,
+                experience: null,
+                bookings: [
+                  {
+                    id: 'booking-1',
+                    status: 'CONFIRMED',
+                    paymentStatus: 'PAID',
+                    updatedAt: '2026-02-03T10:00:00.000Z',
+                  },
+                ],
+              },
+            ],
+            suggestedHosts: [],
+          },
+        ],
+      },
+    ],
+  };
+
+  const destinations = convertTripToGlobeDestinations(trip);
+  assert.equal(destinations[0].activities[0].status, 'BOOKED');
+});
+
+test('convertTripToGlobeDestinations derives PENDING status and candidateId from active tentative booking', () => {
+  const trip: ApiTrip = {
+    id: 'trip-pending',
+    userId: 'user-1',
+    title: 'Pending status trip',
+    stops: [
+      {
+        id: 'stop-1',
+        city: 'Rome',
+        lat: 41.9,
+        lng: 12.5,
+        days: [
+          {
+            id: 'day-1',
+            dayIndex: 1,
+            title: 'Day 1',
+            items: [
+              {
+                id: 'item-pending',
+                type: 'EXPERIENCE',
+                title: 'Tentative class',
+                description: null,
+                experienceId: 'exp-pending',
+                hostId: 'host-1',
+                locationName: 'Studio',
+                lat: 41.91,
+                lng: 12.51,
+                orderIndex: 0,
+                experience: null,
+                bookings: [
+                  {
+                    id: 'booking-tentative',
+                    status: 'TENTATIVE',
+                    paymentStatus: 'PENDING',
+                    updatedAt: '2026-02-03T10:00:00.000Z',
+                  },
+                ],
+              },
+            ],
+            suggestedHosts: [],
+          },
+        ],
+      },
+    ],
+  };
+
+  const destinations = convertTripToGlobeDestinations(trip);
+  assert.equal(destinations[0].activities[0].status, 'PENDING');
+  assert.equal(destinations[0].activities[0].candidateId, 'booking-tentative');
+});
+
+test('convertTripToGlobeDestinations derives FAILED status from latest failed booking when no active candidate exists', () => {
+  const trip: ApiTrip = {
+    id: 'trip-failed',
+    userId: 'user-1',
+    title: 'Failed status trip',
+    stops: [
+      {
+        id: 'stop-1',
+        city: 'Rome',
+        lat: 41.9,
+        lng: 12.5,
+        days: [
+          {
+            id: 'day-1',
+            dayIndex: 1,
+            title: 'Day 1',
+            items: [
+              {
+                id: 'item-failed',
+                type: 'EXPERIENCE',
+                title: 'Failed class',
+                description: null,
+                experienceId: 'exp-failed',
+                hostId: 'host-1',
+                locationName: 'Studio',
+                lat: 41.91,
+                lng: 12.51,
+                orderIndex: 0,
+                experience: null,
+                bookings: [
+                  {
+                    id: 'booking-failed',
+                    status: 'TENTATIVE',
+                    paymentStatus: 'FAILED',
+                    updatedAt: '2026-02-03T10:00:00.000Z',
+                  },
+                ],
+              },
+            ],
+            suggestedHosts: [],
+          },
+        ],
+      },
+    ],
+  };
+
+  const destinations = convertTripToGlobeDestinations(trip);
+  assert.equal(destinations[0].activities[0].status, 'FAILED');
+  assert.equal(destinations[0].activities[0].candidateId, undefined);
+});
+
 test('convertTripToGlobeDestinations falls back to stop city and coordinates when item fields are null', () => {
   const trip: ApiTrip = {
     id: 'trip-1',

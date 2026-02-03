@@ -33,7 +33,7 @@ export function UserMenu() {
     <div ref={menuRef} className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 p-1.5 rounded-full hover:bg-[var(--sand-beige)] transition-colors"
+        className="flex items-center gap-2 p-1.5 rounded-full hover:bg-[var(--muted)]/20 transition-colors"
       >
         {session.user.image ? (
           <img
@@ -42,14 +42,14 @@ export function UserMenu() {
             className="w-8 h-8 rounded-full object-cover"
           />
         ) : (
-          <div className="w-8 h-8 rounded-full bg-[var(--sunset-orange)] text-white flex items-center justify-center text-sm font-medium">
+          <div className="w-8 h-8 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] flex items-center justify-center text-sm font-medium">
             {initials}
           </div>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-[var(--border)] py-2 animate-fade-in z-50">
+        <div className="absolute right-0 mt-2 w-56 bg-[var(--card)] rounded-lg shadow-lg border border-[var(--border)] py-2 animate-fade-in z-50">
           <div className="px-4 py-2 border-b border-[var(--border)]">
             <p className="font-medium text-[var(--foreground)] truncate">
               {session.user.name}
@@ -63,28 +63,28 @@ export function UserMenu() {
             <Link
               href="/profile"
               onClick={() => setIsOpen(false)}
-              className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--sand-beige)] transition-colors"
+              className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]/20 transition-colors"
             >
               Your Profile
             </Link>
             <Link
               href="/trips"
               onClick={() => setIsOpen(false)}
-              className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--sand-beige)] transition-colors"
+              className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]/20 transition-colors"
             >
               My Trips
             </Link>
             <Link
               href="/bookings"
               onClick={() => setIsOpen(false)}
-              className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--sand-beige)] transition-colors"
+              className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]/20 transition-colors"
             >
               Your Bookings
             </Link>
             <Link
               href="/host/dashboard"
               onClick={() => setIsOpen(false)}
-              className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--sand-beige)] transition-colors"
+              className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]/20 transition-colors"
             >
               Host Dashboard
             </Link>

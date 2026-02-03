@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import { Button } from '@/components/ui/button';
 
 // Type for candidate with embedded experience and host from API
 interface BookingCandidateWithData {
@@ -87,7 +88,7 @@ export function BookingDialog({
       />
       
       {/* Dialog */}
-      <div data-testid="booking-dialog" className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div data-testid="booking-dialog" className="relative bg-[var(--card)] rounded-2xl shadow-xl w-full max-w-md mx-4 max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="px-6 py-5 border-b border-[var(--border)]">
           <h2 className="text-xl font-semibold text-[var(--foreground)]">
@@ -113,7 +114,7 @@ export function BookingDialog({
               <h3 className="font-semibold text-[var(--foreground)]">{experience.title}</h3>
               <p className="text-sm text-[var(--muted-foreground)]">with {host.name}</p>
               <div className="flex items-center gap-2 mt-2 text-sm">
-                <span className="text-amber-500">★ {experience.rating}</span>
+                <span className="text-[var(--accent)]">★ {experience.rating}</span>
                 <span className="text-[var(--muted-foreground)]">
                   ({experience.reviewCount} reviews)
                 </span>
@@ -144,7 +145,7 @@ export function BookingDialog({
           </div>
 
           {/* Chat unlock notice */}
-          <div className="bg-[var(--blue-green)]/10 rounded-xl p-4 mb-6">
+          <div className="bg-[var(--secondary)]/10 rounded-xl p-4 mb-6">
             <div className="flex gap-3">
               <span className="text-2xl">💬</span>
               <div>
@@ -169,21 +170,22 @@ export function BookingDialog({
 
           {/* Actions */}
           <div className="flex gap-3">
-            <button
+            <Button
               onClick={onClose}
               disabled={isBooking}
+              variant="outline"
               data-testid="booking-cancel-button"
-              className="flex-1 px-4 py-3 border border-[var(--border)] text-[var(--foreground)] rounded-xl font-medium hover:bg-[var(--background)] transition-colors disabled:opacity-50"
+              className="flex-1 rounded-xl h-12"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleConfirm}
               disabled={isBooking}
-              className="flex-1 px-4 py-3 bg-[var(--princeton-orange)] text-white rounded-xl font-medium hover:bg-[var(--princeton-orange)]/90 transition-colors disabled:opacity-50"
+              className="flex-1 rounded-xl h-12"
             >
               {isBooking ? 'Booking...' : `Confirm $${(experience.price / 100).toFixed(0)}`}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

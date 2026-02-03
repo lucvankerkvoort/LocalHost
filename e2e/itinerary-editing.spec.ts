@@ -96,4 +96,105 @@ test.describe('Itinerary Editing and Persistence', () => {
     const count = await addButtons.count();
     expect(count).toBeGreaterThan(0);
   });
+
+  test('host panel locks booked items and keeps draft items removable', async ({ page }) => {
+    await page.route('**/api/trips', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ trips: [{ id: 'trip-host-panel' }] }),
+      });
+    });
+
+    await page.route('**/api/trips/trip-host-panel', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'trip-host-panel',
+          userId: 'e2e-user',
+          title: 'Host panel status test',
+          stops: [
+            {
+              id: 'stop-rome',
+              city: 'Rome',
+              lat: 41.9028,
+              lng: 12.4964,
+              days: [
+                {
+                  id: 'day-rome-1',
+                  dayIndex: 1,
+                  title: 'Rome Day 1',
+                  suggestedHosts: [],
+                  items: [
+                    {
+                      id: 'item-booked',
+                      type: 'EXPERIENCE',
+                      title: 'Sunset Cooking Class with Nonna Maria',
+                      description: null,
+                      status: 'DRAFT',
+                      experienceId: '1',
+                      hostId: 'maria-rome',
+                      locationName: 'Rome',
+                      lat: 41.9028,
+                      lng: 12.4964,
+                      orderIndex: 0,
+                      experience: null,
+                      bookings: [
+                        {
+                          id: 'booking-confirmed',
+                          status: 'CONFIRMED',
+                          paymentStatus: 'PAID',
+                          updatedAt: '2026-02-03T10:00:00.000Z',
+                        },
+                      ],
+                    },
+                    {
+                      id: 'item-draft',
+                      type: 'EXPERIENCE',
+                      title: 'Morning Market Tour & Brunch',
+                      description: null,
+                      status: 'DRAFT',
+                      experienceId: '1b',
+                      hostId: 'maria-rome',
+                      locationName: 'Rome',
+                      lat: 41.9028,
+                      lng: 12.4964,
+                      orderIndex: 1,
+                      experience: null,
+                      bookings: [
+                        {
+                          id: 'booking-tentative',
+                          status: 'TENTATIVE',
+                          paymentStatus: 'PENDING',
+                          updatedAt: '2026-02-03T09:00:00.000Z',
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.goto('/');
+    await waitForGlobe(page);
+
+    await expect(page.getByText('1 Days')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Local Hosts/i })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Rome Day 1' }).click();
+    await page.waitForTimeout(200);
+
+    const bookedButton = page.getByRole('button', { name: 'Booked' }).first();
+    const removeButton = page.getByRole('button', { name: 'Remove from Day' }).first();
+
+    await expect(bookedButton).toBeVisible();
+    await expect(bookedButton).toBeDisabled();
+    await expect(removeButton).toBeVisible();
+    await expect(removeButton).toBeEnabled();
+  });
 });

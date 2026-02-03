@@ -5,7 +5,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectHostCreation, updateDraft, updateStop, moveStop, removeStop, reorderStop } from '@/store/host-creation-slice';
 import { useRouter } from 'next/navigation';
 import { saveExperienceDraft } from '@/actions/experiences';
-import { ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
+import { ArrowUp01Icon, ArrowDown01Icon, Delete02Icon, Location01Icon } from 'hugeicons-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableStopCard } from './sortable-stop-card';
@@ -107,8 +107,8 @@ export function SummaryPanel({ draftId }: SummaryPanelProps) {
         <section>
           <h3 className="text-xs uppercase tracking-wide font-semibold text-[var(--muted-foreground)] mb-3">City</h3>
           {city ? (
-            <div className="px-4 py-3 bg-[var(--card)] rounded-xl border border-[var(--border)] font-medium">
-              📍 {city}
+            <div className="px-4 py-3 bg-[var(--card)] rounded-xl border border-[var(--border)] font-medium flex items-center gap-2">
+              <Location01Icon className="w-4 h-4" /> {city}
             </div>
           ) : (
             <div className="px-4 py-3 bg-[var(--muted)]/20 rounded-xl border border-dashed border-[var(--border)] text-[var(--muted-foreground)] text-sm italic">
@@ -153,7 +153,7 @@ export function SummaryPanel({ draftId }: SummaryPanelProps) {
                             className="p-1 hover:bg-[var(--background)] rounded text-[var(--muted-foreground)] disabled:opacity-30"
                             title="Move Up"
                          >
-                           <ChevronUp className="w-3 h-3" />
+                           <ArrowUp01Icon className="w-3 h-3" />
                          </button>
                          <button 
                             onClick={() => dispatch(reorderStop({ id: stop.id, direction: 'down' }))}
@@ -161,14 +161,14 @@ export function SummaryPanel({ draftId }: SummaryPanelProps) {
                             className="p-1 hover:bg-[var(--background)] rounded text-[var(--muted-foreground)] disabled:opacity-30"
                             title="Move Down"
                          >
-                           <ChevronDown className="w-3 h-3" />
+                           <ArrowDown01Icon className="w-3 h-3" />
                          </button>
                          <button 
                             onClick={() => dispatch(removeStop(stop.id))}
                             className="p-1 hover:bg-red-50 hover:text-red-500 rounded text-[var(--muted-foreground)] ml-1"
                             title="Remove Stop"
                          >
-                           <Trash2 className="w-3 h-3" />
+                           <Delete02Icon className="w-3 h-3" />
                          </button>
                       </div>
                     </div>

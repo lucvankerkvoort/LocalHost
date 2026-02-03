@@ -107,6 +107,8 @@ test('updateDraft merges only provided fields', () => {
   assert.equal(state.duration, 180);
   assert.equal(state.status, 'review');
   assert.equal(state.city, null);
+  assert.equal(state.isHydrated, false);
+  assert.equal(state.draftId, null);
 });
 
 test('setDraft applies payload over a clean initial state', () => {
@@ -116,11 +118,13 @@ test('setDraft applies payload over a clean initial state', () => {
   );
   const resetWithPayload = reducer(
     dirty,
-    setDraft({ title: 'Fresh Draft', status: 'synthesizing' })
+    setDraft({ title: 'Fresh Draft', status: 'synthesizing', draftId: 'draft-123' })
   );
 
   assert.equal(resetWithPayload.title, 'Fresh Draft');
   assert.equal(resetWithPayload.status, 'synthesizing');
+  assert.equal(resetWithPayload.draftId, 'draft-123');
+  assert.equal(resetWithPayload.isHydrated, true);
   assert.equal(resetWithPayload.city, null);
   assert.deepEqual(resetWithPayload.stops, []);
 });
@@ -149,4 +153,12 @@ test('setDraft keeps provided stops and renumbers as provided', () => {
   assert.equal(state.stops[0].id, 'a');
   assert.equal(state.stops[0].order, 3);
   assert.equal(state.stops[1].order, 7);
+  assert.equal(state.isHydrated, true);
+});
+
+test('setDraft defaults draftId to null when payload omits it', () => {
+  const state = reducer(getInitialState(), setDraft({ title: 'No id draft' }));
+
+  assert.equal(state.draftId, null);
+  assert.equal(state.isHydrated, true);
 });

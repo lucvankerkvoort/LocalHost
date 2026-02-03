@@ -26,7 +26,16 @@ export async function GET(
                                 items: {
                                     orderBy: { orderIndex: 'asc' },
                                     include: {
-                                        experience: true // Include experience details if needed
+                                        experience: true, // Include experience details if needed
+                                        bookings: {
+                                            orderBy: { updatedAt: 'desc' },
+                                            select: {
+                                                id: true,
+                                                status: true,
+                                                paymentStatus: true,
+                                                updatedAt: true,
+                                            }
+                                        }
                                     }
                                 }
                             }

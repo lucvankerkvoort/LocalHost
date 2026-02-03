@@ -78,7 +78,7 @@ export function ExploreFilters({ filters, onFiltersChange, resultCount }: Explor
             placeholder="Search experiences..."
             value={filters.searchQuery}
             onChange={(e) => onFiltersChange({ ...filters, searchQuery: e.target.value })}
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--sunset-orange)] transition-colors"
+            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition-colors"
           />
           <svg
             className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[var(--muted)]"
@@ -111,8 +111,8 @@ export function ExploreFilters({ filters, onFiltersChange, resultCount }: Explor
                 transition-all duration-200
                 ${
                   filters.categories.includes(cat.value)
-                    ? 'bg-[var(--sunset-orange)] text-white'
-                    : 'bg-[var(--sand-beige-light)] text-[var(--foreground)] hover:bg-[var(--sand-beige)]'
+                    ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
+                    : 'bg-[var(--muted)]/10 text-[var(--foreground)] hover:bg-[var(--muted)]/20'
                 }
               `}
             >
@@ -163,7 +163,7 @@ export function ExploreFilters({ filters, onFiltersChange, resultCount }: Explor
                         priceRange: e.target.checked ? range.value : null,
                       })
                     }
-                    className="w-4 h-4 text-[var(--sunset-orange)] focus:ring-[var(--sunset-orange)]"
+                    className="w-4 h-4 text-[var(--primary)] focus:ring-[var(--ring)]"
                   />
                   <span className="text-sm text-[var(--foreground)]">{range.label}</span>
                 </label>
@@ -193,7 +193,7 @@ export function ExploreFilters({ filters, onFiltersChange, resultCount }: Explor
                         groupSize: e.target.checked ? size.value : null,
                       })
                     }
-                    className="w-4 h-4 text-[var(--sunset-orange)] focus:ring-[var(--sunset-orange)]"
+                    className="w-4 h-4 text-[var(--primary)] focus:ring-[var(--ring)]"
                   />
                   <span className="text-sm text-[var(--foreground)]">{size.label}</span>
                 </label>
@@ -211,7 +211,7 @@ export function ExploreFilters({ filters, onFiltersChange, resultCount }: Explor
         {hasActiveFilters && (
           <button
             onClick={clearAllFilters}
-            className="text-sm text-[var(--sunset-orange)] hover:underline"
+            className="text-sm text-[var(--primary)] hover:underline"
           >
             Clear all
           </button>
@@ -239,7 +239,7 @@ export function MobileFilterTrigger({ onClick, activeCount }: { onClick: () => v
       </svg>
       Filters
       {activeCount > 0 && (
-        <span className="ml-1 px-2 py-0.5 rounded-full bg-[var(--sunset-orange)] text-white text-xs">
+        <span className="ml-1 px-2 py-0.5 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] text-xs">
           {activeCount}
         </span>
       )}

@@ -501,7 +501,7 @@ export default function CesiumGlobe({
         >
           <div className="bg-white rounded-xl shadow-xl border border-[var(--border)] overflow-hidden">
             {/* Header with photo */}
-            <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-[var(--blue-green)]/10 to-transparent">
+            <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-[var(--secondary)]/10 to-transparent">
               <img
                 src={hoveredHost.photo || '/placeholder-host.jpg'}
                 alt={hoveredHost.name}
@@ -515,7 +515,7 @@ export default function CesiumGlobe({
               </div>
               {hoveredHost.rating && (
                 <div className="flex items-center gap-1 text-sm">
-                  <span className="text-[var(--sunset-orange)]">★</span>
+                  <span className="text-[var(--accent)]">★</span>
                   <span className="font-medium">{hoveredHost.rating}</span>
                 </div>
               )}
@@ -529,7 +529,7 @@ export default function CesiumGlobe({
                 </p>
               )}
               <div className="flex items-center justify-between text-xs">
-                <span className="text-[var(--blue-green)] font-medium">
+                <span className="text-[var(--primary)] font-medium">
                   Click to view details
                 </span>
                 {hoveredHost.experienceCount && (

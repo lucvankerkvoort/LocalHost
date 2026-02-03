@@ -19,7 +19,7 @@ export default async function BecomeHostEditorPage({ params }: PageProps) {
   // 1. Try to find as a Draft
   let draft = await prisma.experienceDraft.findUnique({
     where: { id: draftId },
-    include: { stops: true }
+    include: { stops: { orderBy: { order: 'asc' } } }
   });
 
   if (draft && draft.userId === session.user.id) {
@@ -33,7 +33,7 @@ export default async function BecomeHostEditorPage({ params }: PageProps) {
             cityLat: coords.lat,
             cityLng: coords.lng,
           },
-          include: { stops: true }
+          include: { stops: { orderBy: { order: 'asc' } } }
         });
       }
     }

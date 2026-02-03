@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ExperienceItem, EXPERIENCE_STATUS_CONFIG } from '@/types/itinerary-plan';
 import { CATEGORY_ICONS } from '@/types';
+import { Location01Icon, StarIcon, Cancel01Icon, SparklesIcon, Time01Icon, CheckmarkCircle01Icon, AlertCircleIcon } from 'hugeicons-react';
 
 interface AnchorCardProps {
   anchor: ExperienceItem;
@@ -42,7 +43,12 @@ export function AnchorCard({
         className="absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-medium text-white flex items-center gap-1"
         style={{ backgroundColor: statusConfig.color }}
       >
-        <span>{statusConfig.icon}</span>
+        <span>
+          {anchor.status === 'DRAFT' && <SparklesIcon className="w-3.5 h-3.5" />}
+          {anchor.status === 'PENDING' && <Time01Icon className="w-3.5 h-3.5" />}
+          {anchor.status === 'BOOKED' && <CheckmarkCircle01Icon className="w-3.5 h-3.5" />}
+          {anchor.status === 'FAILED' && <AlertCircleIcon className="w-3.5 h-3.5" />}
+        </span>
         <span>{statusConfig.label}</span>
       </div>
       
@@ -82,8 +88,9 @@ export function AnchorCard({
         </div>
         
         {/* Location */}
-        <div className="text-xs text-[var(--muted-foreground)] mb-3">
-          📍 {anchor.location.neighborhood || anchor.location.city}, {anchor.location.country}
+        <div className="text-xs text-[var(--muted-foreground)] mb-3 flex items-center gap-1">
+          <Location01Icon className="w-3.5 h-3.5" /> 
+          <span>{anchor.location.neighborhood || anchor.location.city}, {anchor.location.country}</span>
           {anchor.location.type === 'hidden' && (
             <span className="ml-1 text-amber-600">(revealed after booking)</span>
           )}
@@ -92,7 +99,7 @@ export function AnchorCard({
         {/* Rating & Price */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1">
-            <span className="text-amber-500">★</span>
+            <StarIcon className="w-3.5 h-3.5 fill-current text-amber-500" />
             <span className="text-sm font-medium">{anchor.rating.toFixed(1)}</span>
             <span className="text-xs text-[var(--muted-foreground)]">
               ({anchor.reviewCount})
@@ -136,7 +143,7 @@ export function AnchorCard({
             onClick={(e) => { e.stopPropagation(); onRemove(); }}
             className="py-2 px-3 border border-[var(--border)] text-[var(--muted-foreground)] text-sm rounded-lg hover:bg-[var(--muted)] transition-colors"
           >
-            ✕
+            <Cancel01Icon className="w-4 h-4" />
           </button>
         </div>
         

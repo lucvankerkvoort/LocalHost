@@ -6,13 +6,38 @@ import Link from 'next/link';
 import {
   DndContext,
   useDraggable,
-  DragEndEvent,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { usePathname } from 'next/navigation';
 import { ChatMessage } from './chat-message';
 import { OrchestratorJobStatus } from './orchestrator-job-status';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { ingestToolInvocations, ingestToolParts } from '@/lib/ai/tool-events';
+import { selectHostCreation } from '@/store/host-creation-slice';
+import {
+  HOST_ONBOARDING_START_TOKEN,
+  HANDSHAKE_STORAGE_PREFIX,
+  buildHostOnboardingTrigger,
+  type ChatWidgetIntent,
+  getChatId,
+  getHostDraftIdFromPath,
+  getHostToolOnlyFallbackQuestion,
+  getChatIntent,
+  resolveHostOnboardingStage,
+  shouldStartHostOnboardingHandshake,
+} from './chat-widget-handshake';
+import { 
+  UserSearch01Icon, 
+  House01Icon, 
+  BubbleChatIcon, 
+  Cancel01Icon, 
+  ArrowDown01Icon, 
+  ArrowRight01Icon, 
+  ReloadIcon,
+  Location01Icon,
+  Wrench01Icon,
+  SentIcon
+} from 'hugeicons-react';
 
 interface HostMatch {
   id: string;
@@ -23,9 +48,6 @@ interface HostMatch {
   quote: string;
   interests: string[];
 }
-
-// Threshold in pixels from bottom to enable auto-scroll
-const AUTO_SCROLL_THRESHOLD = 100;
 
 // LocalStorage key for persisting position
 const POSITION_STORAGE_KEY = 'chat-widget-position';
@@ -63,46 +85,65 @@ function useDraggablePanel(position: Position, onPositionChange: (pos: Position)
   };
 }
 
-import { usePathname } from 'next/navigation';
-
 // Intent-based UI configuration
 const INTENT_UI_CONFIG = {
   general: {
-    emoji: '🤝',
+    Icon: UserSearch01Icon,
     title: 'Find Your Person',
     subtitle: 'Tell me where you\'re going!',
-    emptyStateGreeting: '👋 Hey! I can help you find locals who match your vibe.',
+    emptyStateGreeting: 'Hey! I can help you find locals who match your vibe.',
     emptyStateHint: 'Try: "I\'m going to Rome and I love food and art"',
     inputPlaceholder: 'Where are you heading?',
   },
   become_host: {
-    emoji: '🏠',
+    Icon: House01Icon,
     title: 'Create Your Experience',
     subtitle: 'I\'ll help you set up your hosting profile',
-    emptyStateGreeting: '👋 Ready to become a host? Let\'s start with your city!',
+    emptyStateGreeting: 'Ready to become a host? Let\'s start with your city!',
     emptyStateHint: 'Tell me which city you\'re in, e.g. "I\'m in Barcelona"',
     inputPlaceholder: 'Which city are you in?',
   },
 } as const;
 
-export function ChatWidget() {
+
+interface ChatWidgetProps {
+  intent?: ChatWidgetIntent;
+  isActive?: boolean;
+}
+
+export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidgetProps = {}) {
   const pathname = usePathname();
-  // Fix: Check startsWith to handle /become-host/[id]
-  const isHostContext =
-    pathname?.startsWith('/become-host') ||
-    (pathname?.startsWith('/experiences/') && pathname?.endsWith('/availability'));
-  const intent = isHostContext ? 'become_host' : 'general';
+  const intent = getChatIntent(pathname, intentOverride);
   const uiConfig = INTENT_UI_CONFIG[intent];
+  const hostCreationState = useAppSelector(selectHostCreation);
   
-  // Stable chat ID per intent - conversations persist when switching routes
-  const chatId = `chat-${intent}`;
+  // Stable chat ID per intent/session (draft-specific for host onboarding)
+  const chatId = getChatId(intent, pathname);
 
   const [isOpen, setIsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const seenToolEventsRef = useRef<Set<string>>(new Set());
+  const handshakeTriggeredRef = useRef<Set<string>>(new Set());
   const dispatch = useAppDispatch();
   const activeTripId = useAppSelector((state) => state.globe.tripId);
+  const routeDraftId = getHostDraftIdFromPath(pathname);
+  const isDraftReady =
+    intent !== 'become_host'
+      ? true
+      : Boolean(
+          routeDraftId &&
+            hostCreationState.isHydrated &&
+            hostCreationState.draftId === routeDraftId
+        );
+  const onboardingStage = resolveHostOnboardingStage({
+    city: hostCreationState.city,
+    stops: hostCreationState.stops,
+    title: hostCreationState.title,
+    shortDesc: hostCreationState.shortDesc,
+    longDesc: hostCreationState.longDesc,
+    duration: hostCreationState.duration,
+  });
   
   // Use the chatId to maintain separate conversations per intent
   const { messages, sendMessage, status, error } = useChat({ id: chatId }) as any;
@@ -116,6 +157,59 @@ export function ChatWidget() {
   
   // Draggable position state
   const [panelPosition, setPanelPosition] = useState<Position>(DEFAULT_POSITION);
+
+  const chatRequestBody = useCallback(() => {
+    if (intent !== 'become_host') {
+      return { intent };
+    }
+
+    return {
+      intent,
+      onboardingStage,
+    };
+  }, [intent, onboardingStage]);
+
+  // Proactive onboarding trigger (silent handshake) for become-host context.
+  useEffect(() => {
+    if (!sendMessage) return;
+
+    const storageKey = `${HANDSHAKE_STORAGE_PREFIX}${chatId}`;
+    const alreadyTriggered =
+      handshakeTriggeredRef.current.has(chatId) ||
+      (typeof window !== 'undefined' && sessionStorage.getItem(storageKey) === '1');
+
+    if (
+      !shouldStartHostOnboardingHandshake({
+        intent,
+        isActive,
+        pathname,
+        messageCount: messages.length,
+        alreadyTriggered,
+        isDraftReady,
+      })
+    ) {
+      return;
+    }
+
+    handshakeTriggeredRef.current.add(chatId);
+    sessionStorage.setItem(storageKey, '1');
+
+    const trigger = buildHostOnboardingTrigger(onboardingStage);
+
+    void sendMessage({ text: trigger }, { body: chatRequestBody() }).catch(() => {
+      // Keep one-shot behavior to avoid duplicate handshake sends in Strict Mode.
+    });
+  }, [
+    chatId,
+    chatRequestBody,
+    intent,
+    isActive,
+    isDraftReady,
+    messages.length,
+    onboardingStage,
+    pathname,
+    sendMessage,
+  ]);
 
   // Load saved position from localStorage on mount
   useEffect(() => {
@@ -186,7 +280,7 @@ export function ChatWidget() {
     
     // Send message with intent - sendMessage expects { text: string }
     if (sendMessage) {
-        await sendMessage({ text }, { body: { intent } });
+        await sendMessage({ text }, { body: chatRequestBody() });
     }
   };
 
@@ -272,7 +366,7 @@ export function ChatWidget() {
         // Small delay to ensure widget animation starts
         setTimeout(() => {
           if (sendMessage) {
-            sendMessage({ text }, { body: { intent } });
+            sendMessage({ text }, { body: chatRequestBody() });
           }
         }, 100);
       }
@@ -280,7 +374,7 @@ export function ChatWidget() {
 
     window.addEventListener('send-chat-message', handleCustomMessage);
     return () => window.removeEventListener('send-chat-message', handleCustomMessage);
-  }, [sendMessage, intent]);
+  }, [chatRequestBody, sendMessage]);
 
   // Extract host matches from messages
   const getHostMatches = (message: any): HostMatch[] => {
@@ -310,17 +404,14 @@ export function ChatWidget() {
       {/* Chat Button - Fixed position */}
       <button
         onClick={() => setIsOpen(!isOpen)}
+        data-testid="chat-toggle"
         className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-[var(--princeton-orange)] rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group hover:scale-105"
         aria-label={isOpen ? 'Close chat' : 'Open chat'}
       >
         {isOpen ? (
-          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <Cancel01Icon className="w-6 h-6 text-white" />
         ) : (
-          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
+          <BubbleChatIcon className="w-6 h-6 text-white" />
         )}
       </button>
 
@@ -340,7 +431,7 @@ export function ChatWidget() {
               >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                    <span className="text-xl">{uiConfig.emoji}</span>
+                    <uiConfig.Icon className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1">
                     <h3 className="text-white font-semibold">{uiConfig.title}</h3>
@@ -357,9 +448,7 @@ export function ChatWidget() {
                       className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
                       title="Reset position"
                     >
-                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
+                      <ReloadIcon className="w-4 h-4 text-white" />
                     </button>
                   )}
                 </div>
@@ -370,6 +459,7 @@ export function ChatWidget() {
               <div className="relative" onClick={(e) => e.stopPropagation()}>
                 <div 
                   ref={messagesContainerRef}
+                  data-testid="chat-messages"
                   onScroll={handleScroll}
                   className="h-[400px] overflow-y-auto p-4 space-y-3 scroll-smooth"
                 >
@@ -415,12 +505,28 @@ export function ChatWidget() {
                   if (!textContent && typeof message.content === 'string') {
                     textContent = message.content;
                   }
+
+                  const isHiddenHandshakeMessage =
+                    message.role === 'user' &&
+                    textContent.trim().startsWith(HOST_ONBOARDING_START_TOKEN);
+                  if (isHiddenHandshakeMessage) {
+                    return null;
+                  }
                   
                   const hostMatches = message.role === 'assistant' ? getHostMatches(message) : [];
                   
                   // Show something even if only tool calls (no text)
                   const hasToolCalls = toolCalls.length > 0;
-                  const showMessage = textContent || hasToolCalls;
+                  const hasNonCompletionToolCall = toolCalls.some((toolCall) => toolCall.name !== 'completeProfile');
+                  const shouldShowHostToolOnlyFallback =
+                    intent === 'become_host' &&
+                    message.role === 'assistant' &&
+                    !textContent &&
+                    hasNonCompletionToolCall;
+                  const displayContent = shouldShowHostToolOnlyFallback
+                    ? getHostToolOnlyFallbackQuestion(onboardingStage)
+                    : textContent;
+                  const showMessage = displayContent || hasToolCalls;
                   
                   if (!showMessage && message.role === 'assistant') {
                     return null; // Skip empty assistant messages
@@ -428,10 +534,10 @@ export function ChatWidget() {
                   
                   return (
                     <div key={message.id}>
-                      {textContent && (
+                      {displayContent && (
                         <ChatMessage
                           role={message.role as 'user' | 'assistant'}
-                          content={textContent}
+                          content={displayContent}
                         />
                       )}
                       
@@ -443,7 +549,8 @@ export function ChatWidget() {
                               {toolCalls.map((tc, i) => (
                                 <div key={i} className="flex items-center gap-2">
                                   <span className={`w-2 h-2 rounded-full ${tc.state === 'result' || tc.state === 'output-available' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
-                                  <span>🔧 {tc.name}</span>
+                                  <Wrench01Icon className="w-4 h-4 text-[var(--foreground)]" />
+                                  <span className="font-medium text-[var(--foreground)]">{tc.name}</span>
                                   {tc.output?.message && <span className="text-[var(--foreground)]">- {tc.output.message}</span>}
                                 </div>
                               ))}
@@ -469,11 +576,12 @@ export function ChatWidget() {
                                 />
                                 <div className="flex-1 min-w-0">
                                   <h4 className="font-medium text-[var(--foreground)] text-sm">{host.name}</h4>
-                                  <p className="text-xs text-[var(--muted-foreground)]">📍 {host.city}, {host.country}</p>
+                                  <p className="flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
+                                    <Location01Icon className="w-3 h-3" />
+                                    {host.city}, {host.country}
+                                  </p>
                                 </div>
-                                <svg className="w-4 h-4 text-[var(--muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
+                                <ArrowRight01Icon className="w-4 h-4 text-[var(--muted)]" />
                               </div>
                               <p className="text-xs text-[var(--muted-foreground)] mt-2 italic line-clamp-1">"{host.quote}"</p>
                               <div className="flex flex-wrap gap-1 mt-2">
@@ -519,19 +627,7 @@ export function ChatWidget() {
                     className="absolute bottom-3 left-1/2 -translate-x-1/2 w-8 h-8 bg-[var(--card-background)] border border-[var(--border)] rounded-full shadow-lg flex items-center justify-center hover:bg-[var(--muted)] transition-all duration-200 animate-fade-in z-10"
                     aria-label="Scroll to bottom"
                   >
-                    <svg 
-                      className="w-4 h-4 text-[var(--foreground)]" 
-                      fill="none" 
-                      viewBox="0 0 24 24" 
-                      stroke="currentColor"
-                    >
-                      <path 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        strokeWidth={2} 
-                        d="M19 14l-7 7m0 0l-7-7m7 7V3" 
-                      />
-                    </svg>
+                    <ArrowDown01Icon className="w-4 h-4 text-[var(--foreground)]" />
                   </button>
                 )}
               </div>
@@ -541,6 +637,7 @@ export function ChatWidget() {
                 <div className="flex gap-2">
                   <input
                     type="text"
+                    data-testid="chat-input"
                     value={localInput}
                     onChange={(e) => setLocalInput(e.target.value)}
                     placeholder={uiConfig.inputPlaceholder}
@@ -549,12 +646,11 @@ export function ChatWidget() {
                   />
                   <button
                     type="submit"
+                    data-testid="chat-send"
                     disabled={isLoading || !localInput.trim()}
                     className="w-10 h-10 bg-[var(--princeton-orange)] rounded-full flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--blue-green)] transition-colors"
                   >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                    </svg>
+                    <SentIcon className="w-5 h-5 text-white" />
                   </button>
                 </div>
               </form>
