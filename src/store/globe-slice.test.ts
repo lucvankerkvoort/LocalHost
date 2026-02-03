@@ -1,21 +1,27 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import type { GlobeDestination } from '@/types/globe';
 import { createItem } from '@/types/itinerary';
 import reducer, {
+  addLocalExperience,
   addHostMarkers,
   addPlaceMarker,
   clearItinerary,
   clearVisualTarget,
+  hydrateGlobeState,
+  setDestinations,
+  setSelectedDestination,
   setActiveItemId,
   setFocusedItemId,
   setItineraryData,
   setTripId,
   setVisualTarget,
+  updateDayIds,
 } from './globe-slice';
 import { toolCallReceived } from './tool-calls-slice';
 
-function makeDestination(id: string, day: number) {
+function makeDestination(id: string, day: number): GlobeDestination {
   return {
     id,
     name: `Day ${day}`,
@@ -176,6 +182,182 @@ test('toolCallReceived(resolve_place) ignores low-confidence marker data', () =>
         name: 'Too uncertain',
         confidence: 0.2,
         location: { lat: 40.0, lng: -74.0 },
+      },
+      source: 'chat',
+    })
+  );
+
+  assert.equal(state.placeMarkers.length, 0);
+});
+
+test('setDestinations resets selected destination when prior selection is missing', () => {
+  let state = reducer(getInitialState(), setSelectedDestination('missing'));
+  state = reducer(state, setDestinations([makeDestination('d-1', 1), makeDestination('d-2', 2)]));
+
+  assert.equal(state.selectedDestination, 'd-1');
+});
+
+test('setDestinations keeps selected destination when it still exists', () => {
+  let state = reducer(getInitialState(), setSelectedDestination('d-2'));
+  state = reducer(state, setDestinations([makeDestination('d-1', 1), makeDestination('d-2', 2)]));
+
+  assert.equal(state.selectedDestination, 'd-2');
+});
+
+test('addPlaceMarker keeps only the most recent 50 markers', () => {
+  let state = getInitialState();
+  for (let i = 1; i <= 55; i++) {
+    state = reducer(
+      state,
+      addPlaceMarker({
+        id: `p-${i}`,
+        name: `Place ${i}`,
+        lat: i,
+        lng: i,
+        confidence: 1,
+      })
+    );
+  }
+
+  assert.equal(state.placeMarkers.length, 50);
+  assert.equal(state.placeMarkers[0].id, 'p-6');
+  assert.equal(state.placeMarkers[49].id, 'p-55');
+});
+
+test('hydrateGlobeState updates only provided fields and allows selectedDestination null', () => {
+  let state = reducer(
+    getInitialState(),
+    setItineraryData({
+      destinations: [makeDestination('d-1', 1)],
+      routes: [],
+      selectedDestinationId: 'd-1',
+    })
+  );
+  state = reducer(
+    state,
+    hydrateGlobeState({
+      selectedDestination: null,
+      visualTarget: { lat: 1, lng: 2, height: 3 },
+    })
+  );
+
+  assert.equal(state.destinations.length, 1);
+  assert.equal(state.selectedDestination, null);
+  assert.deepEqual(state.visualTarget, { lat: 1, lng: 2, height: 3 });
+});
+
+test('addLocalExperience appends item to matching day and marks it local', () => {
+  let state = reducer(
+    getInitialState(),
+    setItineraryData({
+      destinations: [makeDestination('d-1', 1)],
+      routes: [],
+      selectedDestinationId: 'd-1',
+    })
+  );
+  state = reducer(
+    state,
+    addLocalExperience({
+      dayNumber: 1,
+      item: { title: 'New local stop', type: 'SIGHT' },
+    })
+  );
+
+  assert.equal(state.destinations[0].activities.length, 2);
+  const added = state.destinations[0].activities[1] as { isLocal?: boolean; id?: string };
+  assert.equal(added.isLocal, true);
+  assert.equal(typeof added.id, 'string');
+});
+
+test('addLocalExperience is a no-op when day does not exist', () => {
+  let state = reducer(
+    getInitialState(),
+    setItineraryData({
+      destinations: [makeDestination('d-1', 1)],
+      routes: [],
+      selectedDestinationId: 'd-1',
+    })
+  );
+  state = reducer(
+    state,
+    addLocalExperience({
+      dayNumber: 99,
+      item: { title: 'Missing day stop', type: 'SIGHT' },
+    })
+  );
+
+  assert.equal(state.destinations.length, 1);
+  assert.equal(state.destinations[0].activities.length, 1);
+});
+
+test('updateDayIds remaps destination ids based on day number', () => {
+  let state = reducer(
+    getInitialState(),
+    setItineraryData({
+      destinations: [makeDestination('d-1', 1), makeDestination('d-2', 2)],
+      routes: [],
+      selectedDestinationId: 'd-1',
+    })
+  );
+  state = reducer(state, updateDayIds({ 1: 'day-a', 2: 'day-b' }));
+
+  assert.deepEqual(state.destinations.map((d) => d.id), ['day-a', 'day-b']);
+});
+
+test('toolCallReceived(resolve_place) adds valid marker data', () => {
+  const state = reducer(
+    getInitialState(),
+    toolCallReceived({
+      toolName: 'resolve_place',
+      state: 'result',
+      result: {
+        id: 'place-ok',
+        name: 'Valid Place',
+        category: 'landmark',
+        confidence: 0.9,
+        location: { lat: 40.7128, lng: -74.006 },
+      },
+      source: 'chat',
+    })
+  );
+
+  assert.equal(state.placeMarkers.length, 1);
+  assert.equal(state.placeMarkers[0].id, 'place-ok');
+});
+
+test('toolCallReceived(resolve_place) ignores country category markers', () => {
+  const state = reducer(
+    getInitialState(),
+    toolCallReceived({
+      toolName: 'resolve_place',
+      state: 'result',
+      result: {
+        id: 'country',
+        name: 'France',
+        category: 'country',
+        confidence: 1,
+        location: { lat: 46.2276, lng: 2.2137 },
+      },
+      source: 'chat',
+    })
+  );
+
+  assert.equal(state.placeMarkers.length, 0);
+});
+
+test('toolCallReceived(resolve_place) ignores markers too far from anchor', () => {
+  const state = reducer(
+    getInitialState(),
+    toolCallReceived({
+      toolName: 'resolve_place',
+      state: 'result',
+      result: {
+        id: 'too-far',
+        name: 'Too Far',
+        category: 'landmark',
+        confidence: 0.95,
+        distanceToAnchor: 500000,
+        location: { lat: 10, lng: 10 },
       },
       source: 'chat',
     })
