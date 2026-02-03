@@ -8,6 +8,68 @@
  */
 import { test as base, expect, Page } from '@playwright/test';
 
+// =============================================================================
+// E2E ACTOR CONSTANTS - Reference these in tests for deterministic auth
+// =============================================================================
+
+/**
+ * Named E2E actors with deterministic credentials.
+ * These must match the seed-staging.ts data exactly.
+ */
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`[E2E] Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
+export const E2E_ACTORS = {
+  TRAVELER: {
+    id: 'e2e-traveler-full-access',
+    email: 'traveler@e2e.localhost',
+    password: requiredEnv('E2E_TRAVELER_PASSWORD'),
+  },
+  HOST: {
+    id: 'e2e-host-full-access',
+    email: 'host@e2e.localhost',
+    password: requiredEnv('E2E_HOST_PASSWORD'),
+  },
+  DUAL: {
+    id: 'e2e-host-and-traveler',
+    email: 'dual@e2e.localhost',
+    password: requiredEnv('E2E_DUAL_PASSWORD'),
+  },
+  ADMIN: {
+    id: 'e2e-admin-debug',
+    email: 'admin@e2e.localhost',
+    password: requiredEnv('E2E_ADMIN_PASSWORD'),
+  },
+} as const;
+
+/**
+ * Named E2E scenarios with deterministic IDs.
+ * These must match the seed-staging.ts data exactly.
+ */
+export const E2E_SCENARIOS = {
+  HAPPY_PATH_BOOKING: 'booking-e2e-happy-path',
+  MESSAGING_ENABLED: 'booking-e2e-messaging',
+  DUAL_ROLE_TRIP: 'trip-e2e-dual-role',
+} as const;
+
+/**
+ * Named E2E experiences with deterministic IDs.
+ */
+export const E2E_EXPERIENCES = {
+  ROME_FOOD_TOUR: 'exp-e2e-rome-food-tour',
+  BARCELONA_ART_WALK: 'exp-e2e-barcelona-art-walk',
+} as const;
+
+// =============================================================================
+// FIXTURE TYPES
+// =============================================================================
+
+
 // Define custom fixture types
 type LocalHostFixtures = {
   /** Authenticated page with session */
