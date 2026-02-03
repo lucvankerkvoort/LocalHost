@@ -29,6 +29,7 @@ export function EditorLayout({ draftId, initialData }: EditorLayoutProps) {
       // Or we can manually dispatch partial updates
       // For MVP, assuming initialData (ExperienceDraft) has similar shape or we adapt it
       dispatch(setDraft({
+        draftId: draftId ?? null,
         stops: initialData.stops || [],
         city: initialData.city,
         cityLat: initialData.cityLat,

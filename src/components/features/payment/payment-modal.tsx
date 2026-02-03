@@ -5,7 +5,7 @@ import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { CheckoutForm } from './checkout-form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2 } from 'lucide-react';
+import { Loading03Icon } from 'hugeicons-react';
 
 // Initialize Stripe outside of render
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -60,7 +60,7 @@ export function PaymentModal({ bookingId, isOpen, onClose, onSuccess }: PaymentM
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md bg-white dark:bg-zinc-900">
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto bg-[var(--card)]">
         <DialogHeader>
           <DialogTitle>Complete Your Booking</DialogTitle>
         </DialogHeader>
@@ -78,7 +78,7 @@ export function PaymentModal({ bookingId, isOpen, onClose, onSuccess }: PaymentM
           </Elements>
         ) : (
           <div className="flex justify-center p-8">
-            <Loader2 className="w-8 h-8 animate-spin text-[var(--princeton-orange)]" />
+            <Loading03Icon className="w-8 h-8 animate-spin text-[var(--primary)]" />
           </div>
         )}
       </DialogContent>

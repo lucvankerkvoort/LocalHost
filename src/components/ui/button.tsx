@@ -30,29 +30,29 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variants = {
       primary: `
-        bg-[var(--sunset-orange)] text-white
-        hover:bg-[var(--sunset-orange-dark)]
-        focus-visible:ring-[var(--sunset-orange)]
+        bg-[var(--primary)] text-[var(--primary-foreground)]
+        hover:bg-[var(--princeton-dark)]
+        focus-visible:ring-[var(--ring)]
         shadow-md hover:shadow-lg
       `,
       secondary: `
-        bg-[var(--ocean-blue)] text-white
-        hover:bg-[var(--ocean-blue-dark)]
-        focus-visible:ring-[var(--ocean-blue)]
+        bg-[var(--secondary)] text-[var(--secondary-foreground)]
+        hover:bg-[var(--blue-green-dark)]
+        focus-visible:ring-[var(--secondary)]
         shadow-md hover:shadow-lg
       `,
       outline: `
-        border-2 border-[var(--sunset-orange)] text-[var(--sunset-orange)]
-        hover:bg-[var(--sunset-orange)] hover:text-white
-        focus-visible:ring-[var(--sunset-orange)]
+        border-2 border-[var(--primary)] text-[var(--primary)]
+        hover:bg-[var(--primary)] hover:text-[var(--primary-foreground)]
+        focus-visible:ring-[var(--ring)]
       `,
       ghost: `
         text-[var(--foreground)]
-        hover:bg-[var(--sand-beige-dark)]
-        focus-visible:ring-[var(--sunset-orange)]
+        hover:bg-[var(--muted)]/20
+        focus-visible:ring-[var(--ring)]
       `,
       destructive: `
-        bg-[var(--destructive)] text-white
+        bg-[var(--destructive)] text-[var(--destructive-foreground)]
         hover:bg-red-700
         focus-visible:ring-[var(--destructive)]
         shadow-md hover:shadow-lg

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loading03Icon } from 'hugeicons-react';
 
 interface CheckoutFormProps {
   amount: number;
@@ -70,7 +70,7 @@ export function CheckoutForm({ amount, currency, onSuccess, onCancel }: Checkout
           disabled={!stripe || isProcessing}
         >
           {isProcessing ? (
-            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            <Loading03Icon className="w-4 h-4 animate-spin mr-2" />
           ) : (
             `Pay ${new Intl.NumberFormat('en-US', { style: 'currency', currency: currency }).format(amount / 100)}`
           )}

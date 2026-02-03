@@ -42,7 +42,7 @@ export function ReviewsSection({ reviews, averageRating, totalCount }: ReviewsSe
                 key={star}
                 className={`h-5 w-5 ${
                   star <= Math.round(averageRating)
-                    ? 'text-[var(--sunset-orange)]'
+                    ? 'text-[var(--accent)]'
                     : 'text-gray-200'
                 }`}
                 fill="currentColor"
@@ -70,7 +70,7 @@ export function ReviewsSection({ reviews, averageRating, totalCount }: ReviewsSe
               </span>
               <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-[var(--sunset-orange)] rounded-full transition-all"
+                  className="h-full bg-[var(--primary)] rounded-full transition-all"
                   style={{ width: `${percentage}%` }}
                 />
               </div>
@@ -99,7 +99,7 @@ export function ReviewsSection({ reviews, averageRating, totalCount }: ReviewsSe
                     className="w-10 h-10 rounded-full object-cover"
                   />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-[var(--sand-beige)] text-[var(--foreground)] flex items-center justify-center text-sm font-medium">
+                  <div className="w-10 h-10 rounded-full bg-[var(--muted)]/20 text-[var(--foreground)] flex items-center justify-center text-sm font-medium">
                     {review.reviewer.name?.[0] || '?'}
                   </div>
                 )}
@@ -120,7 +120,7 @@ export function ReviewsSection({ reviews, averageRating, totalCount }: ReviewsSe
                     key={star}
                     className={`h-4 w-4 ${
                       star <= review.rating
-                        ? 'text-[var(--sunset-orange)]'
+                        ? 'text-[var(--accent)]'
                         : 'text-gray-200'
                     }`}
                     fill="currentColor"

@@ -2,12 +2,14 @@
 
 import { HOSTS, type Host, type HostExperience } from '@/lib/data/hosts';
 import type { HostMarkerData } from '@/types/globe';
+import { getHostExperienceCtaState } from './host-panel-state';
 
 interface HostPanelProps {
   hosts: HostMarkerData[];
   selectedHostId?: string | null;
   selectedDayNumber?: number;
   addedExperienceIds?: Set<string>;
+  bookedExperienceIds?: Set<string>;
   onHostClick: (host: HostMarkerData) => void;
   onViewProfile: (host: HostMarkerData) => void;
   onAddExperience: (host: Host, experience: HostExperience) => void;
@@ -18,6 +20,7 @@ export function HostPanel({
   selectedHostId,
   selectedDayNumber,
   addedExperienceIds,
+  bookedExperienceIds,
   onHostClick,
   onViewProfile,
   onAddExperience,
@@ -70,6 +73,7 @@ export function HostPanel({
             isSelected={marker.id === selectedHostId}
             selectedDayNumber={selectedDayNumber}
             addedExperienceIds={addedExperienceIds}
+            bookedExperienceIds={bookedExperienceIds}
             onClick={() => onHostClick(marker)}
             onViewProfile={() => onViewProfile(marker)}
             onAddExperience={(exp) => onAddExperience(fullHost!, exp)}
@@ -86,6 +90,7 @@ interface HostCardWithExperiencesProps {
   isSelected: boolean;
   selectedDayNumber?: number;
   addedExperienceIds?: Set<string>;
+  bookedExperienceIds?: Set<string>;
   onClick: () => void;
   onViewProfile: () => void;
   onAddExperience: (experience: HostExperience) => void;
@@ -97,6 +102,7 @@ function HostCardWithExperiences({
   isSelected,
   selectedDayNumber,
   addedExperienceIds,
+  bookedExperienceIds,
   onClick,
   onViewProfile,
   onAddExperience,
@@ -153,7 +159,9 @@ function HostCardWithExperiences({
         
         <div className="divide-y divide-[var(--border)]/30">
           {host.experiences.map((exp) => {
-            const isAdded = addedExperienceIds?.has(exp.id);
+            const isAdded = addedExperienceIds?.has(exp.id) ?? false;
+            const isBooked = bookedExperienceIds?.has(exp.id) ?? false;
+            const ctaState = getHostExperienceCtaState(isAdded, isBooked);
             
             return (
               <div
@@ -180,14 +188,22 @@ function HostCardWithExperiences({
                   </div>
                 </div>
                 <button
-                  onClick={() => onAddExperience(exp)}
+                  onClick={() => {
+                    if (ctaState === 'BOOKED') return;
+                    onAddExperience(exp);
+                  }}
+                  disabled={ctaState === 'BOOKED'}
                   className={`w-full mt-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    isAdded 
+                    ctaState === 'BOOKED'
+                      ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-200 cursor-not-allowed'
+                      : ctaState === 'REMOVE'
                       ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20 border border-red-200'
                       : 'bg-[var(--princeton-orange)] text-white hover:bg-[var(--princeton-dark)]'
                   }`}
                 >
-                  {isAdded 
+                  {ctaState === 'BOOKED'
+                    ? 'Booked'
+                    : ctaState === 'REMOVE'
                     ? 'Remove from Day' 
                     : selectedDayNumber ? `Add to Day ${selectedDayNumber}` : 'Add to Trip'
                   }

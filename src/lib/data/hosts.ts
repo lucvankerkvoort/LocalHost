@@ -242,8 +242,11 @@ const generatedHosts: Host[] = (generatedHostsRaw as any[]).map((host) => ({
     ...exp,
     // Map category to uppercase, handling kebab-case to SNAKE_CASE if needed
     category: (exp.category as string).toUpperCase().replace(/-/g, '_') as ExperienceCategory,
-    // Map single photo to photos array
-    photos: [exp.photo],
+    // Map single photo to photos array, filtering out undefined values
+    photos: [
+      ...(exp.photo ? [exp.photo] : []),
+      ...(exp.photos || [])
+    ].filter((p: any) => typeof p === 'string' && p.length > 0),
   })),
 }));
 

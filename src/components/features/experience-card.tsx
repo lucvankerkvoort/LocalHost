@@ -2,16 +2,30 @@
 
 import Link from 'next/link';
 import { formatPrice, formatDuration, formatGroupSize } from '@/lib/utils';
+import { 
+  BookOpen01Icon, 
+  Location01Icon, 
+  Moon01Icon, 
+  MountainIcon, 
+  PaintBoardIcon, 
+  Restaurant01Icon, 
+  SparklesIcon, 
+  StarIcon, 
+  UserGroupIcon, 
+  Yoga01Icon,
+  SmileIcon
+} from 'hugeicons-react';
 
 // Map database enum to display values
-const CATEGORY_DISPLAY: Record<string, { label: string; icon: string }> = {
-  FOOD_DRINK: { label: 'Food & Drink', icon: '🍽️' },
-  ARTS_CULTURE: { label: 'Arts & Culture', icon: '🎨' },
-  OUTDOOR_ADVENTURE: { label: 'Outdoor & Adventure', icon: '🏔️' },
-  WELLNESS: { label: 'Wellness', icon: '🧘' },
-  LEARNING: { label: 'Learning', icon: '📚' },
-  NIGHTLIFE_SOCIAL: { label: 'Nightlife & Social', icon: '🌃' },
-  FAMILY: { label: 'Family', icon: '👨‍👩‍👧‍👦' },
+// Map database enum to display values
+const CATEGORY_DISPLAY: Record<string, { label: string; icon: React.ReactNode }> = {
+  FOOD_DRINK: { label: 'Food & Drink', icon: <Restaurant01Icon className="w-3.5 h-3.5" /> },
+  ARTS_CULTURE: { label: 'Arts & Culture', icon: <PaintBoardIcon className="w-3.5 h-3.5" /> },
+  OUTDOOR_ADVENTURE: { label: 'Outdoor & Adventure', icon: <MountainIcon className="w-3.5 h-3.5" /> },
+  WELLNESS: { label: 'Wellness', icon: <Yoga01Icon className="w-3.5 h-3.5" /> },
+  LEARNING: { label: 'Learning', icon: <BookOpen01Icon className="w-3.5 h-3.5" /> },
+  NIGHTLIFE_SOCIAL: { label: 'Nightlife & Social', icon: <Moon01Icon className="w-3.5 h-3.5" /> },
+  FAMILY: { label: 'Family', icon: <UserGroupIcon className="w-3.5 h-3.5" /> },
 };
 
 interface ExperienceCardProps {
@@ -51,7 +65,7 @@ export function ExperienceCard({
   reviewCount,
   host,
 }: ExperienceCardProps) {
-  const categoryInfo = CATEGORY_DISPLAY[category] || { label: category, icon: '✨' };
+  const categoryInfo = CATEGORY_DISPLAY[category] || { label: category, icon: <SparklesIcon className="w-3.5 h-3.5" /> };
   const mainImage = photos[0] || 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=600&h=400&fit=crop';
 
   return (
@@ -81,12 +95,12 @@ export function ExperienceCard({
         <div className="p-4 flex-1 flex flex-col">
           {/* Location */}
           <div className="flex items-center gap-1 text-sm text-[var(--muted-foreground)] mb-1">
-            <span>📍</span>
+            <Location01Icon className="w-3.5 h-3.5" />
             <span>{city}, {country}</span>
           </div>
 
           {/* Title */}
-          <h3 className="font-semibold text-lg text-[var(--foreground)] mb-2 line-clamp-2 group-hover:text-[var(--sunset-orange)] transition-colors">
+          <h3 className="font-semibold text-lg text-[var(--foreground)] mb-2 line-clamp-2 group-hover:text-[var(--primary)] transition-colors">
             {title}
           </h3>
 
@@ -100,7 +114,7 @@ export function ExperienceCard({
                   className="w-6 h-6 rounded-full object-cover"
                 />
               ) : (
-                <div className="w-6 h-6 rounded-full bg-[var(--sunset-orange)] text-white flex items-center justify-center text-xs">
+                <div className="w-6 h-6 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] flex items-center justify-center text-xs">
                   {host.name?.[0] || '?'}
                 </div>
               )}
@@ -111,14 +125,14 @@ export function ExperienceCard({
           )}
 
           {/* Group size */}
-          <div className="text-sm text-[var(--muted-foreground)] mb-3">
-            👥 {formatGroupSize(minGroupSize, maxGroupSize)}
+          <div className="flex items-center gap-1.5 text-sm text-[var(--muted-foreground)] mb-3">
+            <UserGroupIcon className="w-3.5 h-3.5" /> {formatGroupSize(minGroupSize, maxGroupSize)}
           </div>
 
           {/* Footer: Rating & Price */}
           <div className="mt-auto pt-3 border-t border-[var(--border)] flex items-center justify-between">
             <div className="flex items-center gap-1">
-              <span className="text-[var(--sunset-orange)]">★</span>
+              <span className="text-[var(--accent)]"><StarIcon className="w-3.5 h-3.5 fill-current" /></span>
               <span className="font-medium">{rating.toFixed(1)}</span>
               <span className="text-[var(--muted-foreground)] text-sm">
                 ({reviewCount})
@@ -140,16 +154,16 @@ export function ExperienceCard({
 // Skeleton loader for experience cards
 export function ExperienceCardSkeleton() {
   return (
-    <div className="rounded-xl bg-white shadow-md overflow-hidden animate-pulse">
-      <div className="aspect-[4/3] bg-[var(--sand-beige)]" />
+    <div className="rounded-xl bg-[var(--card)] shadow-md overflow-hidden animate-pulse">
+      <div className="aspect-[4/3] bg-[var(--muted)]/20" />
       <div className="p-4 space-y-3">
-        <div className="h-4 bg-[var(--sand-beige)] rounded w-1/3" />
-        <div className="h-5 bg-[var(--sand-beige)] rounded w-full" />
-        <div className="h-5 bg-[var(--sand-beige)] rounded w-3/4" />
-        <div className="h-4 bg-[var(--sand-beige)] rounded w-1/2" />
+        <div className="h-4 bg-[var(--muted)]/20 rounded w-1/3" />
+        <div className="h-5 bg-[var(--muted)]/20 rounded w-full" />
+        <div className="h-5 bg-[var(--muted)]/20 rounded w-3/4" />
+        <div className="h-4 bg-[var(--muted)]/20 rounded w-1/2" />
         <div className="pt-3 border-t border-[var(--border)] flex justify-between">
-          <div className="h-4 bg-[var(--sand-beige)] rounded w-16" />
-          <div className="h-5 bg-[var(--sand-beige)] rounded w-20" />
+          <div className="h-4 bg-[var(--muted)]/20 rounded w-16" />
+          <div className="h-5 bg-[var(--muted)]/20 rounded w-20" />
         </div>
       </div>
     </div>

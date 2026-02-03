@@ -94,7 +94,7 @@ export function BookingWidget({
           <span className="text-[var(--muted-foreground)]"> / person</span>
         </div>
         <div className="flex items-center gap-1">
-          <span className="text-[var(--sunset-orange)]">★</span>
+          <span className="text-[var(--accent)]">★</span>
           <span className="font-medium">{rating.toFixed(1)}</span>
           <span className="text-[var(--muted-foreground)]">({reviewCount})</span>
         </div>
@@ -108,7 +108,7 @@ export function BookingWidget({
         <select
           value={selectedDate}
           onChange={(e) => setSelectedDate(e.target.value)}
-          className="w-full px-4 py-3 rounded-lg border border-[var(--border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--sunset-orange)] transition-colors"
+          className="w-full px-4 py-3 rounded-lg border border-[var(--border)] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition-colors"
         >
           <option value="">Choose a date</option>
           {availableDates.map((date) => (
@@ -128,7 +128,7 @@ export function BookingWidget({
           <button
             onClick={() => setGuestCount(Math.max(minGroupSize, guestCount - 1))}
             disabled={guestCount <= minGroupSize}
-            className="w-10 h-10 rounded-full border border-[var(--border)] flex items-center justify-center hover:bg-[var(--sand-beige)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-10 h-10 rounded-full border border-[var(--border)] flex items-center justify-center hover:bg-[var(--muted)]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
@@ -138,7 +138,7 @@ export function BookingWidget({
           <button
             onClick={() => setGuestCount(Math.min(maxGroupSize, guestCount + 1))}
             disabled={guestCount >= maxGroupSize}
-            className="w-10 h-10 rounded-full border border-[var(--border)] flex items-center justify-center hover:bg-[var(--sand-beige)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-10 h-10 rounded-full border border-[var(--border)] flex items-center justify-center hover:bg-[var(--muted)]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

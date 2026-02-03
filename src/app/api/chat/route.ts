@@ -2,6 +2,22 @@ import { convertToModelMessages } from 'ai';
 import { agentRouter } from '@/lib/conversation/router';
 import { conversationController } from '@/lib/conversation/controller';
 import { validateAgentOutput, withExecution } from '@/lib/agent-constraints';
+import type { HostOnboardingStage } from '@/lib/agents/agent';
+
+const HOST_ONBOARDING_STAGES: HostOnboardingStage[] = [
+  'CITY_MISSING',
+  'STOPS_MISSING',
+  'DETAILS_MISSING',
+  'READY_FOR_ASSIST',
+];
+
+function parseOnboardingStage(value: unknown): HostOnboardingStage | undefined {
+  if (typeof value !== 'string') return undefined;
+  if (HOST_ONBOARDING_STAGES.includes(value as HostOnboardingStage)) {
+    return value as HostOnboardingStage;
+  }
+  return undefined;
+}
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -51,7 +67,8 @@ export async function POST(req: Request) {
     });
   }
 
-  const runAgent = () => agent.process(modelMessages, { sessionId: id });
+  const onboardingStage = parseOnboardingStage(body.onboardingStage);
+  const runAgent = () => agent.process(modelMessages, { sessionId: id, onboardingStage });
   const result = execution ? await withExecution(execution, runAgent) : await runAgent();
 
   if (execution || strictConstraints) {

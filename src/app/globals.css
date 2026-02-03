@@ -49,7 +49,7 @@
   --input: #d0e8ef;
   --ring: var(--blue-green);
   
-  /* Legacy mappings for compatibility */
+  /* Legacy mappings for compatibility - DEPRECATED: Do not use new code */
   --sunset-orange: var(--princeton-orange);
   --sunset-orange-light: var(--amber-flame);
   --terracotta: var(--princeton-dark);

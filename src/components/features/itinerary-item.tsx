@@ -1,6 +1,19 @@
 'use client';
 
 import { ItineraryItem as ItineraryItemData, ItineraryItemType, ITEM_TYPE_CONFIG } from '@/types/itinerary';
+import { 
+  Location01Icon, 
+  Time01Icon, 
+  Edit02Icon, 
+  Delete02Icon,
+  ViewIcon,
+  SparklesIcon,
+  Restaurant01Icon,
+  Sun01Icon,
+  Car01Icon,
+  Note01Icon,
+  House01Icon
+} from 'hugeicons-react';
 
 interface ItineraryItemProps {
   item: ItineraryItemData;
@@ -67,9 +80,15 @@ export function ItineraryItem({
       <div className="flex items-start gap-2">
         <span 
           className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-lg"
-          style={{ backgroundColor: `${config.color}20` }}
+          style={{ backgroundColor: `${config.color}20`, color: config.color }}
         >
-          {config.icon}
+          {configKey === 'SIGHT' && <ViewIcon className="w-4 h-4" />}
+          {configKey === 'EXPERIENCE' && <SparklesIcon className="w-4 h-4" />}
+          {configKey === 'MEAL' && <Restaurant01Icon className="w-4 h-4" />}
+          {configKey === 'FREE_TIME' && <Sun01Icon className="w-4 h-4" />}
+          {configKey === 'TRANSPORT' && <Car01Icon className="w-4 h-4" />}
+          {configKey === 'NOTE' && <Note01Icon className="w-4 h-4" />}
+          {configKey === 'LODGING' && <House01Icon className="w-4 h-4" />}
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -83,8 +102,8 @@ export function ItineraryItem({
             )}
           </div>
           {item.location && (
-            <p className="text-xs text-[var(--muted-foreground)] truncate mt-0.5">
-              📍 {item.location}
+            <p className="flex items-center gap-1 text-xs text-[var(--muted-foreground)] truncate mt-0.5">
+              <Location01Icon className="w-3 h-3" /> {item.location}
             </p>
           )}
         </div>
@@ -92,8 +111,8 @@ export function ItineraryItem({
       
       {/* Time */}
       {(item.startTime || item.endTime) && (
-        <div className="mt-2 text-xs text-[var(--muted-foreground)]">
-          🕐 {item.startTime || '??:??'} - {item.endTime || '??:??'}
+        <div className="flex items-center gap-1 mt-2 text-xs text-[var(--muted-foreground)]">
+          <Time01Icon className="w-3 h-3" /> {item.startTime || '??:??'} - {item.endTime || '??:??'}
         </div>
       )}
       
@@ -127,10 +146,7 @@ export function ItineraryItem({
                      hover:text-[var(--blue-green)] transition-colors"
           title="Edit"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
+          <Edit02Icon className="w-4 h-4" />
         </button>
         <button
           onClick={() => onDelete(dayId, item.id)}
@@ -139,10 +155,7 @@ export function ItineraryItem({
                      hover:text-red-600 transition-colors"
           title="Delete"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
+          <Delete02Icon className="w-4 h-4" />
         </button>
       </div>
     </div>

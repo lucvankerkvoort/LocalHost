@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Map as MapIcon } from 'lucide-react';
+import { ArrowLeft01Icon, ArrowRight01Icon, MapsLocation01Icon } from 'hugeicons-react';
 import { 
   CityMarkerData,
   GlobeDestination, 
@@ -25,6 +25,7 @@ import { BookingDialog } from './booking-dialog';
 import { PaymentModal } from './payment/payment-modal';
 import { ItineraryDayColumn } from './itinerary-day';
 import { HostPanel } from './host-panel';
+import { buildAddedExperienceIds, buildBookedExperienceIds } from './host-panel-state';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   hydrateGlobeState,
@@ -136,12 +137,11 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   }, [selectedDestination, destinations]);
 
   const addedExperienceIds = useMemo(() => {
-    if (!selectedDestData) return new Set<string>();
-    return new Set(
-      selectedDestData.activities
-        .filter(item => item.experienceId)
-        .map(item => item.experienceId!)
-    );
+    return buildAddedExperienceIds(selectedDestData?.activities);
+  }, [selectedDestData]);
+
+  const bookedExperienceIds = useMemo(() => {
+    return buildBookedExperienceIds(selectedDestData?.activities);
   }, [selectedDestData]);
 
   const [showTimeline, setShowTimeline] = useState(true);
@@ -380,6 +380,10 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
 
   // Add Experience from Drawer
   const handleAddExperience = (host: any, experience: any) => {
+    if (bookedExperienceIds.has(experience.id)) {
+      return;
+    }
+
     // Check if already added (Toggle Remove)
     if (addedExperienceIds.has(experience.id)) {
       if (!selectedDestination) return;
@@ -444,6 +448,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
             tripId, // Add tripId
             hostId: item.hostId,
             experienceId: item.experienceId,
+            itemId: item.id,
             dayId, // Add dayId explicitly
             dayNumber: dest.day,
             date: null,
@@ -487,7 +492,12 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
         dispatch(setDestinations(updatedDestinations));
       } else {
         console.log('[GlobeItinerary] Fetching existing candidate:', candidateId);
-        const res = await fetch(`/api/itinerary/candidates?dayNumber=${destinations.find(d => d.id === dayId)?.day}`);
+        const params = new URLSearchParams();
+        params.set('candidateId', candidateId);
+        if (tripId) {
+          params.set('tripId', tripId);
+        }
+        const res = await fetch(`/api/itinerary/candidates?${params.toString()}`);
         const data = await res.json();
         candidateData = data.candidates.find((c: any) => c.id === candidateId);
       }
@@ -522,11 +532,76 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     setPaymentModalState({ isOpen: true, bookingId: candidateId });
   };
 
-  const handlePaymentSuccess = () => {
+  type BookingProjection = {
+    id: string;
+    status: string;
+  };
+
+  type TripProjection = {
+    stops?: Array<{
+      days?: Array<{
+        items?: Array<{
+          bookings?: BookingProjection[];
+        }>;
+      }>;
+    }>;
+  };
+
+  const isBookingProjectedAsBooked = (trip: TripProjection | null | undefined, bookingId: string): boolean => {
+    if (!trip?.stops?.length) return false;
+
+    return trip.stops.some((stop) =>
+      stop.days?.some((day) =>
+        day.items?.some((item) =>
+          item.bookings?.some((booking) =>
+            booking.id === bookingId &&
+            (booking.status === 'CONFIRMED' || booking.status === 'COMPLETED')
+          )
+        )
+      )
+    );
+  };
+
+  const waitForBookedProjection = async (bookingId: string): Promise<boolean> => {
+    if (!tripId) return false;
+
+    const maxAttempts = 6;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const trip = await dispatch(fetchActiveTrip(tripId)).unwrap();
+        if (isBookingProjectedAsBooked(trip, bookingId)) {
+          return true;
+        }
+      } catch (error) {
+        console.warn('[GlobeItinerary] Failed to refresh trip after payment success', error);
+      }
+
+      if (attempt < maxAttempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+    }
+
+    return false;
+  };
+
+  const handlePaymentSuccess = async () => {
+      const bookingId = paymentModalState.bookingId;
       setPaymentModalState({ isOpen: false, bookingId: '' });
-      // Refresh to update statuses
-      if (tripId) dispatch(fetchActiveTrip(tripId));
-      alert('Payment Successful!');
+
+      if (!tripId) {
+        alert('Payment Successful!');
+        return;
+      }
+
+      const confirmed = bookingId ? await waitForBookedProjection(bookingId) : false;
+
+      if (confirmed) {
+        alert('Payment Successful!');
+        return;
+      }
+
+      await dispatch(fetchActiveTrip(tripId));
+      alert('Payment submitted. Booking confirmation may take a few seconds to appear.');
   };
 
   // Itinerary Item Handlers
@@ -838,7 +913,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                                 onClick={() => setIsCollapsed(true)}
                                 className="p-1 hover:bg-white/10 rounded-md text-white/70 transition-colors"
                             >
-                                <ChevronLeft className="w-4 h-4" />
+                                <ArrowLeft01Icon className="w-4 h-4" />
                             </button>
                         </div>
                     </>
@@ -848,9 +923,8 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                             onClick={() => setIsCollapsed(false)}
                             className="p-1 hover:bg-white/10 rounded-md text-white/70 transition-colors"
                         >
-                            <ChevronRight className="w-4 h-4" />
+                            <ArrowRight01Icon className="w-4 h-4" />
                         </button>
-                        <div className="text-[var(--princeton-orange)]">●</div>
                     </div>
                 )}
              </div>
@@ -1005,6 +1079,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
           selectedHostId={selectedHost?.id}
           selectedDayNumber={selectedDestData?.day}
           addedExperienceIds={addedExperienceIds}
+          bookedExperienceIds={bookedExperienceIds}
           onHostClick={(host) => setSelectedHost(host)}
           onViewProfile={handleViewHostProfile}
           onAddExperience={(host, experience) => {

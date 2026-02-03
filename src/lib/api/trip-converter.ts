@@ -7,6 +7,7 @@ interface ApiItineraryItem {
   type: string;
   title: string;
   description: string | null;
+  status?: ItineraryItem['status'];
   experienceId: string | null;
   hostId?: string | null; // Some items may have hostId directly
   locationName: string | null;
@@ -16,6 +17,14 @@ interface ApiItineraryItem {
   experience?: {
       hostId: string;
   } | null;
+  bookings?: ApiBooking[];
+}
+
+interface ApiBooking {
+  id: string;
+  status: 'TENTATIVE' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'PENDING';
+  paymentStatus?: 'PENDING' | 'PAID' | 'REFUNDED' | 'FAILED';
+  updatedAt?: string | Date;
 }
 
 interface ApiItineraryDay {
@@ -41,6 +50,41 @@ export interface ApiTrip {
   stops: ApiTripStop[];
 }
 
+function deriveItineraryItemStatus(item: ApiItineraryItem): ItineraryItem['status'] {
+  const bookings = item.bookings ?? [];
+
+  if (bookings.some((booking) => booking.status === 'CONFIRMED' || booking.status === 'COMPLETED')) {
+    return 'BOOKED';
+  }
+
+  const activeTentative = bookings.find(
+    (booking) =>
+      (booking.status === 'TENTATIVE' || booking.status === 'PENDING') &&
+      booking.paymentStatus !== 'FAILED'
+  );
+  if (activeTentative) {
+    return 'PENDING';
+  }
+
+  const latestBooking = bookings[0];
+  if (latestBooking?.paymentStatus === 'FAILED') {
+    return 'FAILED';
+  }
+
+  return item.status ?? 'DRAFT';
+}
+
+function deriveCandidateId(item: ApiItineraryItem): string | undefined {
+  const bookings = item.bookings ?? [];
+  const activeTentative = bookings.find(
+    (booking) =>
+      (booking.status === 'TENTATIVE' || booking.status === 'PENDING') &&
+      booking.paymentStatus !== 'FAILED'
+  );
+
+  return activeTentative?.id;
+}
+
 export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[] {
   const destinations: GlobeDestination[] = [];
 
@@ -55,6 +99,8 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
                 title: item.title,
                 hostId: item.experience?.hostId || item.hostId || undefined, 
                 experienceId: item.experienceId,
+                status: deriveItineraryItemStatus(item),
+                candidateId: deriveCandidateId(item),
                 position: item.orderIndex,
                 timeSlot: 'Flexible', 
                 description: item.description || '',

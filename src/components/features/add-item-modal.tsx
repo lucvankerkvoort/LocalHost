@@ -2,6 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { ItineraryItem, ItineraryItemType, ITEM_TYPE_CONFIG } from '@/types/itinerary';
+import { 
+  ViewIcon,
+  SparklesIcon,
+  Restaurant01Icon,
+  Sun01Icon,
+  Car01Icon,
+  Note01Icon,
+  House01Icon
+} from 'hugeicons-react';
 
 interface AddItemModalProps {
   isOpen: boolean;
@@ -89,7 +98,15 @@ export function AddItemModal({ isOpen, onClose, onSave, editingItem }: AddItemMo
                                 ? 'border-[var(--blue-green)] bg-[var(--sky-blue-lighter)]/50' 
                                 : 'border-[var(--border)] hover:border-[var(--muted)]'}`}
                   >
-                    <span className="text-xl">{config.icon}</span>
+                    <span className="text-xl" style={{ color: config.color }}>
+                      {itemType === 'SIGHT' && <ViewIcon className="w-5 h-5" />}
+                      {itemType === 'EXPERIENCE' && <SparklesIcon className="w-5 h-5" />}
+                      {itemType === 'MEAL' && <Restaurant01Icon className="w-5 h-5" />}
+                      {itemType === 'FREE_TIME' && <Sun01Icon className="w-5 h-5" />}
+                      {itemType === 'TRANSPORT' && <Car01Icon className="w-5 h-5" />}
+                      {itemType === 'NOTE' && <Note01Icon className="w-5 h-5" />}
+                      {itemType === 'LODGING' && <House01Icon className="w-5 h-5" />}
+                    </span>
                     <span className="text-[10px] text-[var(--muted-foreground)] leading-tight text-center">
                       {config.label}
                     </span>

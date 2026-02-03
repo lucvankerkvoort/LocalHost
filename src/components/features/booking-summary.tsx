@@ -28,7 +28,7 @@ export function BookingSummary({ experience, selectedDate, guestCount }: Booking
   const total = subtotal + serviceFee;
 
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-[var(--border)] p-6">
+    <div className="bg-[var(--card)] rounded-xl shadow-lg border border-[var(--border)] p-6">
       {/* Experience Preview */}
       <div className="flex gap-4 pb-4 border-b border-[var(--border)]">
         <img
@@ -44,7 +44,7 @@ export function BookingSummary({ experience, selectedDate, guestCount }: Booking
             {experience.city}, {experience.country}
           </p>
           <div className="flex items-center gap-1 text-sm">
-            <span className="text-[var(--sunset-orange)]">★</span>
+            <span className="text-[var(--accent)]">★</span>
             <span className="font-medium">{experience.rating}</span>
             <span className="text-[var(--muted-foreground)]">({experience.reviewCount})</span>
           </div>
@@ -96,7 +96,7 @@ export function BookingSummary({ experience, selectedDate, guestCount }: Booking
             className="w-10 h-10 rounded-full object-cover"
           />
         ) : (
-          <div className="w-10 h-10 rounded-full bg-[var(--sunset-orange)] text-white flex items-center justify-center font-medium">
+          <div className="w-10 h-10 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] flex items-center justify-center font-medium">
             {experience.host.name?.[0] || '?'}
           </div>
         )}
@@ -107,7 +107,7 @@ export function BookingSummary({ experience, selectedDate, guestCount }: Booking
       </div>
 
       {/* Cancellation Policy */}
-      <div className="mt-4 p-3 bg-[var(--sand-beige-light)] rounded-lg">
+      <div className="mt-4 p-3 bg-[var(--muted)]/20 rounded-lg">
         <p className="text-sm text-[var(--foreground)]">
           <strong>Free cancellation</strong> up to 48 hours before the experience
         </p>

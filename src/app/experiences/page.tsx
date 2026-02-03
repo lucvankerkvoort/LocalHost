@@ -1,7 +1,7 @@
 import { ExperienceList } from '@/components/experiences/experience-list';
 import { PayoutSetupCard } from '@/components/experiences/payout-setup-card';
 import { Button } from '@/components/ui/button';
-import { Plus, Sparkles } from 'lucide-react';
+import { Add01Icon, SparklesIcon } from 'hugeicons-react';
 import Link from 'next/link';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
@@ -32,7 +32,7 @@ export default async function MyExperiencesPage() {
           <h1 className="text-2xl font-bold text-[var(--foreground)]">My Experiences</h1>
           <Link href="/become-host?new=true">
             <Button size="sm" className="rounded-full bg-gradient-to-r from-[var(--princeton-orange)] to-red-500 hover:opacity-90 text-white shadow-lg shadow-orange-500/20 border-0 gap-1.5 pl-3 pr-4">
-              <Plus className="w-4 h-4" />
+              <Add01Icon className="w-4 h-4 mr-2" />
               <span>Create</span>
             </Button>
           </Link>
@@ -44,7 +44,7 @@ export default async function MyExperiencesPage() {
           {!isHost && (
             <div className="text-center py-12 px-6">
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[var(--princeton-orange)] to-red-500 flex items-center justify-center mx-auto mb-4">
-                <Sparkles className="w-8 h-8 text-white" />
+                <SparklesIcon className="w-4 h-4 text-white" />
               </div>
               <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">Become a Host</h2>
               <p className="text-[var(--muted-foreground)] mb-6">

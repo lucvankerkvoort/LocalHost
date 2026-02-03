@@ -1,8 +1,15 @@
 import { StreamTextResult } from 'ai';
 
+export type HostOnboardingStage =
+  | 'CITY_MISSING'
+  | 'STOPS_MISSING'
+  | 'DETAILS_MISSING'
+  | 'READY_FOR_ASSIST';
+
 export interface AgentContext {
   userId?: string; 
   sessionId?: string;
+  onboardingStage?: HostOnboardingStage;
 }
 
 /**

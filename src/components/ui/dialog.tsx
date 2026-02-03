@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { X } from 'lucide-react';
+import { Cancel01Icon } from 'hugeicons-react';
 import { cn } from '@/lib/utils'; // Assuming cn utility exists
 
 interface DialogProps {
@@ -59,7 +59,7 @@ export const DialogContent: React.FC<{
           className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none data-[state=open]:bg-zinc-100 data-[state=open]:text-zinc-500 dark:data-[state=open]:bg-zinc-800 dark:data-[state=open]:text-zinc-400"
           onClick={() => onOpenChange(false)}
         >
-          <X className="h-4 w-4" />
+          <Cancel01Icon className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </button>
       </div>

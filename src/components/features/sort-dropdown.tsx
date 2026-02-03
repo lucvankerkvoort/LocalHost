@@ -38,7 +38,7 @@ export function SortDropdown({ value, onChange }: SortDropdownProps) {
     <div ref={dropdownRef} className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--border)] bg-white hover:bg-[var(--sand-beige-light)] transition-colors"
+        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/20 transition-colors"
       >
         <span className="text-sm text-[var(--muted-foreground)]">Sort by:</span>
         <span className="text-sm font-medium text-[var(--foreground)]">
@@ -55,7 +55,7 @@ export function SortDropdown({ value, onChange }: SortDropdownProps) {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-[var(--border)] py-1 z-50 animate-fade-in">
+        <div className="absolute right-0 mt-2 w-48 bg-[var(--popover)] rounded-lg shadow-lg border border-[var(--border)] py-1 z-50 animate-fade-in">
           {SORT_OPTIONS.map((option) => (
             <button
               key={option.value}
@@ -67,8 +67,8 @@ export function SortDropdown({ value, onChange }: SortDropdownProps) {
                 w-full text-left px-4 py-2 text-sm transition-colors
                 ${
                   option.value === value
-                    ? 'bg-[var(--sand-beige-light)] text-[var(--sunset-orange)] font-medium'
-                    : 'text-[var(--foreground)] hover:bg-[var(--sand-beige-light)]'
+                    ? 'bg-[var(--muted)]/10 text-[var(--primary)] font-medium'
+                    : 'text-[var(--foreground)] hover:bg-[var(--muted)]/20'
                 }
               `}
             >

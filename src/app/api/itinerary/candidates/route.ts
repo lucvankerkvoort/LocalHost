@@ -11,9 +11,23 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const dayNumber = searchParams.get('dayNumber');
+    const tripId = searchParams.get('tripId');
+    const candidateId = searchParams.get('candidateId');
 
-    if (!dayNumber) {
-         return new NextResponse('Day number required', { status: 400 });
+    if (candidateId) {
+      const candidate = await prisma.booking.findFirst({
+        where: {
+          id: candidateId,
+          guestId: session.user.id,
+          ...(tripId ? { tripId } : {}),
+        },
+        include: {
+          experience: true,
+          host: true,
+        },
+      });
+
+      return NextResponse.json({ candidates: candidate ? [candidate] : [] });
     }
 
     // Find active trip for user
@@ -28,11 +42,16 @@ export async function GET(req: Request) {
     
     // Let's implement a basic lookup for the most recent trip's candidates on that day.
     
-    const trip = await prisma.trip.findFirst({
-        where: { userId: session.user.id },
-        orderBy: { updatedAt: 'desc' },
-        include: { stops: { include: { days: true } } } 
-    });
+    const trip = tripId
+      ? await prisma.trip.findFirst({
+          where: { id: tripId, userId: session.user.id },
+          include: { stops: { include: { days: true } } },
+        })
+      : await prisma.trip.findFirst({
+          where: { userId: session.user.id },
+          orderBy: { updatedAt: 'desc' },
+          include: { stops: { include: { days: true } } },
+        });
 
     if (!trip) {
         return NextResponse.json({ candidates: [] });
@@ -40,23 +59,33 @@ export async function GET(req: Request) {
     
     // Find the day ID
     let dayId = null;
-    for (const stop of (trip as any).stops) {
-        const day = stop.days.find((d: any) => d.dayIndex + 1 === parseInt(dayNumber));
-        if (day) {
-            dayId = day.id;
-            break;
+    if (dayNumber) {
+        const parsedDayNumber = parseInt(dayNumber);
+        for (const stop of (trip as any).stops) {
+            const day = stop.days.find((d: any) => d.dayIndex + 1 === parsedDayNumber || d.dayIndex === parsedDayNumber);
+            if (day) {
+                dayId = day.id;
+                break;
+            }
         }
-    }
-
-    if (!dayId) {
-         return NextResponse.json({ candidates: [] });
     }
 
     const candidates = await prisma.booking.findMany({
         where: {
             tripId: trip.id,
             status: 'TENTATIVE', 
-            // We might want to link to dayId? Booking has 'date'.
+            ...(dayId
+              ? {
+                  OR: [
+                    { itemId: null },
+                    {
+                      itineraryItem: {
+                        dayId,
+                      },
+                    },
+                  ],
+                }
+              : {}),
         },
         include: {
             experience: true,
@@ -80,7 +109,7 @@ export async function POST(req: Request) {
     }
     
     const body = await req.json();
-    const { tripId, hostId, experienceId, dayId, dayNumber, date } = body;
+    const { tripId, hostId, experienceId, dayId, dayNumber, date, itemId } = body;
 
     // 1. Find the active trip
     let trip;
@@ -140,6 +169,49 @@ export async function POST(req: Request) {
         // Fallback: Use first day if valid? Or Error.
         console.error('[CandidateAPI] Day not found:', { tripId: trip.id, dayId, dayNumber });
          return new NextResponse('Day not found in trip', { status: 400 });
+    }
+
+    if (itemId) {
+        const item = await prisma.itineraryItem.findFirst({
+            where: {
+                id: itemId,
+                dayId: targetDay.id,
+                day: {
+                    tripStop: {
+                        tripId: trip.id,
+                    },
+                },
+            },
+            select: { id: true },
+        });
+
+        if (!item) {
+            return new NextResponse('Item not found in trip day', { status: 403 });
+        }
+
+        const existingCandidate = await prisma.booking.findFirst({
+            where: {
+                tripId: trip.id,
+                guestId: session.user.id,
+                itemId,
+                status: { in: ['TENTATIVE', 'PENDING'] },
+                paymentStatus: { not: 'FAILED' },
+            },
+            orderBy: { updatedAt: 'desc' },
+            include: {
+                experience: true,
+                host: {
+                    select: { id: true, name: true, image: true, city: true }
+                }
+            },
+        });
+
+        if (existingCandidate) {
+            return NextResponse.json({
+                candidate: existingCandidate,
+                message: 'Candidate reused',
+            });
+        }
     }
 
     // 3. Get or Create Experience
@@ -212,6 +284,7 @@ export async function POST(req: Request) {
             tripId: trip.id,
             guestId: session.user.id,
             hostId: hostId || experience.hostId, // Ensure hostId
+            itemId: itemId || null,
             experienceId: experience.id, // Use created/found experience's ID
             date: date ? new Date(date) : (targetDay.date || new Date()),
             status: 'TENTATIVE',

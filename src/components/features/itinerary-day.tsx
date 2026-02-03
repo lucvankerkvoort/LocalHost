@@ -1,7 +1,7 @@
 'use client';
 
 import { ItineraryItem as ItineraryItemType } from '@/types/itinerary';
-import { Calendar, MapPin, Clock } from 'lucide-react';
+import { Calendar01Icon, Location01Icon, Time01Icon, Add01Icon } from 'hugeicons-react';
 
 interface ItineraryDayProps {
   dayId: string;
@@ -55,7 +55,7 @@ export function ItineraryDayColumn({
       className={`relative pl-8 ${isActive ? 'opacity-100' : 'opacity-70 hover:opacity-100'} transition-opacity`}
     >
       {/* Timeline Line */}
-      <div className="absolute left-[15px] top-0 bottom-0 w-px bg-white/10" />
+      <div className="absolute left-[15px] top-0 bottom-0 w-px bg-[var(--border)]" />
       
       {/* Day Header */}
       <div 
@@ -65,13 +65,13 @@ export function ItineraryDayColumn({
         <div className={`absolute -left-[39px] top-0 w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-colors ${
            isActive 
              ? 'bg-[var(--princeton-orange)] border-[var(--princeton-orange)] text-white' 
-             : 'bg-[var(--deep-space-blue)] border-white/20 text-[var(--muted-foreground)] group-hover:border-[var(--princeton-orange)]'
+             : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted-foreground)] group-hover:border-[var(--princeton-orange)]'
         }`}>
            {dayNumber}
         </div>
         
         <div className="flex flex-col">
-            <span className="text-sm font-bold text-white group-hover:text-[var(--princeton-orange)] transition-colors">
+            <span className="text-sm font-bold text-[var(--foreground)] group-hover:text-[var(--princeton-orange)] transition-colors">
                 {formatDate(date)}
             </span>
             <span className="text-xs text-[var(--muted-foreground)]">
@@ -84,16 +84,15 @@ export function ItineraryDayColumn({
       <div className="space-y-3">
         {activities.map((item) => {
             const isAnchor = item.type === 'EXPERIENCE' || item.type === 'MEAL';
-            const isContext = item.type === 'SIGHT' || item.type === 'FREE_TIME';
             
             return (
             <div 
                 key={item.id}
                 data-item-id={item.id}
-                className={`group/card relative rounded-lg p-3 transition-all cursor-pointer border ${
+                className={`group/card relative rounded-lg p-3 transition-all cursor-pointer border shadow-sm ${
                     isAnchor 
-                        ? 'bg-white/10 hover:bg-white/15 border-l-4 border-l-[var(--princeton-orange)] border-y-transparent border-r-transparent' 
-                        : 'bg-white/5 hover:bg-white/10 border-transparent hover:border-white/10 opacity-80 hover:opacity-100'
+                        ? 'bg-[var(--card)] hover:bg-[var(--muted)]/10 border-l-4 border-l-[var(--princeton-orange)] border-y-[var(--border)] border-r-[var(--border)]' 
+                        : 'bg-[var(--card)]/80 hover:bg-[var(--card)] border-[var(--border)] opacity-80 hover:opacity-100'
                 }`}
                 onClick={(e) => {
                     e.stopPropagation();
@@ -116,13 +115,13 @@ export function ItineraryDayColumn({
                                 </span>
                             )}
                         </div>
-                        <h4 className={`font-medium text-white truncate pr-6 ${isAnchor ? 'text-sm' : 'text-xs'}`}>
+                        <h4 className={`font-medium text-[var(--foreground)] truncate pr-6 ${isAnchor ? 'text-sm' : 'text-xs'}`}>
                             {item.title}
                         </h4>
                         <div className="flex items-center gap-2 mt-1 text-xs text-[var(--muted-foreground)]">
-                           {item.duration && (
+                       {item.duration && (
                                <span className="flex items-center gap-1">
-                                   <Clock className="w-3 h-3" />
+                                   <Time01Icon className="w-3 h-3" />
                                    {Math.round(item.duration / 60) > 0 ? `${Math.round(item.duration / 60)}h` : `${item.duration}m`}
                                </span>
                            )}
@@ -152,9 +151,9 @@ export function ItineraryDayColumn({
         {/* Add Item Placeholder */}
         <button
             onClick={() => onAddActivity(dayId)}
-            className="w-full py-2 border border-dashed border-white/10 rounded-lg text-xs text-[var(--muted-foreground)] hover:text-white hover:border-white/30 transition-colors flex items-center justify-center gap-1"
+            className="w-full py-2 border-2 border-dashed border-[var(--border)] rounded-lg text-sm font-semibold text-[var(--foreground)]/80 hover:bg-[var(--secondary)]/10 hover:text-[var(--secondary)] hover:border-[var(--secondary)]/50 transition-all flex items-center justify-center gap-1"
         >
-            <span>+</span> Add to Day {dayNumber}
+            <Add01Icon className="w-4 h-4" /> Add to Day {dayNumber}
         </button>
       </div>
     </div>

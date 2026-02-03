@@ -107,7 +107,7 @@ export function PaymentForm({ totalAmount, currency, onSubmit, onCancel }: Payme
               maxLength={19}
               className={`w-full px-4 py-3 rounded-lg border ${
                 errors.cardNumber ? 'border-red-500' : 'border-[var(--border)]'
-              } focus:outline-none focus:ring-2 focus:ring-[var(--sunset-orange)] transition-colors`}
+              } focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition-colors`}
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
               <svg className="h-8 w-8 text-[#1A1F71]" viewBox="0 0 48 48" fill="currentColor">
@@ -140,7 +140,7 @@ export function PaymentForm({ totalAmount, currency, onSubmit, onCancel }: Payme
               maxLength={5}
               className={`w-full px-4 py-3 rounded-lg border ${
                 errors.expiry ? 'border-red-500' : 'border-[var(--border)]'
-              } focus:outline-none focus:ring-2 focus:ring-[var(--sunset-orange)] transition-colors`}
+              } focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition-colors`}
             />
             {errors.expiry && (
               <p className="text-red-500 text-sm mt-1">{errors.expiry}</p>
@@ -158,7 +158,7 @@ export function PaymentForm({ totalAmount, currency, onSubmit, onCancel }: Payme
               maxLength={4}
               className={`w-full px-4 py-3 rounded-lg border ${
                 errors.cvc ? 'border-red-500' : 'border-[var(--border)]'
-              } focus:outline-none focus:ring-2 focus:ring-[var(--sunset-orange)] transition-colors`}
+              } focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition-colors`}
             />
             {errors.cvc && (
               <p className="text-red-500 text-sm mt-1">{errors.cvc}</p>
@@ -178,7 +178,7 @@ export function PaymentForm({ totalAmount, currency, onSubmit, onCancel }: Payme
             placeholder="John Doe"
             className={`w-full px-4 py-3 rounded-lg border ${
               errors.name ? 'border-red-500' : 'border-[var(--border)]'
-            } focus:outline-none focus:ring-2 focus:ring-[var(--sunset-orange)] transition-colors`}
+            } focus:outline-none focus:ring-2 focus:ring-[var(--ring)] transition-colors`}
           />
           {errors.name && (
             <p className="text-red-500 text-sm mt-1">{errors.name}</p>

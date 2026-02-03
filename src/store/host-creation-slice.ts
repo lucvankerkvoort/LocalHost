@@ -11,6 +11,8 @@ export interface HostCreationStop {
 }
 
 export interface HostCreationState {
+  draftId: string | null;
+  isHydrated: boolean;
   city: string | null;
   cityLat: number | null;
   cityLng: number | null;
@@ -23,6 +25,8 @@ export interface HostCreationState {
 }
 
 const initialState: HostCreationState = {
+  draftId: null,
+  isHydrated: false,
   city: null,
   cityLat: null,
   cityLng: null,
@@ -89,8 +93,13 @@ export const hostCreationSlice = createSlice({
     updateDraft: (state, action: PayloadAction<Partial<HostCreationState>>) => {
       Object.assign(state, action.payload);
     },
-    setDraft: (state, action: PayloadAction<Partial<HostCreationState>>) => {
-      return { ...initialState, ...action.payload };
+    setDraft: (_state, action: PayloadAction<Partial<HostCreationState>>) => {
+      return {
+        ...initialState,
+        ...action.payload,
+        draftId: action.payload.draftId ?? null,
+        isHydrated: true,
+      };
     },
     resetDraft: () => initialState,
   },
