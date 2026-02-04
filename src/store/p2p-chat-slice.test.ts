@@ -118,6 +118,7 @@ test('markThreadAsRead clears unread count and marks HOST messages as read', () 
           content: 'host message',
           createdAt: '2026-01-01T00:00:00.000Z',
           isRead: false,
+          senderId: 'h-1',
         },
       ],
       'req-1',
@@ -145,8 +146,8 @@ test('markThreadAsRead clears unread count and marks HOST messages as read', () 
   const [first, second, third] = next.threads['b-1'].messages;
 
   assert.equal(next.threads['b-1'].unreadCount, 0);
-  assert.equal(first.senderType, 'USER');
-  assert.equal(first.isRead, false);
+  assert.equal(first.senderType, 'HOST');
+  assert.equal(first.isRead, true);
   assert.equal(second.senderType, 'USER');
   assert.equal(second.isRead, true);
   assert.equal(third.senderType, 'HOST');
@@ -172,6 +173,7 @@ test('fetchMessages.fulfilled maps API payload into thread messages', () => {
           content: 'hello',
           createdAt: '2026-01-01T00:00:00.000Z',
           isRead: true,
+          senderId: 'h-1',
         },
       ],
       'req-1',
@@ -185,7 +187,7 @@ test('fetchMessages.fulfilled maps API payload into thread messages', () => {
       content: 'hello',
       createdAt: '2026-01-01T00:00:00.000Z',
       isRead: true,
-      senderType: 'USER',
+      senderType: 'HOST',
     },
   ]);
 });

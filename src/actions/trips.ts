@@ -44,6 +44,9 @@ export async function getUserTrips() {
   }
 }
 
+import { getCityCoordinates } from '@/lib/data/city-coordinates';
+import { geocodeCity } from '@/lib/server-geocoding';
+
 export async function createTrip(data: CreateTripData) {
   const session = await auth();
 
@@ -53,20 +56,43 @@ export async function createTrip(data: CreateTripData) {
 
   const { title, city, startDate, endDate } = data;
 
+  // Resolve coordinates
+  let lat = 0;
+  let lng = 0;
+  let resolvedCity = city;
+
+  // 1. Try static map
+  const staticCoords = getCityCoordinates(city);
+  if (staticCoords) {
+    lat = staticCoords.lat;
+    lng = staticCoords.lng;
+  } else {
+    // 2. Try external geocoding
+    try {
+      const geoCoords = await geocodeCity(city);
+      if (geoCoords) {
+        lat = geoCoords.lat;
+        lng = geoCoords.lng;
+      }
+    } catch (e) {
+      console.warn(`Failed to geocode city: ${city}`, e);
+    }
+  }
+
   try {
     const newTrip = await prisma.trip.create({
       data: {
         userId: session.user.id,
-        title: title || `Trip to ${city}`,
+        title: title || `Trip to ${resolvedCity}`,
         status: TripStatus.DRAFT,
         startDate,
         endDate,
         stops: {
           create: {
-            city: city, // Storing city directly on stop for now, coordinates can be resolved later or passed if available
-            country: '', // Placeholder, should be resolved ideally
-            lat: 0, // Placeholder
-            lng: 0, // Placeholder
+            city: resolvedCity,
+            country: '', // Could be improved with geocoding result if it returned more info
+            lat,
+            lng,
             order: 0
           }
         }

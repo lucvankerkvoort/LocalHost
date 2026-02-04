@@ -129,9 +129,9 @@ export function ItineraryDayColumn({
                     </div>
                 </div>
                 
-                {/* Actions (hover only) */}
+                 {/* Actions (hover only) */}
                 <div className="absolute top-2 right-2 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center gap-1">
-                     {onBookItem && isAnchor && (
+                     {onBookItem && isAnchor && item.hostId && (
                          <button 
                             onClick={(e) => {
                                 e.stopPropagation();

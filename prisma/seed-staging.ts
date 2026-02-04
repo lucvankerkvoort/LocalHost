@@ -20,7 +20,6 @@ if (!databaseUrl) {
 }
 
 const prisma = new PrismaClient({
-  // @ts-ignore - accelerateUrl is needed for Prisma Accelerate
   accelerateUrl: databaseUrl,
   log: ['info', 'warn', 'error'],
 });
@@ -39,6 +38,8 @@ interface E2EActor {
   bio: string;
   city: string;
   country: string;
+  isSyntheticHost?: boolean;
+  syntheticBotEnabled?: boolean;
 }
 
 function requiredEnv(name: string): string {
@@ -101,6 +102,19 @@ const E2E_ACTORS: E2EActor[] = [
     city: 'San Francisco',
     country: 'USA',
   },
+  {
+    id: 'e2e-synthetic-host',
+    email: 'synthetic-host@e2e.localhost',
+    password: E2E_PASSWORDS.HOST,
+    name: 'E2E Synthetic Host',
+    isHost: true,
+    isTraveler: false,
+    bio: 'Synthetic host actor for automated booking chat replies in E2E testing.',
+    city: 'Rome',
+    country: 'Italy',
+    isSyntheticHost: true,
+    syntheticBotEnabled: true,
+  },
 ];
 
 // =============================================================================
@@ -142,6 +156,17 @@ const E2E_EXPERIENCES: E2EExperience[] = [
     duration: 150,
     price: 6000, // $60
   },
+  {
+    id: 'exp-e2e-rome-synthetic-family-day',
+    hostId: 'e2e-synthetic-host',
+    title: 'E2E Synthetic Family Day',
+    description: 'A deterministic synthetic-host experience for chat bot E2E coverage.',
+    category: 'FAMILY',
+    city: 'Rome',
+    country: 'Italy',
+    duration: 120,
+    price: 5000, // $50
+  },
 ];
 
 // =============================================================================
@@ -151,6 +176,7 @@ const E2E_EXPERIENCES: E2EExperience[] = [
 const E2E_SCENARIO_IDS = {
   HAPPY_PATH_BOOKING: 'booking-e2e-happy-path',
   MESSAGING_ENABLED: 'booking-e2e-messaging',
+  SYNTHETIC_REPLY: 'booking-e2e-synthetic-reply',
   DUAL_ROLE_TRIP: 'trip-e2e-dual-role',
 };
 
@@ -245,6 +271,12 @@ async function seedActors() {
         isVerified: true,
         verificationTier: 'VERIFIED',
         trustScore: 100,
+        isSyntheticHost: actor.isSyntheticHost ?? false,
+        syntheticBotEnabled: actor.syntheticBotEnabled ?? false,
+        syntheticPersonaKey: actor.isSyntheticHost ? 'e2e.synthetic.host' : null,
+        syntheticResponseStyle: actor.isSyntheticHost ? 'FRIENDLY' : 'FRIENDLY',
+        syntheticResponseLatencyMinSec: actor.isSyntheticHost ? 2 : 5,
+        syntheticResponseLatencyMaxSec: actor.isSyntheticHost ? 4 : 10,
         // Host-specific fields (fully enabled for E2E)
         stripeConnectedAccountId: actor.isHost ? `acct_e2e_${actor.id}` : null,
         stripeOnboardingStatus: actor.isHost ? 'COMPLETE' : 'NOT_STARTED',
@@ -384,6 +416,29 @@ async function seedScenarios() {
       chatUnlocked: true,
     },
   });
+
+  // Scenario 3: Synthetic Host Reply (CONFIRMED with synthetic host bot enabled)
+  const syntheticBookingDate = new Date(bookingDate);
+  syntheticBookingDate.setUTCDate(bookingDate.getUTCDate() + 2);
+
+  await prisma.booking.create({
+    data: {
+      id: E2E_SCENARIO_IDS.SYNTHETIC_REPLY,
+      experienceId: 'exp-e2e-rome-synthetic-family-day',
+      guestId: 'e2e-traveler-full-access',
+      hostId: 'e2e-synthetic-host',
+      date: syntheticBookingDate,
+      guests: 2,
+      totalPrice: 10000,
+      amountSubtotal: 10000,
+      platformFee: 1000,
+      hostNetAmount: 9000,
+      currency: 'USD',
+      status: 'CONFIRMED',
+      paymentStatus: 'PAID',
+      chatUnlocked: true,
+    },
+  });
   
   // Seed messages for messaging scenario
   await prisma.message.createMany({
@@ -403,7 +458,7 @@ async function seedScenarios() {
     ],
   });
   
-  // Scenario 3: Dual Role Trip (host_and_traveler as guest)
+  // Scenario 4: Dual Role Trip (host_and_traveler as guest)
   const dualRoleTripStart = new Date(bookingDate);
   dualRoleTripStart.setUTCDate(bookingDate.getUTCDate() + 14);
   
@@ -454,14 +509,14 @@ async function seedScenarios() {
     },
   });
   
-  console.log('✓ Created 3 E2E scenarios: happy_path_booking, messaging_enabled, dual_role_trip');
+  console.log('✓ Created 4 E2E scenarios: happy_path_booking, messaging_enabled, synthetic_reply, dual_role_trip');
 }
 
 // =============================================================================
 // MAIN
 // =============================================================================
 
-async function main() {
+export async function runStagingSeed() {
   console.log('');
   console.log('🌱 E2E STAGING SEED SCRIPT');
   console.log('==========================');
@@ -485,15 +540,20 @@ async function main() {
   console.log('E2E Scenarios:');
   console.log('  Happy Path Booking: booking-e2e-happy-path');
   console.log('  Messaging Enabled:  booking-e2e-messaging');
+  console.log('  Synthetic Reply:    booking-e2e-synthetic-reply');
   console.log('  Dual Role Trip:     trip-e2e-dual-role');
   console.log('');
 }
 
-main()
-  .catch((e) => {
-    console.error('❌ Error seeding E2E staging database:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+const isDirectExecution = process.argv[1]?.endsWith('seed-staging.ts');
+
+if (isDirectExecution) {
+  runStagingSeed()
+    .catch((e) => {
+      console.error('❌ Error seeding E2E staging database:', e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

@@ -7,7 +7,7 @@ import { useSession } from 'next-auth/react';
 import { SignInButton, AuthButton, UserMenu } from '@/components/features';
 import { P2PChatPanel } from '@/components/features/p2p-chat-panel';
 
-import { Home01Icon, Comment01Icon, Menu01Icon } from 'hugeicons-react';
+import { Home01Icon, Comment01Icon } from 'hugeicons-react';
 
 import { useAppSelector } from '@/store/hooks';
 import { selectTotalUnreadCount } from '@/store/p2p-chat-slice';
@@ -16,14 +16,10 @@ export function Navbar() {
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const isLoading = status === 'loading';
-  const isBecomeHostPage = pathname === '/become-host';
-  const ctaLink = isBecomeHostPage
-    ? { href: '/', label: 'Plan a Trip' }
-    : { href: '/become-host', label: 'Become a Host' };
+
 
   // P2P Chat Panel state
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const unreadCount = useAppSelector(selectTotalUnreadCount);
 
@@ -68,46 +64,11 @@ export function Navbar() {
                 </>
               )}
 
-              {/* Menu Button (Visible on all screens) */}
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="p-2 rounded-lg hover:bg-[var(--muted)] transition-colors"
-                aria-label="Toggle menu"
-              >
-                <Menu01Icon className="w-6 h-6 text-[var(--foreground)]" />
-              </button>
+
             </div>
           </div>
         </div>
 
-        {/* Menu Overlay (Visible on all screens when open) */}
-        {isMobileMenuOpen && (
-          <div className="border-t border-[var(--border)] bg-[var(--background)] px-4 py-4 shadow-lg animate-in slide-in-from-top-2 duration-200">
-            <div className="flex flex-col space-y-4">
-              <Link 
-                href="/trips" 
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="text-lg font-medium text-[var(--foreground)] hover:text-[var(--princeton-orange)] transition-colors"
-              >
-                My Trips
-              </Link>
-              <Link 
-                href="/experiences" 
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="text-lg font-medium text-[var(--foreground)] hover:text-[var(--princeton-orange)] transition-colors"
-              >
-                My Experiences
-              </Link>
-              <Link 
-                href={ctaLink.href} 
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="text-lg font-medium text-[var(--foreground)] hover:text-[var(--princeton-orange)] transition-colors"
-              >
-                {ctaLink.label}
-              </Link>
-            </div>
-          </div>
-        )}
       </nav>
 
       {/* P2P Chat Panel */}

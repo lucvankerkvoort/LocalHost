@@ -20,7 +20,9 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:seed": "npx tsx prisma/seed.ts",
+    "db:seed": "SYNTHETIC_BOTS_PROFILE=dev-lite npx tsx prisma/seed.ts",
+    "db:seed:dev-lite": "SYNTHETIC_BOTS_PROFILE=dev-lite npx tsx prisma/seed.ts",
+    "db:seed:demo-rich": "SYNTHETIC_BOTS_PROFILE=demo-rich npx tsx prisma/seed.ts",
     "db:seed:staging": "DOTENV_CONFIG_PATH=.env.staging npx tsx prisma/seed-staging.ts",
     "db:reset:staging": "./scripts/reset-staging.sh",
     "db:verify:staging": "DOTENV_CONFIG_PATH=.env.staging npx tsx scripts/verify-staging.ts"

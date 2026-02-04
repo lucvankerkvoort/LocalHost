@@ -18,7 +18,6 @@ if (!databaseUrl) {
 }
 
 const prisma = new PrismaClient({
-  // @ts-ignore - accelerateUrl is needed for Prisma Accelerate
   accelerateUrl: databaseUrl,
 });
 
@@ -28,15 +27,17 @@ const EXPECTED_ACTORS = [
   'e2e-host-full-access',
   'e2e-host-and-traveler',
   'e2e-admin-debug',
+  'e2e-synthetic-host',
 ];
 
 const EXPECTED_EXPERIENCES = [
   'exp-e2e-rome-food-tour',
   'exp-e2e-barcelona-art-walk',
+  'exp-e2e-rome-synthetic-family-day',
 ];
 
 const EXPECTED_SCENARIOS = {
-  bookings: ['booking-e2e-happy-path', 'booking-e2e-messaging'],
+  bookings: ['booking-e2e-happy-path', 'booking-e2e-messaging', 'booking-e2e-synthetic-reply'],
   trips: ['trip-e2e-dual-role'],
 };
 

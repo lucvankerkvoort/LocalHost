@@ -4,6 +4,8 @@ import { HOSTS, type Host, type HostExperience } from '@/lib/data/hosts';
 import type { HostMarkerData } from '@/types/globe';
 import { getHostExperienceCtaState } from './host-panel-state';
 
+import { Home01Icon } from 'hugeicons-react';
+
 interface HostPanelProps {
   hosts: HostMarkerData[];
   selectedHostId?: string | null;
@@ -36,7 +38,7 @@ export function HostPanel({
       <div className="w-80 flex-shrink-0 bg-[var(--background)]/60 backdrop-blur-xl border-l border-[var(--border)]/50 flex flex-col">
         <div className="p-4 border-b border-[var(--border)]/50">
           <h2 className="font-semibold text-[var(--foreground)] flex items-center gap-2">
-            <span>🏠</span>
+            <Home01Icon className="w-5 h-5 text-[var(--princeton-orange)]" />
             <span>Local Hosts</span>
           </h2>
         </div>
@@ -55,7 +57,7 @@ export function HostPanel({
       {/* Header */}
       <div className="p-4 border-b border-[var(--border)]/50">
         <h2 className="font-semibold text-[var(--foreground)] flex items-center gap-2">
-          <span>🏠</span>
+          <Home01Icon className="w-5 h-5 text-[var(--princeton-orange)]" />
           <span>Local Hosts</span>
           <span className="ml-auto text-sm font-normal text-[var(--muted-foreground)]">
             {hosts.length} available

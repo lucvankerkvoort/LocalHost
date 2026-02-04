@@ -24,6 +24,14 @@ export interface ChatThread {
   isLoading: boolean;
 }
 
+interface ApiBookingMessage {
+  id: string;
+  senderId?: string;
+  content: string;
+  createdAt: string;
+  isRead: boolean;
+}
+
 interface P2PChatState {
   threads: Record<string, ChatThread>; // Keyed by bookingId
   activeBookingId: string | null;
@@ -113,14 +121,15 @@ export const p2pChatSlice = createSlice({
   extraReducers: (builder) => {
     builder.addCase(fetchMessages.fulfilled, (state, action) => {
         const bookingId = action.meta.arg;
-        const messages = action.payload;
+        const messages = action.payload as ApiBookingMessage[];
         if (state.threads[bookingId]) {
-            state.threads[bookingId].messages = messages.map((msg: any) => ({
+            const hostId = state.threads[bookingId].hostId;
+            state.threads[bookingId].messages = messages.map((msg) => ({
                 id: msg.id,
                 content: msg.content,
                 createdAt: msg.createdAt,
                 isRead: msg.isRead,
-                senderType: 'USER', // Placeholder/Default
+                senderType: msg.senderId === hostId ? 'HOST' : 'USER',
             }));
         }
     });

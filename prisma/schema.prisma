@@ -28,6 +28,12 @@ model User {
   bio           String?
   quote         String?
   responseTime  String?   @default("within a day") // e.g. "within an hour"
+  isSyntheticHost Boolean @default(false)
+  syntheticBotEnabled Boolean @default(false)
+  syntheticPersonaKey String?
+  syntheticResponseStyle SyntheticResponseStyle @default(FRIENDLY)
+  syntheticResponseLatencyMinSec Int? @default(5)
+  syntheticResponseLatencyMaxSec Int? @default(30)
   
   // Location
   city          String?
@@ -53,6 +59,7 @@ model User {
   hostedExperiences Experience[] @relation("HostedExperiences")
   bookings          Booking[]    @relation("GuestBookings")
   hostBookings      Booking[]    @relation("HostBookings")
+  syntheticReplyJobs SyntheticReplyJob[] @relation("HostSyntheticJobs")
   reviewsGiven      Review[]     @relation("ReviewerReviews")
   reviewsReceived   Review[]     @relation("RevieweeReviews")
   messagesSent      Message[]    @relation("SentMessages")
@@ -332,6 +339,7 @@ model Booking {
   
   // Communication
   messages      Message[]
+  syntheticReplyJobs SyntheticReplyJob[]
   
   // Reviews
   reviews       Review[]
@@ -403,6 +411,7 @@ model Message {
   
   senderId     String
   sender       User     @relation("SentMessages", fields: [senderId], references: [id])
+  triggeredSyntheticJobs SyntheticReplyJob[] @relation("TriggeredSyntheticJobs")
   
   content      String   @db.Text
   isRead       Boolean  @default(false)
@@ -411,6 +420,27 @@ model Message {
   
   @@index([bookingId])
   @@index([senderId])
+}
+
+model SyntheticReplyJob {
+  id               String   @id @default(cuid())
+  bookingId        String
+  booking          Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  hostId           String
+  host             User     @relation("HostSyntheticJobs", fields: [hostId], references: [id], onDelete: Cascade)
+  triggerMessageId String
+  triggerMessage   Message  @relation("TriggeredSyntheticJobs", fields: [triggerMessageId], references: [id], onDelete: Cascade)
+  status           SyntheticReplyJobStatus @default(PENDING)
+  dueAt            DateTime
+  attemptCount     Int      @default(0)
+  error            String?  @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([status, dueAt])
+  @@index([bookingId])
+  @@index([hostId])
+  @@unique([bookingId, triggerMessageId])
 }
 
 // ============================================
@@ -436,6 +466,21 @@ enum StripeOnboardingStatus {
   PENDING
   COMPLETE
   RESTRICTED
+}
+
+enum SyntheticResponseStyle {
+  FRIENDLY
+  PROFESSIONAL
+  CONCISE
+  WARM
+}
+
+enum SyntheticReplyJobStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+  CANCELLED
 }
 
 enum PayoutStatus {

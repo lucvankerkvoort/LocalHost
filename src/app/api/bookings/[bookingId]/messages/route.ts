@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
+import { processDueSyntheticReplyJobs } from '@/lib/synthetic-bots/jobs';
+import { maybeEnqueueSyntheticReplyForMessage, resolveBookingHostId } from '@/lib/synthetic-bots/chat-trigger';
 
 export async function GET(
     req: Request,
@@ -17,21 +19,36 @@ export async function GET(
         // Verify participation
         const booking = await prisma.booking.findUnique({
             where: { id: bookingId },
-            include: { experience: true }
+            include: {
+                experience: {
+                    select: {
+                        hostId: true
+                    }
+                }
+            }
         });
 
         if (!booking) {
             return new NextResponse('Booking not found', { status: 404 });
         }
 
+        const hostParticipantId = resolveBookingHostId(booking);
+
         // Allow Guest or Host to view
-        if (booking.guestId !== session.user.id && booking.experience.hostId !== session.user.id) {
+        if (booking.guestId !== session.user.id && hostParticipantId !== session.user.id) {
             return new NextResponse('Forbidden', { status: 403 });
         }
 
         // Chat access gate: only allow access if booking is CONFIRMED or COMPLETED
         if (booking.status !== 'CONFIRMED' && booking.status !== 'COMPLETED') {
             return new NextResponse('Chat is locked until booking is confirmed', { status: 403 });
+        }
+
+        // Opportunistic processor trigger to drain due jobs on normal chat traffic.
+        try {
+            await processDueSyntheticReplyJobs({ limit: 3 });
+        } catch (error) {
+            console.error('[MESSAGES_GET_SYNTHETIC_PROCESS]', error);
         }
 
         const messages = await prisma.message.findMany({
@@ -60,20 +77,37 @@ export async function POST(
 
         const { bookingId } = await params;
         const body = await req.json();
-        const { content } = body;
+        const content = typeof body?.content === 'string' ? body.content.trim() : '';
 
         if (!content) return new NextResponse('Missing content', { status: 400 });
 
         const booking = await prisma.booking.findUnique({
             where: { id: bookingId },
-            include: { experience: true }
+            include: {
+                experience: {
+                    select: {
+                        hostId: true
+                    }
+                },
+                host: {
+                    select: {
+                        id: true,
+                        isSyntheticHost: true,
+                        syntheticBotEnabled: true,
+                        syntheticResponseLatencyMinSec: true,
+                        syntheticResponseLatencyMaxSec: true,
+                    }
+                }
+            }
         });
 
         if (!booking) {
             return new NextResponse('Booking not found', { status: 404 });
         }
 
-        if (booking.guestId !== session.user.id && booking.experience.hostId !== session.user.id) {
+        const hostParticipantId = resolveBookingHostId(booking);
+
+        if (booking.guestId !== session.user.id && hostParticipantId !== session.user.id) {
              return new NextResponse('Forbidden', { status: 403 });
         }
 
@@ -89,6 +123,19 @@ export async function POST(
                 content
             }
         });
+
+        await maybeEnqueueSyntheticReplyForMessage({
+            booking,
+            senderId: session.user.id,
+            triggerMessageId: message.id,
+        });
+
+        // Opportunistic processor trigger for low-latency replies once jobs become due.
+        try {
+            await processDueSyntheticReplyJobs({ limit: 1 });
+        } catch (error) {
+            console.error('[MESSAGES_POST_SYNTHETIC_PROCESS]', error);
+        }
 
         return NextResponse.json(message);
 

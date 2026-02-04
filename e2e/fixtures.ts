@@ -54,6 +54,7 @@ export const E2E_ACTORS = {
 export const E2E_SCENARIOS = {
   HAPPY_PATH_BOOKING: 'booking-e2e-happy-path',
   MESSAGING_ENABLED: 'booking-e2e-messaging',
+  SYNTHETIC_REPLY: 'booking-e2e-synthetic-reply',
   DUAL_ROLE_TRIP: 'trip-e2e-dual-role',
 } as const;
 
@@ -63,6 +64,7 @@ export const E2E_SCENARIOS = {
 export const E2E_EXPERIENCES = {
   ROME_FOOD_TOUR: 'exp-e2e-rome-food-tour',
   BARCELONA_ART_WALK: 'exp-e2e-barcelona-art-walk',
+  ROME_SYNTHETIC_FAMILY_DAY: 'exp-e2e-rome-synthetic-family-day',
 } as const;
 
 // =============================================================================
@@ -83,14 +85,14 @@ type LocalHostFixtures = {
  */
 export const test = base.extend<LocalHostFixtures>({
   // Authenticated page fixture
-  authenticatedPage: async ({ page }, use) => {
+  authenticatedPage: async ({ page }, run) => {
     await page.goto('/');
     await waitForAppReady(page);
-    await use(page);
+    await run(page);
   },
   
   // Mock auth page for testing without real OAuth
-  mockAuthPage: async ({ page }, use) => {
+  mockAuthPage: async ({ page }, run) => {
     // Intercept auth session endpoint to return authenticated user
     await page.route('**/api/auth/session', async (route) => {
       await route.fulfill({
@@ -108,7 +110,7 @@ export const test = base.extend<LocalHostFixtures>({
       });
     });
     
-    await use(page);
+    await run(page);
   },
 });
 

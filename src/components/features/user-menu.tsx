@@ -61,13 +61,6 @@ export function UserMenu() {
 
           <div className="py-1">
             <Link
-              href="/profile"
-              onClick={() => setIsOpen(false)}
-              className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]/20 transition-colors"
-            >
-              Your Profile
-            </Link>
-            <Link
               href="/trips"
               onClick={() => setIsOpen(false)}
               className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]/20 transition-colors"
@@ -75,18 +68,11 @@ export function UserMenu() {
               My Trips
             </Link>
             <Link
-              href="/bookings"
+              href="/experiences"
               onClick={() => setIsOpen(false)}
               className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]/20 transition-colors"
             >
-              Your Bookings
-            </Link>
-            <Link
-              href="/host/dashboard"
-              onClick={() => setIsOpen(false)}
-              className="block px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]/20 transition-colors"
-            >
-              Host Dashboard
+              My Experiences
             </Link>
           </div>
 

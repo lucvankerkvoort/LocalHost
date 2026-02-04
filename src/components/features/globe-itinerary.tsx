@@ -18,7 +18,6 @@ import { ItineraryItem, createItem } from '@/types/itinerary';
 import { getHostsByCity } from '@/lib/data/hosts';
 import { CATEGORY_ICONS, CATEGORY_LABELS, ExperienceCategory } from '@/types';
 import { ExperienceDrawer } from './experience-drawer';
-import { ProposalDialog } from './proposal-dialog';
 
 import { initThread, sendChatMessage } from '@/store/p2p-chat-slice';
 import { BookingDialog } from './booking-dialog';
@@ -322,61 +321,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   }, [persistItineraryState, router]);
 
 
-  // Proposal Dialog State
-  const [pendingProposal, setPendingProposal] = useState<{
-    host: { id: string; name: string; photo?: string }; 
-    experience: any;
-  } | null>(null);
 
-  const handleConfirmProposal = (message: string) => {
-    if (!pendingProposal) return;
-    
-    // 1. (Old Chat init removed - moving to post-success)
-
-    // 2. Add to Itinerary (Persistent)
-    const { host, experience } = pendingProposal;
-    
-    if (tripId && selectedDestination) {
-       dispatch(addExperienceToTrip({
-         tripId: tripId || null,
-         dayId: selectedDestData?.id, 
-         dayNumber: selectedDestData?.day || 1,
-         experience,
-         host
-       })).unwrap().then((result: any) => {
-           if (result.local) {
-               setPendingProposal(null);
-               return; 
-           }
-           // result should be { item, booking }
-           if (result && result.booking) {
-               console.log("Experience added, starting chat for booking:", result.booking.id);
-               
-               // Initialize thread with bookingId
-               dispatch(initThread({
-                   bookingId: result.booking.id,
-                   hostId: host.id,
-                   hostName: host.name,
-                   hostPhoto: host.photo || ''
-               }));
-
-               // Send the message
-               dispatch(sendChatMessage({
-                   bookingId: result.booking.id,
-                   content: message
-               }));
-           }
-       }).catch(err => {
-           console.error("Failed to add experience and start chat:", err);
-       });
-    } else {
-       console.warn('[GlobeItinerary] Cannot add experience: Missing tripId or selectedDestination');
-    }
-    
-    // 3. Cleanup
-    setPendingProposal(null);
-    setDrawerOpen(false);
-  };
 
   // Add Experience from Drawer
   const handleAddExperience = (host: any, experience: any) => {
@@ -396,8 +341,29 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
           console.warn('Cannot remove: item not found or missing tripId');
       }
     } else {
-        // Open proposal dialog
-        setPendingProposal({ host, experience });
+      // DIRECT ADD: Bypass proposal dialog
+        if (tripId && selectedDestination) {
+           dispatch(addExperienceToTrip({
+             tripId: tripId || null,
+             dayId: selectedDestData?.id, 
+             dayNumber: selectedDestData?.day || 1,
+             experience,
+             host
+           })).unwrap().then((result: any) => {
+               if (result.local) return;
+               
+               // If booking created, we can optionally start chat here or just notify
+               if (result && result.booking) {
+                   console.log("Experience added, booking created:", result.booking.id);
+                   // Optional: Start thread silently so it's ready?
+                   // dispatch(initThread({ ... }));
+               }
+           }).catch(err => {
+               console.error("Failed to add experience:", err);
+           });
+        } else {
+           console.warn('[GlobeItinerary] Cannot add experience: Missing tripId or selectedDestination');
+        }
     }
   };
 
@@ -1134,13 +1100,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
         onAddExperience={handleAddExperience}
       />
 
-      <ProposalDialog
-        isOpen={!!pendingProposal}
-        onClose={() => setPendingProposal(null)}
-        onConfirm={handleConfirmProposal}
-        hostName={pendingProposal?.host.name || ''}
-        experienceTitle={pendingProposal?.experience.title || ''}
-      />
+
       
       {/* Booking Dialog */}
       {bookingDialogState.candidate && (
