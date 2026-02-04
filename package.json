@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "prepare:cesium": "rm -rf public/cesium && mkdir -p public/cesium && cp -R node_modules/cesium/Build/Cesium/. public/cesium/",
+    "build": "npm run prepare:cesium && prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test $(find src -name '*.test.ts' -print)",
@@ -15,7 +16,7 @@
     "test:chunk:tool-calls-slice": "tsx --test src/store/tool-calls-slice.test.ts",
     "test:chunk:type-helpers": "tsx --test src/types/globe.test.ts src/types/itinerary.test.ts",
     "test:chunk:orchestrator-ui-slices": "tsx --test src/store/orchestrator-slice.test.ts src/store/ui-slice.test.ts",
-    "postinstall": "rm -f public/cesium && ln -sf ../node_modules/cesium/Build/Cesium public/cesium",
+    "postinstall": "npm run prepare:cesium",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",

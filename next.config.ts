@@ -12,14 +12,14 @@ const nextConfig: NextConfig = {
   webpack: (config) => {
     config.plugins.push(
       new webpack.DefinePlugin({
-        CESIUM_BASE_URL: JSON.stringify("cesium"),
+        CESIUM_BASE_URL: JSON.stringify("/cesium"),
       })
     );
     return config;
   },
   // Environment variables
   env: {
-    CESIUM_BASE_URL: "cesium",
+    CESIUM_BASE_URL: "/cesium",
   },
   images: {
     remotePatterns: [
