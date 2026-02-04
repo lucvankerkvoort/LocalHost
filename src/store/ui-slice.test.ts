@@ -6,7 +6,13 @@ import reducer, {
   openContactHost,
   selectUI,
   setP2PChatOpen,
+  setItineraryCollapsed,
+  setItineraryPanelTab,
+  setListSurfaceOpen,
   setShowTimeline,
+  toggleItineraryCollapsed,
+  toggleItineraryPanelTab,
+  toggleListSurface,
   toggleTimeline,
 } from './ui-slice';
 
@@ -60,6 +66,36 @@ test('toggleTimeline flips timeline visibility', () => {
 
   assert.equal(first.showTimeline, false);
   assert.equal(second.showTimeline, true);
+});
+
+test('setListSurfaceOpen and toggleListSurface control list visibility', () => {
+  const opened = reducer(getInitialState(), setListSurfaceOpen(true));
+  const toggledClosed = reducer(opened, toggleListSurface());
+  const toggledOpen = reducer(toggledClosed, toggleListSurface());
+
+  assert.equal(opened.isListSurfaceOpen, true);
+  assert.equal(toggledClosed.isListSurfaceOpen, false);
+  assert.equal(toggledOpen.isListSurfaceOpen, true);
+});
+
+test('setItineraryCollapsed and toggleItineraryCollapsed control itinerary collapse state', () => {
+  const collapsed = reducer(getInitialState(), setItineraryCollapsed(true));
+  const toggledOpen = reducer(collapsed, toggleItineraryCollapsed());
+  const toggledCollapsed = reducer(toggledOpen, toggleItineraryCollapsed());
+
+  assert.equal(collapsed.isItineraryCollapsed, true);
+  assert.equal(toggledOpen.isItineraryCollapsed, false);
+  assert.equal(toggledCollapsed.isItineraryCollapsed, true);
+});
+
+test('itinerary panel tab defaults to ITINERARY and can be set/toggled', () => {
+  const initial = getInitialState();
+  const setExperiences = reducer(initial, setItineraryPanelTab('EXPERIENCES'));
+  const toggled = reducer(setExperiences, toggleItineraryPanelTab());
+
+  assert.equal(initial.itineraryPanelTab, 'ITINERARY');
+  assert.equal(setExperiences.itineraryPanelTab, 'EXPERIENCES');
+  assert.equal(toggled.itineraryPanelTab, 'ITINERARY');
 });
 
 test('selectUI returns ui slice from root state', () => {

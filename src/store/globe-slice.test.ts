@@ -7,9 +7,19 @@ import reducer, {
   addLocalExperience,
   addHostMarkers,
   addPlaceMarker,
+  clearSelectedExperienceId,
+  clearSelectedHostId,
   clearItinerary,
   clearVisualTarget,
   hydrateGlobeState,
+  patchActiveFilters,
+  resetActiveFilters,
+  selectVisibleExperienceIds,
+  selectVisibleHostIds,
+  setActiveFilters,
+  setPlanningViewMode,
+  setSelectedExperienceId,
+  setSelectedHostId,
   setDestinations,
   setSelectedDestination,
   setActiveItemId,
@@ -151,6 +161,79 @@ test('setFocusedItemId can independently change focus', () => {
 
   assert.equal(focused.activeItemId, 'item-42');
   assert.equal(focused.focusedItemId, 'item-99');
+});
+
+test('planning state fields default to deterministic values', () => {
+  const state = getInitialState();
+
+  assert.equal(state.planningViewMode, 'MAP');
+  assert.equal(state.selectedHostId, null);
+  assert.equal(state.selectedExperienceId, null);
+  assert.deepEqual(state.activeFilters, {
+    query: '',
+    categories: [],
+    minRating: null,
+    maxPriceCents: null,
+  });
+});
+
+test('planning selection reducers set and clear selected host and experience ids', () => {
+  const selectedHost = reducer(getInitialState(), setSelectedHostId('host-42'));
+  const clearedHost = reducer(selectedHost, clearSelectedHostId());
+  const selectedExperience = reducer(clearedHost, setSelectedExperienceId('exp-7'));
+  const clearedExperience = reducer(selectedExperience, clearSelectedExperienceId());
+
+  assert.equal(selectedHost.selectedHostId, 'host-42');
+  assert.equal(clearedHost.selectedHostId, null);
+  assert.equal(selectedExperience.selectedExperienceId, 'exp-7');
+  assert.equal(clearedExperience.selectedExperienceId, null);
+});
+
+test('setPlanningViewMode transitions between MAP and LIST', () => {
+  const list = reducer(getInitialState(), setPlanningViewMode('LIST'));
+  const map = reducer(list, setPlanningViewMode('MAP'));
+
+  assert.equal(list.planningViewMode, 'LIST');
+  assert.equal(map.planningViewMode, 'MAP');
+});
+
+test('setActiveFilters, patchActiveFilters, and resetActiveFilters update filters deterministically', () => {
+  const start = reducer(
+    getInitialState(),
+    setActiveFilters({
+      query: 'rome',
+      categories: ['FOOD_DRINK'],
+      minRating: 4.5,
+      maxPriceCents: 8000,
+    })
+  );
+  const patched = reducer(
+    start,
+    patchActiveFilters({
+      minRating: 4.8,
+      categories: ['ARTS_CULTURE'],
+    })
+  );
+  const reset = reducer(patched, resetActiveFilters());
+
+  assert.deepEqual(start.activeFilters, {
+    query: 'rome',
+    categories: ['FOOD_DRINK'],
+    minRating: 4.5,
+    maxPriceCents: 8000,
+  });
+  assert.deepEqual(patched.activeFilters, {
+    query: 'rome',
+    categories: ['ARTS_CULTURE'],
+    minRating: 4.8,
+    maxPriceCents: 8000,
+  });
+  assert.deepEqual(reset.activeFilters, {
+    query: '',
+    categories: [],
+    minRating: null,
+    maxPriceCents: null,
+  });
 });
 
 test('toolCallReceived(flyToLocation) sets visualTarget and defaults height', () => {
@@ -364,4 +447,70 @@ test('toolCallReceived(resolve_place) ignores markers too far from anchor', () =
   );
 
   assert.equal(state.placeMarkers.length, 0);
+});
+
+test('visible host and experience selectors return canonical filtered ids', () => {
+  const globeState = reducer(
+    reducer(
+      getInitialState(),
+      addHostMarkers([
+        { id: 'maria-rome', hostId: 'maria-rome', name: 'Maria Rossi', lat: 41.9, lng: 12.49, rating: 4.9 },
+        { id: 'carlos-cdmx', hostId: 'carlos-cdmx', name: 'Carlos Mendez', lat: 19.43, lng: -99.13, rating: 4.8 },
+      ])
+    ),
+    setActiveFilters({
+      query: 'sunset',
+      categories: ['FOOD_DRINK'],
+      minRating: 4.5,
+      maxPriceCents: 8000,
+    })
+  );
+
+  const rootState = {
+    globe: globeState,
+    hosts: {
+      allHosts: [
+        {
+          id: 'maria-rome',
+          name: 'Maria Rossi',
+          city: 'Rome',
+          country: 'Italy',
+          lat: 41.9,
+          lng: 12.49,
+          experiences: [
+            {
+              id: 'exp-rome-sunset',
+              title: 'Sunset cooking',
+              category: 'FOOD_DRINK',
+              rating: 4.9,
+              price: 7500,
+            },
+          ],
+        },
+        {
+          id: 'carlos-cdmx',
+          name: 'Carlos Mendez',
+          city: 'Mexico City',
+          country: 'Mexico',
+          lat: 19.43,
+          lng: -99.13,
+          experiences: [
+            {
+              id: 'exp-cdmx-art',
+              title: 'Street art walk',
+              category: 'ARTS_CULTURE',
+              rating: 4.8,
+              price: 3500,
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  const visibleHostIds = selectVisibleHostIds(rootState as never);
+  const visibleExperienceIds = selectVisibleExperienceIds(rootState as never);
+
+  assert.deepEqual(visibleHostIds, ['maria-rome']);
+  assert.deepEqual(visibleExperienceIds, ['exp-rome-sunset']);
 });

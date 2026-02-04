@@ -5,7 +5,7 @@ import { CityMarkerData, GlobeDestination, HostMarkerData, PlaceMarkerData, Rout
 
 // Set Cesium base URL BEFORE importing Cesium
 if (typeof window !== 'undefined') {
-  (window as any).CESIUM_BASE_URL = '/cesium';
+  (window as Window & { CESIUM_BASE_URL?: string }).CESIUM_BASE_URL = '/cesium';
 }
 
 // Now import Cesium and Resium
@@ -89,6 +89,7 @@ interface CesiumGlobeProps {
   activeItemId?: string | null;
   hoveredItemId?: string | null;
   onItemHover?: (itemId: string | null) => void;
+  onMapBackgroundClick?: () => void;
 }
 
 // Helper to create circular avatar image from URL
@@ -164,6 +165,7 @@ export default function CesiumGlobe({
   activeItemId,
   hoveredItemId,
   onItemHover,
+  onMapBackgroundClick,
 }: CesiumGlobeProps) {
   const viewerRef = useRef<CesiumViewer | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -262,13 +264,20 @@ export default function CesiumGlobe({
       onItemHover?.(null); // Clear item hover if not over a marker
     }, ScreenSpaceEventType.MOUSE_MOVE);
 
+    handler.setInputAction((movement: { position: Cartesian2 }) => {
+      const pickedObject = viewer.scene.pick(movement.position);
+      if (!defined(pickedObject) || !pickedObject.id) {
+        onMapBackgroundClick?.();
+      }
+    }, ScreenSpaceEventType.LEFT_CLICK);
+
     return () => {
       if (handlerRef.current) {
         handlerRef.current.destroy();
         handlerRef.current = null;
       }
     };
-  }, [isReady, hostMarkers, onItemHover]);
+  }, [isReady, hostMarkers, onItemHover, onMapBackgroundClick]);
 
   // Handle explicit visual target (e.g. from chat command)
   useEffect(() => {
@@ -372,7 +381,7 @@ export default function CesiumGlobe({
               outlineWidth: 3,
               style: 2, // FILL_AND_OUTLINE
               verticalOrigin: VerticalOrigin.BOTTOM,
-              pixelOffset: { x: 0, y: -20 } as any,
+              pixelOffset: new Cartesian2(0, -20),
               heightReference: HeightReference.CLAMP_TO_GROUND,
               disableDepthTestDistance: MARKER_DEPTH_TEST_DISTANCE,
               show: isSelected || cityMarkers.length <= 1,

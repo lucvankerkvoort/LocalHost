@@ -12,9 +12,11 @@ interface HostPanelProps {
   selectedDayNumber?: number;
   addedExperienceIds?: Set<string>;
   bookedExperienceIds?: Set<string>;
+  variant?: 'sidebar' | 'sheet';
   onHostClick: (host: HostMarkerData) => void;
+  onFocusExperience: (host: Host, experience: HostExperience, marker: HostMarkerData) => void;
   onViewProfile: (host: HostMarkerData) => void;
-  onAddExperience: (host: Host, experience: HostExperience) => void;
+  onAddExperience: (host: Host, experience: HostExperience, marker: HostMarkerData) => void;
 }
 
 export function HostPanel({
@@ -23,10 +25,14 @@ export function HostPanel({
   selectedDayNumber,
   addedExperienceIds,
   bookedExperienceIds,
+  variant = 'sidebar',
   onHostClick,
+  onFocusExperience,
   onViewProfile,
   onAddExperience,
 }: HostPanelProps) {
+  const isSheetVariant = variant === 'sheet';
+
   // Get full host data to access experiences
   const hostsWithExperiences = hosts.map(marker => {
     const fullHost = HOSTS.find(h => h.id === marker.id);
@@ -35,7 +41,7 @@ export function HostPanel({
 
   if (hosts.length === 0) {
     return (
-      <div className="w-80 flex-shrink-0 bg-[var(--background)]/60 backdrop-blur-xl border-l border-[var(--border)]/50 flex flex-col">
+      <div className={`${isSheetVariant ? 'w-full h-full' : 'w-80 flex-shrink-0'} bg-[var(--background)]/60 backdrop-blur-xl ${isSheetVariant ? 'border border-[var(--border)]/50 rounded-2xl' : 'border-l border-[var(--border)]/50'} flex flex-col`}>
         <div className="p-4 border-b border-[var(--border)]/50">
           <h2 className="font-semibold text-[var(--foreground)] flex items-center gap-2">
             <Home01Icon className="w-5 h-5 text-[var(--princeton-orange)]" />
@@ -53,7 +59,7 @@ export function HostPanel({
   }
 
   return (
-    <div className="w-96 flex-shrink-0 bg-[var(--background)]/60 backdrop-blur-xl border-l border-[var(--border)]/50 flex flex-col">
+    <div className={`${isSheetVariant ? 'w-full h-full rounded-2xl border border-[var(--border)]/50' : 'w-96 flex-shrink-0 border-l border-[var(--border)]/50'} bg-[var(--background)]/60 backdrop-blur-xl flex flex-col`}>
       {/* Header */}
       <div className="p-4 border-b border-[var(--border)]/50">
         <h2 className="font-semibold text-[var(--foreground)] flex items-center gap-2">
@@ -70,15 +76,15 @@ export function HostPanel({
         {hostsWithExperiences.map(({ marker, fullHost }) => (
           <HostCardWithExperiences
             key={marker.id}
-            marker={marker}
             host={fullHost!}
             isSelected={marker.id === selectedHostId}
             selectedDayNumber={selectedDayNumber}
             addedExperienceIds={addedExperienceIds}
             bookedExperienceIds={bookedExperienceIds}
             onClick={() => onHostClick(marker)}
+            onFocusExperience={(exp) => onFocusExperience(fullHost!, exp, marker)}
             onViewProfile={() => onViewProfile(marker)}
-            onAddExperience={(exp) => onAddExperience(fullHost!, exp)}
+            onAddExperience={(exp) => onAddExperience(fullHost!, exp, marker)}
           />
         ))}
       </div>
@@ -87,25 +93,25 @@ export function HostPanel({
 }
 
 interface HostCardWithExperiencesProps {
-  marker: HostMarkerData;
   host: Host;
   isSelected: boolean;
   selectedDayNumber?: number;
   addedExperienceIds?: Set<string>;
   bookedExperienceIds?: Set<string>;
   onClick: () => void;
+  onFocusExperience: (experience: HostExperience) => void;
   onViewProfile: () => void;
   onAddExperience: (experience: HostExperience) => void;
 }
 
 function HostCardWithExperiences({
-  marker,
   host,
   isSelected,
   selectedDayNumber,
   addedExperienceIds,
   bookedExperienceIds,
   onClick,
+  onFocusExperience,
   onViewProfile,
   onAddExperience,
 }: HostCardWithExperiencesProps) {
@@ -136,7 +142,7 @@ function HostCardWithExperiences({
               {host.name}
             </h3>
             <p className="text-xs text-[var(--muted-foreground)] line-clamp-1 mt-0.5 italic">
-              "{host.quote}"
+              {`"${host.quote}"`}
             </p>
           </div>
           <button
@@ -168,7 +174,8 @@ function HostCardWithExperiences({
             return (
               <div
                 key={exp.id}
-                className="p-3 hover:bg-[var(--muted)]/20 transition-colors"
+                className="p-3 hover:bg-[var(--muted)]/20 transition-colors cursor-pointer"
+                onClick={() => onFocusExperience(exp)}
               >
                 <div className="flex gap-3">
                   <img
@@ -190,7 +197,8 @@ function HostCardWithExperiences({
                   </div>
                 </div>
                 <button
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.stopPropagation();
                     if (ctaState === 'BOOKED') return;
                     onAddExperience(exp);
                   }}

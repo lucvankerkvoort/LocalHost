@@ -1,11 +1,16 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from './store';
 
+export type ItineraryPanelTab = 'ITINERARY' | 'EXPERIENCES';
+
 interface UIState {
   isP2PChatOpen: boolean;
   contactHostId: string | null;
   contactExperienceId: string | null;
   showTimeline: boolean;
+  isListSurfaceOpen: boolean;
+  isItineraryCollapsed: boolean;
+  itineraryPanelTab: ItineraryPanelTab;
 }
 
 const initialState: UIState = {
@@ -13,6 +18,9 @@ const initialState: UIState = {
   contactHostId: null,
   contactExperienceId: null,
   showTimeline: true,
+  isListSurfaceOpen: false,
+  isItineraryCollapsed: false,
+  itineraryPanelTab: 'ITINERARY',
 };
 
 export const uiSlice = createSlice({
@@ -35,7 +43,26 @@ export const uiSlice = createSlice({
     },
     toggleTimeline: (state) => {
       state.showTimeline = !state.showTimeline;
-    }
+    },
+    setListSurfaceOpen: (state, action: PayloadAction<boolean>) => {
+      state.isListSurfaceOpen = action.payload;
+    },
+    toggleListSurface: (state) => {
+      state.isListSurfaceOpen = !state.isListSurfaceOpen;
+    },
+    setItineraryCollapsed: (state, action: PayloadAction<boolean>) => {
+      state.isItineraryCollapsed = action.payload;
+    },
+    toggleItineraryCollapsed: (state) => {
+      state.isItineraryCollapsed = !state.isItineraryCollapsed;
+    },
+    setItineraryPanelTab: (state, action: PayloadAction<ItineraryPanelTab>) => {
+      state.itineraryPanelTab = action.payload;
+    },
+    toggleItineraryPanelTab: (state) => {
+      state.itineraryPanelTab =
+        state.itineraryPanelTab === 'ITINERARY' ? 'EXPERIENCES' : 'ITINERARY';
+    },
   },
 });
 
@@ -44,7 +71,13 @@ export const {
   openContactHost, 
   closeContactHost,
   setShowTimeline,
-  toggleTimeline
+  toggleTimeline,
+  setListSurfaceOpen,
+  toggleListSurface,
+  setItineraryCollapsed,
+  toggleItineraryCollapsed,
+  setItineraryPanelTab,
+  toggleItineraryPanelTab,
 } = uiSlice.actions;
 
 export const selectUI = (state: RootState) => state.ui;

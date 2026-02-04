@@ -1,21 +1,20 @@
 'use client';
 
 import { ItineraryItem as ItineraryItemType } from '@/types/itinerary';
-import { Calendar01Icon, Location01Icon, Time01Icon, Add01Icon } from 'hugeicons-react';
+import { Time01Icon } from 'hugeicons-react';
 
 interface ItineraryDayProps {
-  dayId: string;
+  dayId?: string;
   dayNumber: number;
   title?: string;
   date?: string;
   activities: ItineraryItemType[];
-  isSpaceOptimized?: boolean;
   isActive?: boolean;
-  
-  onAddActivity: (dayId: string) => void;
+
   onSelect?: () => void;
   onItemClick?: (item: ItineraryItemType) => void;
   onItemHover?: (itemId: string | null) => void;
+  onAddActivity?: (dayId: string) => void;
   onEditItem?: (item: ItineraryItemType) => void;
   onDeleteItem?: (itemId: string) => void;
   onBookItem?: (item: ItineraryItemType) => void;
@@ -27,25 +26,20 @@ function formatDate(dateString?: string): string {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return 'Unscheduled';
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  } catch (e) {
+  } catch {
     return 'Unscheduled';
   }
 }
 
 export function ItineraryDayColumn({
-  dayId,
   dayNumber,
   title,
   date,
   activities = [],
-  isSpaceOptimized = false,
   isActive = false,
-  onAddActivity,
   onSelect,
   onItemClick,
   onItemHover,
-  onEditItem,
-  onDeleteItem,
   onBookItem,
 }: ItineraryDayProps) {
   
@@ -147,14 +141,6 @@ export function ItineraryDayColumn({
             </div>
             );
         })}
-        
-        {/* Add Item Placeholder */}
-        <button
-            onClick={() => onAddActivity(dayId)}
-            className="w-full py-2 border-2 border-dashed border-[var(--border)] rounded-lg text-sm font-semibold text-[var(--foreground)]/80 hover:bg-[var(--secondary)]/10 hover:text-[var(--secondary)] hover:border-[var(--secondary)]/50 transition-all flex items-center justify-center gap-1"
-        >
-            <Add01Icon className="w-4 h-4" /> Add to Day {dayNumber}
-        </button>
       </div>
     </div>
   );

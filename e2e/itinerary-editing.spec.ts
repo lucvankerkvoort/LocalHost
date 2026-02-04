@@ -5,18 +5,102 @@
  * NOTE: Uses element-based waits, not networkidle (incompatible with Cesium)
  */
 import { test, expect, waitForGlobe, waitForItinerary } from './fixtures';
+import type { Page } from '@playwright/test';
+
+async function mockRomeTrip(page: Page) {
+  await page.route('**/api/trips', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ trips: [{ id: 'trip-planning-mode' }] }),
+    });
+  });
+
+  await page.route('**/api/trips/trip-planning-mode', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'trip-planning-mode',
+        userId: 'e2e-user',
+        title: 'Planning mode test trip',
+        stops: [
+          {
+            id: 'stop-rome',
+            city: 'Rome',
+            lat: 41.9028,
+            lng: 12.4964,
+            days: [
+              {
+                id: 'day-rome-1',
+                dayIndex: 1,
+                title: 'Rome Day 1',
+                suggestedHosts: [],
+                items: [],
+              },
+            ],
+          },
+        ],
+      }),
+    });
+  });
+}
+
+async function mockRomeTripWithTwoDays(page: Page) {
+  await page.route('**/api/trips', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ trips: [{ id: 'trip-mobile-days' }] }),
+    });
+  });
+
+  await page.route('**/api/trips/trip-mobile-days', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'trip-mobile-days',
+        userId: 'e2e-user',
+        title: 'Planning mode mobile day selector test',
+        stops: [
+          {
+            id: 'stop-rome',
+            city: 'Rome',
+            lat: 41.9028,
+            lng: 12.4964,
+            days: [
+              {
+                id: 'day-rome-1',
+                dayIndex: 1,
+                title: 'Rome Day 1',
+                suggestedHosts: [],
+                items: [],
+              },
+              {
+                id: 'day-rome-2',
+                dayIndex: 2,
+                title: 'Rome Day 2',
+                suggestedHosts: [],
+                items: [],
+              },
+            ],
+          },
+        ],
+      }),
+    });
+  });
+}
 
 test.describe('Itinerary Editing and Persistence', () => {
   
-  // Increase timeout for tests that load demo data
+  // Increase timeout for tests that need mocked data + Cesium startup.
   test.setTimeout(60000);
 
-  test('day cards are visible after loading demo', async ({ page }) => {
+  test('day cards are visible after trip load', async ({ page }) => {
+    await mockRomeTrip(page);
     await page.goto('/');
     await waitForGlobe(page);
-    
-    // Load demo data
-    await page.getByRole('button', { name: 'Load Demo', exact: true }).click();
     await waitForItinerary(page);
     
     // Day cards should be visible
@@ -24,11 +108,10 @@ test.describe('Itinerary Editing and Persistence', () => {
     await expect(dayCards.first()).toBeVisible();
   });
 
-  test('itinerary panel is visible after demo load', async ({ page }) => {
+  test('itinerary panel is visible after trip load', async ({ page }) => {
+    await mockRomeTrip(page);
     await page.goto('/');
     await waitForGlobe(page);
-    
-    await page.getByRole('button', { name: 'Load Demo', exact: true }).click();
     await waitForItinerary(page);
     
     const panel = page.locator('[data-testid="itinerary-panel"]');
@@ -36,10 +119,9 @@ test.describe('Itinerary Editing and Persistence', () => {
   });
 
   test('clicking day card does not crash app', async ({ page }) => {
+    await mockRomeTrip(page);
     await page.goto('/');
     await waitForGlobe(page);
-    
-    await page.getByRole('button', { name: 'Load Demo', exact: true }).click();
     await waitForItinerary(page);
     
     const dayCards = page.locator('[data-testid="day-card"]');
@@ -55,23 +137,21 @@ test.describe('Itinerary Editing and Persistence', () => {
     await expect(page.locator('[data-testid="navbar"]')).toBeVisible();
   });
 
-  test('itinerary shows header after demo load', async ({ page }) => {
+  test('itinerary shows planner header after trip load', async ({ page }) => {
+    await mockRomeTrip(page);
     await page.goto('/');
     await waitForGlobe(page);
-    
-    await page.getByRole('button', { name: 'Load Demo', exact: true }).click();
     await waitForItinerary(page);
     
     // Itinerary panel should show header
-    const header = page.getByText('Your Itinerary');
+    const header = page.getByText('Planner');
     await expect(header).toBeVisible();
   });
 
   test('itinerary items have book button on hover', async ({ page }) => {
+    await mockRomeTrip(page);
     await page.goto('/');
     await waitForGlobe(page);
-    
-    await page.getByRole('button', { name: 'Load Demo', exact: true }).click();
     await waitForItinerary(page);
     
     // Look for Book buttons in the itinerary items (visible on hover)
@@ -82,22 +162,18 @@ test.describe('Itinerary Editing and Persistence', () => {
     expect(count).toBeGreaterThanOrEqual(0); // May be 0 if no anchor experiences
   });
 
-  test('itinerary items show add button for each day', async ({ page }) => {
+  test('itinerary day cards do not show add-to-day buttons', async ({ page }) => {
+    await mockRomeTrip(page);
     await page.goto('/');
     await waitForGlobe(page);
-    
-    await page.getByRole('button', { name: 'Load Demo', exact: true }).click();
     await waitForItinerary(page);
-    
-    // Each day should have an "Add to Day" button
+
     const addButtons = page.getByRole('button', { name: /Add to Day/i });
-    
-    // At least one add button should exist
     const count = await addButtons.count();
-    expect(count).toBeGreaterThan(0);
+    expect(count).toBe(0);
   });
 
-  test('host panel locks booked items and keeps draft items removable', async ({ page }) => {
+  test('experiences tab locks booked items and keeps draft items removable', async ({ page }) => {
     await page.route('**/api/trips', async (route) => {
       await route.fulfill({
         status: 200,
@@ -182,12 +258,13 @@ test.describe('Itinerary Editing and Persistence', () => {
 
     await page.goto('/');
     await waitForGlobe(page);
+    await waitForItinerary(page);
 
-    await expect(page.getByText('1 Days')).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Local Hosts/i })).toBeVisible();
-
-    await page.getByRole('button', { name: 'Rome Day 1' }).click();
-    await page.waitForTimeout(200);
+    await page
+      .getByTestId('itinerary-panel-tabs')
+      .getByRole('button', { name: 'Experiences' })
+      .click();
+    await expect(page.getByText('Local Hosts')).toBeVisible();
 
     const bookedButton = page.getByRole('button', { name: 'Booked' }).first();
     const removeButton = page.getByRole('button', { name: 'Remove from Day' }).first();
@@ -196,5 +273,55 @@ test.describe('Itinerary Editing and Persistence', () => {
     await expect(bookedButton).toBeDisabled();
     await expect(removeButton).toBeVisible();
     await expect(removeButton).toBeEnabled();
+  });
+
+  test('mobile experiences tab uses dropdown day selector and updates add target day', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await mockRomeTripWithTwoDays(page);
+
+    await page.goto('/');
+    await waitForGlobe(page);
+    await waitForItinerary(page);
+
+    await page
+      .getByTestId('itinerary-panel-tabs')
+      .getByRole('button', { name: 'Experiences' })
+      .click();
+
+    const dayDropdown = page.locator('[data-testid="itinerary-panel"] select').first();
+    await expect(dayDropdown).toBeVisible();
+    await expect(page.getByRole('button', { name: /Add to Day 1/i }).first()).toBeVisible();
+
+    await dayDropdown.selectOption('day-rome-2');
+    await expect(page.getByRole('button', { name: /Add to Day 2/i }).first()).toBeVisible();
+  });
+
+  test('switching tabs preserves selected experience context and removes legacy list controls', async ({ page }) => {
+    await mockRomeTrip(page);
+
+    await page.goto('/');
+    await waitForGlobe(page);
+    await waitForItinerary(page);
+
+    await page
+      .getByTestId('itinerary-panel-tabs')
+      .getByRole('button', { name: 'Experiences' })
+      .click();
+    await expect(page.getByText('Maria Rossi').first()).toBeVisible();
+    await page.getByText('Sunset Cooking Class with Nonna Maria').first().click();
+    await expect(page.locator('[data-selected-experience-id="1"]')).toBeVisible();
+
+    await page
+      .getByTestId('itinerary-panel-tabs')
+      .getByRole('button', { name: 'Itinerary' })
+      .click();
+    await page
+      .getByTestId('itinerary-panel-tabs')
+      .getByRole('button', { name: 'Experiences' })
+      .click();
+
+    await expect(page.locator('[data-selected-experience-id="1"]')).toBeVisible();
+    await expect(page.getByTestId('planning-view-toggle')).toHaveCount(0);
+    await expect(page.getByTestId('map-popper')).toHaveCount(0);
   });
 });

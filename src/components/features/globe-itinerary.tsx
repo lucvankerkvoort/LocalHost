@@ -2,24 +2,18 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft01Icon, ArrowRight01Icon, MapsLocation01Icon } from 'hugeicons-react';
+import { ArrowLeft01Icon, ArrowRight01Icon } from 'hugeicons-react';
 import { 
   CityMarkerData,
   GlobeDestination, 
   PlaceMarkerData,
   RouteMarkerData,
-  TravelRoute, 
-  SAMPLE_DESTINATIONS, 
-  SAMPLE_ROUTES,
+  TravelRoute,
 } from '@/types/globe';
-import { ItineraryItem, createItem } from '@/types/itinerary';
-import { getHostsByCity } from '@/lib/data/hosts';
-import { CATEGORY_ICONS, CATEGORY_LABELS, ExperienceCategory } from '@/types';
-import { ExperienceDrawer } from './experience-drawer';
+import { ItineraryItem } from '@/types/itinerary';
+import type { HostExperience } from '@/lib/data/hosts';
 
-import { initThread, sendChatMessage } from '@/store/p2p-chat-slice';
 import { BookingDialog } from './booking-dialog';
 import { PaymentModal } from './payment/payment-modal';
 import { ItineraryDayColumn } from './itinerary-day';
@@ -29,24 +23,29 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   hydrateGlobeState,
   setDestinations,
-  setHostMarkers,
-  setItineraryData,
   setSelectedDestination,
   clearItinerary,
   setHoveredItemId,
   setActiveItemId,
   setFocusedItemId,
   setVisualTarget,
+  clearSelectedExperienceId,
+  clearSelectedHostId,
+  setSelectedExperienceId,
+  setSelectedHostId,
 } from '@/store/globe-slice';
 import { 
   fetchActiveTrip, 
   addExperienceToTrip, 
   removeExperienceFromTrip,
-  saveTripPlan 
 } from '@/store/globe-thunks';
-import { selectAllHosts, filterHostsByProximity, type HostWithLocation } from '@/store/hosts-slice';
+import { selectAllHosts, filterHostsByProximity } from '@/store/hosts-slice';
 import type { HostMarkerData } from '@/types/globe';
-import { openContactHost } from '@/store/ui-slice';
+import {
+  setItineraryCollapsed,
+  setItineraryPanelTab,
+  setShowTimeline,
+} from '@/store/ui-slice';
 
 // Dynamic import for Cesium (no SSR)
 const CesiumGlobe = dynamic(() => import('./cesium-globe'), { 
@@ -92,10 +91,43 @@ type GlobeItinerarySnapshot = {
   showTimeline: boolean;
   hostMarkers: HostMarkerData[];
   placeMarkers: PlaceMarkerData[];
-  selectedHost: HostMarkerData | null;
-  drawerOpen: boolean;
-  drawerCity: string;
-  selectedCategory: ExperienceCategory | 'all';
+  isItineraryCollapsed: boolean;
+  itineraryPanelTab: 'ITINERARY' | 'EXPERIENCES';
+  selectedHostId: string | null;
+  selectedExperienceId: string | null;
+};
+
+type PlanningExperienceSelection = {
+  hostId: string;
+  hostName: string;
+  hostLat?: number;
+  hostLng?: number;
+  hostCity?: string;
+  experience: HostExperience;
+};
+
+type BookingCandidate = {
+  id: string;
+  hostId: string;
+  experienceId: string;
+  dayNumber?: number;
+  date?: string | null;
+  timeSlot?: string | null;
+  experience: {
+    id: string;
+    title: string;
+    price: number;
+    duration: number;
+    rating?: number;
+    reviewCount?: number;
+    photos?: string[];
+  };
+  host: {
+    id: string;
+    name: string;
+    image?: string | null;
+  };
+  [key: string]: unknown;
 };
 
 type GlobeItineraryProps = {
@@ -115,10 +147,14 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   const allHosts = useAppSelector(selectAllHosts);
   const activeItemId = useAppSelector((state) => state.globe.activeItemId);
   const hoveredItemId = useAppSelector((state) => state.globe.hoveredItemId);
+  const selectedHostId = useAppSelector((state) => state.globe.selectedHostId);
+  const selectedExperienceId = useAppSelector((state) => state.globe.selectedExperienceId);
+  const showTimeline = useAppSelector((state) => state.ui.showTimeline);
+  const isCollapsed = useAppSelector((state) => state.ui.isItineraryCollapsed);
+  const itineraryPanelTab = useAppSelector((state) => state.ui.itineraryPanelTab);
 
   // Use prop ID if available (priority), otherwise state ID
   
-  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     dispatch(fetchActiveTrip(propTripId));
 
@@ -126,7 +162,6 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
         dispatch(clearItinerary());
     };
   }, [dispatch, propTripId]);
-  /* eslint-enable react-hooks/exhaustive-deps */
   
   const tripId = propTripId || tripIdState; 
 
@@ -142,16 +177,6 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   const bookedExperienceIds = useMemo(() => {
     return buildBookedExperienceIds(selectedDestData?.activities);
   }, [selectedDestData]);
-
-  const [showTimeline, setShowTimeline] = useState(true);
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  
-  // Localhost drawer state
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerCity, setDrawerCity] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<ExperienceCategory | 'all'>('all');
-  
-  const [selectedHost, setSelectedHost] = useState<HostMarkerData | null>(null);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -170,10 +195,10 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
       showTimeline,
       hostMarkers,
       placeMarkers,
-      selectedHost,
-      drawerOpen,
-      drawerCity,
-      selectedCategory,
+      isItineraryCollapsed: isCollapsed,
+      itineraryPanelTab,
+      selectedHostId,
+      selectedExperienceId,
     };
 
     const key = `${ITINERARY_STATE_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -195,10 +220,10 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     showTimeline,
     hostMarkers,
     placeMarkers,
-    selectedHost,
-    drawerOpen,
-    drawerCity,
-    selectedCategory,
+    isCollapsed,
+    itineraryPanelTab,
+    selectedHostId,
+    selectedExperienceId,
   ]);
 
   const restoreItineraryState = useCallback((restoreKey: string) => {
@@ -221,11 +246,11 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
           placeMarkers: snapshot.placeMarkers ?? [],
         })
       );
-      setShowTimeline(snapshot.showTimeline ?? true);
-      setSelectedHost(snapshot.selectedHost ?? null);
-      setDrawerOpen(snapshot.drawerOpen ?? false);
-      setDrawerCity(snapshot.drawerCity ?? '');
-      setSelectedCategory(snapshot.selectedCategory ?? 'all');
+      dispatch(setShowTimeline(snapshot.showTimeline ?? true));
+      dispatch(setItineraryCollapsed(snapshot.isItineraryCollapsed ?? false));
+      dispatch(setItineraryPanelTab(snapshot.itineraryPanelTab ?? 'ITINERARY'));
+      dispatch(setSelectedHostId(snapshot.selectedHostId ?? null));
+      dispatch(setSelectedExperienceId(snapshot.selectedExperienceId ?? null));
 
       return true;
     } catch (err) {
@@ -248,7 +273,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     if (!restoreKey) return;
 
     hasRestoredRef.current = true;
-    const restored = restoreItineraryState(restoreKey);
+      restoreItineraryState(restoreKey);
     sessionStorage.removeItem(ITINERARY_PENDING_KEY);
     sessionStorage.removeItem(restoreKey);
 
@@ -292,24 +317,13 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   // Booking State
   const [bookingDialogState, setBookingDialogState] = useState<{
     isOpen: boolean;
-    candidate: any | null;
+    candidate: BookingCandidate | null;
   }>({ isOpen: false, candidate: null });
 
   const [paymentModalState, setPaymentModalState] = useState<{
     isOpen: boolean;
     bookingId: string;
   }>({ isOpen: false, bookingId: '' });
-
-  // Load sample data for demo
-  const loadSampleData = () => {
-    dispatch(
-      setItineraryData({
-        destinations: SAMPLE_DESTINATIONS,
-        routes: SAMPLE_ROUTES,
-        selectedDestinationId: SAMPLE_DESTINATIONS[0]?.id ?? null,
-      })
-    );
-  };
 
   const handleViewHostProfile = useCallback((host: HostMarkerData) => {
     const restoreKey = persistItineraryState();
@@ -320,52 +334,80 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     router.push(`/hosts/${hostId}?returnTo=${encodeURIComponent(returnTo)}`);
   }, [persistItineraryState, router]);
 
+  const handleMapBackgroundClick = useCallback(() => {
+    dispatch(clearSelectedHostId());
+    dispatch(clearSelectedExperienceId());
+    dispatch(setActiveItemId(null));
+  }, [dispatch]);
 
+  const handleAddExperience = useCallback((selection: PlanningExperienceSelection) => {
+    const { experience } = selection;
+    dispatch(setSelectedExperienceId(experience.id));
+    dispatch(setShowTimeline(true));
+    dispatch(setItineraryCollapsed(false));
 
-
-  // Add Experience from Drawer
-  const handleAddExperience = (host: any, experience: any) => {
     if (bookedExperienceIds.has(experience.id)) {
       return;
     }
 
-    // Check if already added (Toggle Remove)
-    if (addedExperienceIds.has(experience.id)) {
-      if (!selectedDestination) return;
-      
-      const itemToRemove = selectedDestData?.activities.find(item => item.experienceId === experience.id);
-      
-      if (itemToRemove && tripId) {
-          dispatch(removeExperienceFromTrip({ tripId, itemId: itemToRemove.id }));
-      } else {
-          console.warn('Cannot remove: item not found or missing tripId');
-      }
-    } else {
-      // DIRECT ADD: Bypass proposal dialog
-        if (tripId && selectedDestination) {
-           dispatch(addExperienceToTrip({
-             tripId: tripId || null,
-             dayId: selectedDestData?.id, 
-             dayNumber: selectedDestData?.day || 1,
-             experience,
-             host
-           })).unwrap().then((result: any) => {
-               if (result.local) return;
-               
-               // If booking created, we can optionally start chat here or just notify
-               if (result && result.booking) {
-                   console.log("Experience added, booking created:", result.booking.id);
-                   // Optional: Start thread silently so it's ready?
-                   // dispatch(initThread({ ... }));
-               }
-           }).catch(err => {
-               console.error("Failed to add experience:", err);
-           });
-        } else {
-           console.warn('[GlobeItinerary] Cannot add experience: Missing tripId or selectedDestination');
-        }
+    if (!selectedDestData) {
+      console.warn('[GlobeItinerary] Cannot add experience: No selected day');
+      return;
     }
-  };
+
+    const hostPayload = {
+      id: selection.hostId,
+      name: selection.hostName,
+      city: selection.hostCity ?? selectedDestData.city ?? selectedDestData.name,
+      lat: selection.hostLat ?? selectedDestData.lat,
+      lng: selection.hostLng ?? selectedDestData.lng,
+    };
+
+    if (addedExperienceIds.has(experience.id)) {
+      const itemToRemove = selectedDestData.activities.find(
+        (item) => item.experienceId === experience.id
+      );
+
+      if (itemToRemove && tripId) {
+        dispatch(removeExperienceFromTrip({ tripId, itemId: itemToRemove.id }));
+      } else {
+        console.warn('Cannot remove: item not found or missing tripId');
+      }
+      return;
+    }
+
+    if (!selectedDestination) {
+      console.warn('[GlobeItinerary] Cannot add experience: Missing selected destination');
+      return;
+    }
+
+    dispatch(
+      addExperienceToTrip({
+        tripId: tripId || null,
+        dayId: selectedDestData.id,
+        dayNumber: selectedDestData.day || 1,
+        experience,
+        host: hostPayload,
+      })
+    )
+      .unwrap()
+      .then((result: { local?: boolean; booking?: { id: string } } | undefined) => {
+        if (result?.local) return;
+        if (result && result.booking) {
+          console.log('Experience added, booking created:', result.booking.id);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to add experience:', err);
+      });
+  }, [
+    addedExperienceIds,
+    bookedExperienceIds,
+    dispatch,
+    selectedDestData,
+    selectedDestination,
+    tripId,
+  ]);
 
   // Booking Handler
   const handleBookItem = async (dayId: string, item: ItineraryItem) => {
@@ -395,7 +437,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
 
     try {
       let candidateId = item.candidateId;
-      let candidateData = null;
+      let candidateData: BookingCandidate | null = null;
 
       // If no candidate yet, create one
       if (!candidateId) {
@@ -437,9 +479,12 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
           throw new Error('Failed to create booking candidate: ' + errorText);
         }
 
-        const data = await res.json();
+        const data = (await res.json()) as { candidate?: BookingCandidate };
         console.log('[GlobeItinerary] Candidate created:', data);
-        candidateData = data.candidate;
+        candidateData = data.candidate || null;
+        if (!candidateData) {
+          throw new Error('Booking candidate was not returned by API');
+        }
         candidateId = candidateData.id;
 
         // Update item with candidateId
@@ -464,8 +509,8 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
           params.set('tripId', tripId);
         }
         const res = await fetch(`/api/itinerary/candidates?${params.toString()}`);
-        const data = await res.json();
-        candidateData = data.candidates.find((c: any) => c.id === candidateId);
+        const data = (await res.json()) as { candidates?: BookingCandidate[] };
+        candidateData = data.candidates?.find((candidate) => candidate.id === candidateId) || null;
       }
 
       if (candidateData) {
@@ -568,69 +613,6 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
 
       await dispatch(fetchActiveTrip(tripId));
       alert('Payment submitted. Booking confirmation may take a few seconds to appear.');
-  };
-
-  // Itinerary Item Handlers
-  const handleEditItem = (dayId: string, updatedItem: ItineraryItem) => {
-    const nextDestinations = destinations.map(dest => {
-      if (dest.id === dayId) {
-        return {
-          ...dest,
-          activities: dest.activities.map(item => item.id === updatedItem.id ? updatedItem : item)
-        };
-      }
-      return dest;
-    });
-    dispatch(setDestinations(nextDestinations));
-  };
-
-  const handleDeleteItem = (dayId: string, itemId: string) => {
-    const nextDestinations = destinations.map(dest => {
-      if (dest.id === dayId) {
-        return {
-          ...dest,
-          activities: dest.activities.filter(item => item.id !== itemId)
-        };
-      }
-      return dest;
-    });
-    dispatch(setDestinations(nextDestinations));
-  };
-
-  const handleDragStart = (e: React.DragEvent, dayId: string, item: ItineraryItem) => {
-    e.dataTransfer.setData('application/json', JSON.stringify({ item, sourceDayId: dayId }));
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e: React.DragEvent, targetDayId: string) => {
-    e.preventDefault();
-    try {
-      const data = JSON.parse(e.dataTransfer.getData('application/json'));
-      const { item, sourceDayId } = data;
-      
-      if (sourceDayId === targetDayId) return; // Reordering within list not fully implemented here yet
-
-      // For now, mostly handling simple drops or just reordering
-      const nextDestinations = destinations.map(dest => {
-        if (dest.id === targetDayId) {
-          // Move to end if dropped on day (simplified)
-          if (!dest.activities.find(i => i.id === item.id)) {
-            return {
-              ...dest,
-              activities: [...dest.activities, { ...item, position: dest.activities.length }]
-            };
-          }
-        }
-        return dest;
-      });
-      dispatch(setDestinations(nextDestinations));
-       
-    } catch (err) {
-      console.error('Drop failed', err);
-    }
   };
 
   const cityMarkers = useMemo<CityMarkerData[]>(() => {
@@ -748,7 +730,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
       .sort((a, b) => a.day - b.day)[0];
 
     dispatch(setSelectedDestination(nextDay?.id ?? marker.dayIds[0]));
-    setSelectedHost(null);
+    dispatch(clearSelectedHostId());
   }, [destinations, dispatch, selectedDestination]);
 
   // Get hosts near the selected destination using proximity filtering
@@ -776,6 +758,38 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
       experienceCount: host.experiences.length,
     }));
   }, [selectedDestData, allHosts]);
+
+  const orderedDestinations = useMemo(
+    () => [...destinations].sort((a, b) => a.day - b.day),
+    [destinations]
+  );
+
+  const findHostMarker = useCallback((hostId: string): HostMarkerData | null => {
+    const nearby = nearbyHosts.find((host) => host.id === hostId || host.hostId === hostId);
+    if (nearby) return nearby;
+    return hostMarkers.find((host) => host.id === hostId || host.hostId === hostId) ?? null;
+  }, [hostMarkers, nearbyHosts]);
+
+  const handleHostSelection = useCallback((host: HostMarkerData) => {
+    dispatch(setSelectedHostId(host.hostId || host.id));
+    dispatch(clearSelectedExperienceId());
+    dispatch(setItineraryPanelTab('EXPERIENCES'));
+    dispatch(setShowTimeline(true));
+    dispatch(setItineraryCollapsed(false));
+  }, [dispatch]);
+
+  const handleFocusExperience = useCallback((selection: PlanningExperienceSelection) => {
+    const hostMarker = findHostMarker(selection.hostId);
+    dispatch(setSelectedHostId(selection.hostId));
+    dispatch(setSelectedExperienceId(selection.experience.id));
+
+    const focusLat = selection.hostLat ?? hostMarker?.lat ?? selectedDestData?.lat;
+    const focusLng = selection.hostLng ?? hostMarker?.lng ?? selectedDestData?.lng;
+
+    if (typeof focusLat === 'number' && typeof focusLng === 'number') {
+      dispatch(setVisualTarget({ lat: focusLat, lng: focusLng, height: 5000 }));
+    }
+  }, [dispatch, findHostMarker, selectedDestData?.lat, selectedDestData?.lng]);
 
   // --- List <-> Globe Sync Handlers ---
   
@@ -807,11 +821,20 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     }
   }, [dispatch, destinations]);
 
+  useEffect(() => {
+    if (selectedDestination || destinations.length === 0) return;
+    dispatch(setSelectedDestination(destinations[0].id));
+  }, [destinations, dispatch, selectedDestination]);
+
   return (
-    <div className="h-full w-full flex flex-col bg-[var(--deep-space-blue)]">
-      {/* Header */}
+    <div
+      className="h-full w-full flex flex-col bg-[var(--deep-space-blue)]"
+      data-itinerary-panel-tab={itineraryPanelTab}
+      data-selected-host-id={selectedHostId || ''}
+      data-selected-experience-id={selectedExperienceId || ''}
+    >
       {/* Floating Map Controls */}
-      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+      <div className="absolute top-4 right-4 z-[70] flex flex-col gap-2">
            {!tripId && (
               <button
                 onClick={() => {
@@ -824,16 +847,15 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
               </button>
            )}
            <button
-             onClick={loadSampleData}
+             data-testid="open-experiences-tab"
+             onClick={() => {
+               dispatch(setItineraryPanelTab('EXPERIENCES'));
+               dispatch(setShowTimeline(true));
+               dispatch(setItineraryCollapsed(false));
+             }}
              className="px-3 py-1.5 text-sm rounded-lg bg-[var(--background)]/80 backdrop-blur-md border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--background)] transition-colors shadow-sm"
            >
-             Load Demo
-           </button>
-           <button
-             onClick={() => setShowTimeline(!showTimeline)}
-             className="px-3 py-1.5 text-sm rounded-lg bg-[var(--background)]/80 backdrop-blur-md border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--background)] transition-colors shadow-sm"
-           >
-             {showTimeline ? 'Hide' : 'Show'} Timeline
+             Experiences
            </button>
       </div>
 
@@ -849,259 +871,189 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
             placeMarkers={placeMarkers}
             selectedDestination={selectedDestination}
             onCityMarkerClick={handleCityMarkerClick}
-            onHostClick={(host) => setSelectedHost(host)}
+            onHostClick={handleHostSelection}
+            onMapBackgroundClick={handleMapBackgroundClick}
             visualTarget={visualTarget}
             activeItemId={activeItemId}
             hoveredItemId={hoveredItemId}
             onItemHover={handleItemHover}
           />
-          
-          
-          {/* Left Itinerary Panel - Only show if destinations exist */}
-          <div 
-             data-testid="itinerary-panel"
-             className={`absolute top-0 left-0 bottom-0 z-10 transition-all duration-300 ease-in-out flex flex-col border-r border-white/10 ${
-               showTimeline && destinations.length > 0 ? (isCollapsed ? 'w-[60px]' : 'w-[360px]') : '-translate-x-full absolute'
-             } bg-[rgba(12,16,24,0.2)] backdrop-blur-[6px]`}
+          {/* Itinerary Panel / Mobile Drawer */}
+          <div
+            data-testid="itinerary-panel"
+            className={`z-10 transition-all duration-300 ease-in-out flex flex-col border-white/10 bg-[rgba(12,16,24,0.2)] backdrop-blur-[6px] ${
+              showTimeline && destinations.length > 0
+                ? 'fixed inset-x-0 bottom-0 top-16 border-t md:absolute md:inset-auto md:top-0 md:left-0 md:bottom-0 md:border-t-0 md:border-r'
+                : 'pointer-events-none translate-y-full md:-translate-x-full'
+            } ${isCollapsed ? 'md:w-[60px]' : 'md:w-[360px]'} `}
           >
-             {/* Sticky Header */}
-             <div className="p-4 border-b border-white/10 flex items-center justify-between bg-[rgba(12,16,24,0.2)] backdrop-blur-[6px] sticky top-0 z-20 h-[60px]">
-                {!isCollapsed ? (
-                    <>
-                        <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                           <span className="text-[var(--princeton-orange)]">●</span> Your Itinerary
-                        </h2>
-                        <div className="flex items-center gap-2">
-                            <div className="text-xs text-[var(--muted-foreground)]">
-                               {destinations.length} Days
-                            </div>
-                            <button 
-                                onClick={() => setIsCollapsed(true)}
-                                className="p-1 hover:bg-white/10 rounded-md text-white/70 transition-colors"
-                            >
-                                <ArrowLeft01Icon className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </>
-                ) : (
-                    <div className="flex flex-col items-center w-full gap-4">
-                        <button 
-                            onClick={() => setIsCollapsed(false)}
-                            className="p-1 hover:bg-white/10 rounded-md text-white/70 transition-colors"
-                        >
-                            <ArrowRight01Icon className="w-4 h-4" />
-                        </button>
+            {/* Header / Tabs */}
+            <div className="px-4 pt-3 pb-2 border-b border-white/10 sticky top-0 z-20 bg-[rgba(12,16,24,0.45)] backdrop-blur-[8px]">
+              {isCollapsed ? (
+                <div className="hidden md:flex items-center justify-center">
+                  <button
+                    onClick={() => dispatch(setItineraryCollapsed(false))}
+                    className="p-1 hover:bg-white/10 rounded-md text-white/70 transition-colors"
+                    aria-label="Expand itinerary panel"
+                  >
+                    <ArrowRight01Icon className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-base font-bold text-white flex items-center gap-2">
+                      <span className="text-[var(--princeton-orange)]">●</span> Planner
+                    </h2>
+                    <div className="hidden md:flex items-center gap-2">
+                      <div className="text-xs text-[var(--muted-foreground)]">{destinations.length} Days</div>
+                      <button
+                        onClick={() => dispatch(setItineraryCollapsed(true))}
+                        className="p-1 hover:bg-white/10 rounded-md text-white/70 transition-colors"
+                      >
+                        <ArrowLeft01Icon className="w-4 h-4" />
+                      </button>
                     </div>
-                )}
-             </div>
+                  </div>
 
-             {/* Scrollable Timeline List (Hidden when collapsed) */}
-             {!isCollapsed && (
-             <div 
+                  <div className="grid grid-cols-2 gap-2" data-testid="itinerary-panel-tabs">
+                    <button
+                      onClick={() => dispatch(setItineraryPanelTab('ITINERARY'))}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        itineraryPanelTab === 'ITINERARY'
+                          ? 'bg-[var(--princeton-orange)] text-white'
+                          : 'bg-white/5 text-white/80 hover:bg-white/10'
+                      }`}
+                    >
+                      Itinerary
+                    </button>
+                    <button
+                      onClick={() => dispatch(setItineraryPanelTab('EXPERIENCES'))}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        itineraryPanelTab === 'EXPERIENCES'
+                          ? 'bg-[var(--princeton-orange)] text-white'
+                          : 'bg-white/5 text-white/80 hover:bg-white/10'
+                      }`}
+                    >
+                      Experiences
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {isCollapsed ? null : itineraryPanelTab === 'ITINERARY' ? (
+              <div
                 className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent p-4 space-y-8"
                 ref={listRef}
                 onScroll={handleListScroll}
-             >
-                {destinations.length === 0 ? (
-                   <div className="text-center text-[var(--muted-foreground)] py-12">
-                      <p>No destinations yet.</p>
-                      <button onClick={loadSampleData} className="mt-4 text-[var(--princeton-orange)] hover:underline">
-                         Load Demo Data
-                      </button>
-                   </div>
-                ) : (
-                   destinations.map((day) => (
-                      <ItineraryDayColumn
-                         key={day.id}
-                         dayId={day.id}
-                         dayNumber={day.day}
-                         title={day.name}
-                         date={day.date}
-                         activities={day.activities}
-                         onAddActivity={(dayId) => {
-                            if (dayId) dispatch(setSelectedDestination(dayId));
-                            setDrawerCity(day.name);
-                            setDrawerOpen(true);
-                         }}
-                         isSpaceOptimized={false}
-                         isActive={day.id === selectedDestination}
-                         onSelect={() => handleDaySelect(day.id)}
-                         onItemClick={(item) => handleItemClick(
-                             item.id, 
-                             day.id, 
-                             item.place?.location?.lat, 
-                             item.place?.location?.lng
-                         )}
-                         onItemHover={(itemId) => handleItemHover(itemId)}
-                         onEditItem={(item) => handleEditItem(day.id, item)}
-                         onDeleteItem={(itemId) => handleDeleteItem(day.id, itemId)}
-                         onBookItem={(item) => handleBookItem(day.id, item)}
-                      />
-                   ))
-                )}
-             </div>
-             )}
-             
-             {isCollapsed && (
-                 <div className="flex-1 flex flex-col items-center py-4 gap-4 opacity-50">
-                     {/* Slim rail icons or indicators could go here */}
-                     {destinations.map(d => (
-                         <div key={d.id} className="w-1.5 h-1.5 rounded-full bg-white/20" />
-                     ))}
-                 </div>
-             )}
-
-             {/* Bottom Action */}
-             <div className="p-4 border-t border-white/10 bg-[rgba(12,16,24,0.2)] backdrop-blur-[6px]">
-                {!isCollapsed ? (
-                    <button
-                       onClick={() => {
-                            // Open drawer for the currently selected city or first city
-                            const targetCity = selectedDestData?.name || destinations[0]?.name || 'San Francisco';
-                            setDrawerCity(targetCity);
-                            setDrawerOpen(true);
-                       }}
-                       className="w-full py-2.5 bg-[var(--princeton-orange)] hover:bg-[var(--princeton-dark)] text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-orange-500/20 flex items-center justify-center gap-2"
-                    >
-                       <span>+ Add Activity</span>
-                    </button>
-                ) : (
-                    <button
-                        onClick={() => setIsCollapsed(false)}
-                        className="w-full flex justify-center py-2 text-[var(--princeton-orange)] hover:bg-white/5 rounded-md"
-                    >
-                        <span className="text-xl">+</span>
-                    </button>
-                )}
-             </div>
-          </div>
-          
-          {/* Host Selection Popup */}
-          {selectedHost && (
-            <div className="absolute bottom-4 left-4 z-10 bg-white rounded-xl shadow-lg border border-[var(--border)] p-4 max-w-xs animate-in slide-in-from-bottom-2">
-              <div className="flex items-start gap-3">
-                <img 
-                  src={selectedHost.photo || '/placeholder-host.jpg'} 
-                  alt={selectedHost.name}
-                  className="w-12 h-12 rounded-full object-cover flex-shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-[var(--foreground)] truncate">🏠 {selectedHost.name}</h3>
-                  <p className="text-sm text-[var(--muted-foreground)]">Local Host</p>
-                </div>
-                <button
-                  onClick={() => setSelectedHost(null)}
-                  className="text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={() => {
-                    if (selectedHost) {
-                       dispatch(openContactHost({ 
-                         hostId: selectedHost.hostId || selectedHost.id 
-                       }));
-                       setSelectedHost(null);
-                    }
-                  }}
-                  className="flex-1 px-3 py-2 border border-[var(--border)] text-[var(--foreground)] rounded-lg text-sm font-medium hover:bg-[var(--muted)] transition-colors"
-                >
-                  Message
-                </button>
-                <button
-                  onClick={() => selectedHost && handleViewHostProfile(selectedHost)}
-                  className="flex-1 px-3 py-2 border border-[var(--border)] text-[var(--foreground)] rounded-lg text-sm font-medium hover:bg-[var(--muted)] transition-colors"
-                >
-                  Profile
-                </button>
-                <button
-                  onClick={() => {
-                    if (selectedDestination) {
-                      handleAddExperience(
-                        { id: selectedHost.id, name: selectedHost.name },
-                        { id: `custom-${selectedHost.id}`, title: `Experience with ${selectedHost.name}`, category: 'local-host', price: 0 }
-                      );
-                      setSelectedHost(null);
-                    } else {
-                      alert('Please select a day on the map first!');
-                    }
-                  }}
-                  className="flex-1 px-3 py-2 bg-[var(--princeton-orange)] text-white rounded-lg text-sm font-medium hover:bg-[var(--princeton-dark)] transition-colors"
-                >
-                  Add to {selectedDestData ? `Day ${selectedDestData.day}` : 'Trip'}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-      {/* Host Panel - Right side (only show when trip exists) */}
-      {destinations.length > 0 && (
-        <HostPanel
-          hosts={nearbyHosts.length > 0 ? nearbyHosts : hostMarkers}
-          selectedHostId={selectedHost?.id}
-          selectedDayNumber={selectedDestData?.day}
-          addedExperienceIds={addedExperienceIds}
-          bookedExperienceIds={bookedExperienceIds}
-          onHostClick={(host) => setSelectedHost(host)}
-          onViewProfile={handleViewHostProfile}
-          onAddExperience={(host, experience) => {
-            if (selectedDestination) {
-              handleAddExperience(
-                { id: host.id, name: host.name },
-                experience
-              );
-            } else {
-              alert('Please select a day on the map first!');
-            }
-          }}
-        />
-      )}
-    </div>
-
-    {/* Timeline */}
-      {showTimeline && destinations.length > 0 && (
-        <div className="flex-shrink-0 bg-[var(--background)] border-t border-[var(--border)] p-4">
-          <div className="flex gap-4 overflow-x-auto pb-2">
-            {destinations.map((dest) => (
-              <button
-                key={dest.id}
-                onClick={() => dispatch(setSelectedDestination(dest.id))}
-                className={`flex-shrink-0 px-4 py-2 rounded-lg border-2 transition-all ${
-                  selectedDestination === dest.id
-                    ? 'border-[var(--princeton-orange)] bg-[var(--princeton-orange)]/10'
-                    : 'border-[var(--border)] hover:border-[var(--blue-green)]'
-                }`}
               >
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: dest.color }}
-                  />
-                  <span className="font-medium text-[var(--foreground)]">
-                    Day {dest.day}: {dest.name}
-                  </span>
+                {orderedDestinations.length === 0 ? (
+                  <div className="text-center text-[var(--muted-foreground)] py-12">
+                    <p>No destinations yet.</p>
+                  </div>
+                ) : (
+                  orderedDestinations.map((day) => (
+                    <ItineraryDayColumn
+                      key={day.id}
+                      dayNumber={day.day}
+                      title={day.name}
+                      date={day.date}
+                      activities={day.activities}
+                      isActive={day.id === selectedDestination}
+                      onSelect={() => handleDaySelect(day.id)}
+                      onItemClick={(item) =>
+                        handleItemClick(
+                          item.id,
+                          day.id,
+                          item.place?.location?.lat,
+                          item.place?.location?.lng
+                        )
+                      }
+                      onItemHover={(itemId) => handleItemHover(itemId)}
+                      onBookItem={(item) => handleBookItem(day.id, item)}
+                    />
+                  ))
+                )}
+              </div>
+            ) : (
+              <div className="flex-1 min-h-0 flex flex-col p-3 gap-3">
+                {/* Desktop day chips */}
+                <div className="hidden sm:flex gap-2 overflow-x-auto pb-1">
+                  {orderedDestinations.map((day) => (
+                    <button
+                      key={day.id}
+                      onClick={() => dispatch(setSelectedDestination(day.id))}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                        selectedDestination === day.id
+                          ? 'bg-[var(--princeton-orange)] text-white'
+                          : 'bg-white/10 text-white/80 hover:bg-white/15'
+                      }`}
+                    >
+                      Day {day.day}
+                    </button>
+                  ))}
                 </div>
-              </button>
-            ))}
+
+                {/* Mobile day dropdown */}
+                <div className="sm:hidden">
+                  <label className="text-xs text-white/70 mb-1 block">Add to day</label>
+                  <select
+                    value={selectedDestination ?? ''}
+                    onChange={(event) => dispatch(setSelectedDestination(event.target.value))}
+                    className="w-full rounded-lg border border-white/15 bg-[rgba(10,14,22,0.8)] text-white text-sm px-3 py-2"
+                  >
+                    {orderedDestinations.map((day) => (
+                      <option key={day.id} value={day.id}>
+                        Day {day.day}: {day.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex-1 min-h-0">
+                  <HostPanel
+                    variant="sheet"
+                    hosts={nearbyHosts.length > 0 ? nearbyHosts : hostMarkers}
+                    selectedHostId={selectedHostId}
+                    selectedDayNumber={selectedDestData?.day}
+                    addedExperienceIds={addedExperienceIds}
+                    bookedExperienceIds={bookedExperienceIds}
+                    onHostClick={handleHostSelection}
+                    onFocusExperience={(host, experience, marker) => {
+                      handleFocusExperience({
+                        hostId: host.id,
+                        hostName: host.name,
+                        hostCity: host.city,
+                        hostLat: marker?.lat,
+                        hostLng: marker?.lng,
+                        experience,
+                      });
+                    }}
+                    onViewProfile={handleViewHostProfile}
+                    onAddExperience={(host, experience, marker) => {
+                      if (!selectedDestination) {
+                        alert('Please select a day on the map first!');
+                        return;
+                      }
+                      handleAddExperience({
+                        hostId: host.id,
+                        hostName: host.name,
+                        hostCity: host.city,
+                        hostLat: marker?.lat,
+                        hostLng: marker?.lng,
+                        experience,
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
-      )}
 
-      {/* Experience Drawer */}
-      <ExperienceDrawer
-        isOpen={drawerOpen}
-        dayId={selectedDestination || ''}
-        city={drawerCity}
-        onClose={() => setDrawerOpen(false)}
-        onAddExperience={handleAddExperience}
-      />
+      </div>
 
-
-      
       {/* Booking Dialog */}
       {bookingDialogState.candidate && (
         <BookingDialog
