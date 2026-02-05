@@ -17,3 +17,9 @@
 ## Orchestrator job stuck
 1) Confirm `/api/orchestrator?jobId=...` returns progress.
 2) Check server logs for tool failures.
+
+## Can't log in on Netlify
+1) In Netlify env vars, set `AUTH_SECRET` (required).
+2) Set `AUTH_TRUST_HOST=true` so Auth.js trusts forwarded host headers.
+3) Set `AUTH_URL` to your deployed site URL (for example `https://your-site.netlify.app`).
+4) Redeploy the site after changing env vars.
