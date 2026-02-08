@@ -63,7 +63,7 @@ test.describe('Itinerary Editing and Persistence', () => {
     await waitForItinerary(page);
     
     // Itinerary panel should show header
-    const header = page.getByText('Your Itinerary');
+    const header = page.getByText('Planner');
     await expect(header).toBeVisible();
   });
 
@@ -184,9 +184,11 @@ test.describe('Itinerary Editing and Persistence', () => {
     await waitForGlobe(page);
 
     await expect(page.getByText('1 Days')).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Local Hosts/i })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Rome Day 1' }).click();
+    await page.getByTestId('open-experiences-tab').click();
+    await expect(page.getByRole('heading', { name: /Experiences/i })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Day 1', exact: true }).click();
     await page.waitForTimeout(200);
 
     const bookedButton = page.getByRole('button', { name: 'Booked' }).first();

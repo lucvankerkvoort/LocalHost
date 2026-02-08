@@ -1,7 +1,7 @@
 'use client';
 
 import { Airplane01Icon, Location01Icon, Calendar01Icon, ArrowRight01Icon } from 'hugeicons-react';
-import { Trip, TripStop } from '@prisma/client';
+import { Trip, TripAnchor } from '@prisma/client';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { useState } from 'react';
@@ -9,7 +9,7 @@ import { deleteTrip } from '@/actions/trips';
 import { useRouter } from 'next/navigation';
 
 type TripWithStops = Trip & {
-  stops: TripStop[];
+  stops: TripAnchor[];
 };
 
 interface TripCardProps {
@@ -20,8 +20,9 @@ export function TripCard({ trip }: TripCardProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Determine display location
-  const city = trip.stops[0]?.city || 'Unknown Destination';
+  // Determine display location from first anchor
+  const firstStop = trip.stops[0];
+  const city = firstStop?.title || (firstStop?.locations as any)?.[0]?.name || 'Unknown Destination';
   
   // Format dates if available
   const dateRange = trip.startDate 

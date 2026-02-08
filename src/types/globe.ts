@@ -31,11 +31,24 @@ export interface RouteMarkerData {
   dayNumber?: number; // Day this marker belongs to (for filtering)
 }
 
-export interface GlobeDestination {
-  id: string;
+export type AnchorType = 'CITY' | 'REGION' | 'ROAD_TRIP' | 'TRAIL';
+
+export interface AnchorLocation {
   name: string;
   lat: number;
   lng: number;
+  placeId?: string;
+}
+
+export interface GlobeDestination {
+  id: string;
+  name: string; // The Anchor Title
+  lat: number;  // Center/Primary Latitude
+  lng: number;  // Center/Primary Longitude
+  
+  type?: AnchorType;
+  locations?: AnchorLocation[];
+  
   day: number;
   date?: string;
   activities: ItineraryItem[];
@@ -105,6 +118,8 @@ export const SAMPLE_DESTINATIONS: GlobeDestination[] = [
     name: 'Tokyo',
     lat: 35.6762,
     lng: 139.6503,
+    type: 'CITY',
+    locations: [{ name: 'Tokyo', lat: 35.6762, lng: 139.6503 }],
     day: 1,
     activities: [
       createItem('TRANSPORT', 'Arrive at Narita', 0),
@@ -118,6 +133,8 @@ export const SAMPLE_DESTINATIONS: GlobeDestination[] = [
     name: 'Kyoto',
     lat: 35.0116,
     lng: 135.7681,
+    type: 'CITY',
+    locations: [{ name: 'Kyoto', lat: 35.0116, lng: 135.7681 }],
     day: 3,
     activities: [
       createItem('SIGHT', 'Fushimi Inari', 0),
@@ -131,6 +148,8 @@ export const SAMPLE_DESTINATIONS: GlobeDestination[] = [
     name: 'Osaka',
     lat: 34.6937,
     lng: 135.5023,
+    type: 'CITY',
+    locations: [{ name: 'Osaka', lat: 34.6937, lng: 135.5023 }],
     day: 5,
     activities: [
       createItem('SIGHT', 'Dotonbori', 0),

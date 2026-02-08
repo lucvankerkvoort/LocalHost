@@ -12,6 +12,10 @@ import reducer, {
   hydrateGlobeState,
   setDestinations,
   setSelectedDestination,
+  setSelectedHostId,
+  clearSelectedHostId,
+  setSelectedExperienceId,
+  clearSelectedExperienceId,
   setActiveItemId,
   setFocusedItemId,
   setItineraryData,
@@ -30,6 +34,8 @@ function makeDestination(id: string, day: number): GlobeDestination {
     day,
     activities: [createItem('SIGHT', `Stop ${day}`, 0)],
     color: '#023047',
+    type: 'CITY',
+    locations: [{ name: `Day ${day}`, lat: 10 + day, lng: 20 + day }],
   };
 }
 
@@ -127,7 +133,14 @@ test('clearItinerary clears destinations, routes, markers and selected destinati
     withHost,
     addPlaceMarker({ id: 'p-1', name: 'Place 1', lat: 1, lng: 1, confidence: 1 })
   );
-  const cleared = reducer(withPlace, clearItinerary());
+  const withSelections = reducer(
+    reducer(
+      reducer(withPlace, setSelectedHostId('host-1')),
+      setSelectedExperienceId('exp-1')
+    ),
+    setActiveItemId('item-1')
+  );
+  const cleared = reducer(withSelections, clearItinerary());
 
   assert.deepEqual(cleared.destinations, []);
   assert.deepEqual(cleared.routes, []);
@@ -136,6 +149,25 @@ test('clearItinerary clears destinations, routes, markers and selected destinati
   assert.equal(cleared.visualTarget, null);
   assert.deepEqual(cleared.hostMarkers, []);
   assert.deepEqual(cleared.placeMarkers, []);
+  assert.equal(cleared.selectedHostId, null);
+  assert.equal(cleared.selectedExperienceId, null);
+  assert.equal(cleared.activeItemId, null);
+});
+
+test('setSelectedHostId and clearSelectedHostId update selection', () => {
+  const selected = reducer(getInitialState(), setSelectedHostId('host-9'));
+  const cleared = reducer(selected, clearSelectedHostId());
+
+  assert.equal(selected.selectedHostId, 'host-9');
+  assert.equal(cleared.selectedHostId, null);
+});
+
+test('setSelectedExperienceId and clearSelectedExperienceId update selection', () => {
+  const selected = reducer(getInitialState(), setSelectedExperienceId('exp-9'));
+  const cleared = reducer(selected, clearSelectedExperienceId());
+
+  assert.equal(selected.selectedExperienceId, 'exp-9');
+  assert.equal(cleared.selectedExperienceId, null);
 });
 
 test('setActiveItemId also sets focusedItemId to active id', () => {
@@ -364,4 +396,21 @@ test('toolCallReceived(resolve_place) ignores markers too far from anchor', () =
   );
 
   assert.equal(state.placeMarkers.length, 0);
+});
+
+test('hydrateGlobeState deduplicates routeMarkers based on id', () => {
+  const state = reducer(
+    getInitialState(),
+    hydrateGlobeState({
+      routeMarkers: [
+        { id: 'rm-1', routeId: 'r-1', kind: 'start', lat: 10, lng: 10 },
+        { id: 'rm-1', routeId: 'r-1', kind: 'start', lat: 20, lng: 20 },
+        { id: 'rm-2', routeId: 'r-1', kind: 'end', lat: 30, lng: 30 },
+      ] as any, // Cast as any because RouteMarkerData might have other optional fields, but id is key
+    })
+  );
+
+  assert.equal(state.routeMarkers.length, 2);
+  assert.equal(state.routeMarkers[0].id, 'rm-1');
+  assert.equal(state.routeMarkers[1].id, 'rm-2');
 });

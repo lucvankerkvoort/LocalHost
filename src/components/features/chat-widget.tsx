@@ -26,18 +26,19 @@ import {
   resolveHostOnboardingStage,
   shouldStartHostOnboardingHandshake,
 } from './chat-widget-handshake';
-import { 
-  UserSearch01Icon, 
-  House01Icon, 
-  BubbleChatIcon, 
-  Cancel01Icon, 
-  ArrowDown01Icon, 
-  ArrowRight01Icon, 
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  UserSearch01Icon,
+  House01Icon,
+  BubbleChatIcon,
+  Cancel01Icon,
+  ArrowDown01Icon,
+  ArrowRight01Icon,
   ReloadIcon,
   Location01Icon,
   Wrench01Icon,
   SentIcon
-} from 'hugeicons-react';
+} from '@hugeicons/core-free-icons';
 
 interface HostMatch {
   id: string;
@@ -116,7 +117,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
   const intent = getChatIntent(pathname, intentOverride);
   const uiConfig = INTENT_UI_CONFIG[intent];
   const hostCreationState = useAppSelector(selectHostCreation);
-  
+  const activeTripId = useAppSelector((state) => state.globe.tripId);
   // Stable chat ID per intent/session (draft-specific for host onboarding)
   const chatId = getChatId(intent, pathname);
 
@@ -126,7 +127,6 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
   const seenToolEventsRef = useRef<Set<string>>(new Set());
   const handshakeTriggeredRef = useRef<Set<string>>(new Set());
   const dispatch = useAppDispatch();
-  const activeTripId = useAppSelector((state) => state.globe.tripId);
   const routeDraftId = getHostDraftIdFromPath(pathname);
   const isDraftReady =
     intent !== 'become_host'
@@ -144,17 +144,17 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
     longDesc: hostCreationState.longDesc,
     duration: hostCreationState.duration,
   });
-  
+
   // Use the chatId to maintain separate conversations per intent
   const { messages, sendMessage, status, error } = useChat({ id: chatId }) as any;
   const isLoading = status === 'submitted' || status === 'streaming';
-  
+
   const [localInput, setLocalInput] = useState('');
-  
+
   // Track if user is near the bottom (within threshold)
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  
+
   // Draggable position state
   const [panelPosition, setPanelPosition] = useState<Position>(DEFAULT_POSITION);
 
@@ -211,6 +211,29 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
     sendMessage,
   ]);
 
+  // Auto-open/close on specific routes
+  useEffect(() => {
+    // Define "Globe Pages" where chat should be auto-opened
+    // Only open on specific Trip or Draft pages, not on the list/root pages.
+    const isTripPage = pathname.startsWith('/trips/') && pathname.length > '/trips/'.length;
+    const isHostDraftPage = pathname.startsWith('/become-host/') && pathname.length > '/become-host/'.length;
+    
+    const isAutoOpenPage = isTripPage || isHostDraftPage;
+
+    if (isAutoOpenPage) {
+      setIsOpen(true);
+    }
+
+    // Cleanup: If we are leaving an auto-open page, close the chat.
+    // This preserves manual open state on other pages (user opens on Home -> navigates to About -> stays open).
+    // But (Trips -> Home) -> closes.
+    return () => {
+      if (isAutoOpenPage) {
+        setIsOpen(false);
+      }
+    };
+  }, [pathname]);
+
   // Load saved position from localStorage on mount
   useEffect(() => {
     try {
@@ -253,10 +276,10 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
   // Handle scroll events to track user position
   const handleScroll = () => {
     if (!messagesContainerRef.current) return;
-    
+
     const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
     const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-    
+
     setShouldAutoScroll(isNearBottom);
     setShowScrollButton(!isNearBottom);
   };
@@ -274,10 +297,10 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
   const handleLocalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!localInput.trim() || isLoading) return;
-    
+
     const text = localInput.trim();
     setLocalInput('');
-    
+
     // Send message with intent - sendMessage expects { text: string }
     if (sendMessage) {
         await sendMessage({ text }, { body: chatRequestBody() });
@@ -287,7 +310,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
   // Auto-scroll on new messages
   useEffect(() => {
     if (!shouldAutoScroll) return;
-    
+
     const container = messagesContainerRef.current;
     if (container) {
       // Use requestAnimationFrame for smoother scrolling without blocking UI
@@ -312,7 +335,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
   // Handle tool results - dispatch tool events for shared reducers
   useEffect(() => {
     const lastMessage = messages[messages.length - 1] as any;
-    
+
     // Debug: Log messages and tool invocations
     if (lastMessage) {
       console.log('[ChatWidget] Last message:', {
@@ -321,7 +344,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
         toolCount: lastMessage.toolInvocations?.length || 0,
         toolNames: lastMessage.toolInvocations?.map((t: any) => t.toolName) || [],
       });
-      
+
       if (lastMessage.toolInvocations) {
         for (const tool of lastMessage.toolInvocations) {
           console.log('[ChatWidget] Tool:', {
@@ -332,7 +355,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
         }
       }
     }
-    
+
     const parts = lastMessage?.parts;
     const hasToolParts =
       Array.isArray(parts) &&
@@ -360,7 +383,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
     const handleCustomMessage = (e: Event) => {
       const customEvent = e as CustomEvent<string>;
       const text = customEvent.detail;
-      
+
       if (text) {
         setIsOpen(true);
         // Small delay to ensure widget animation starts
@@ -379,7 +402,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
   // Extract host matches from messages
   const getHostMatches = (message: any): HostMatch[] => {
     if (!message.parts) return [];
-    
+
     for (const part of message.parts) {
       if (part.type === 'tool-matchHosts' && 'state' in part && part.state === 'output-available' && 'output' in part) {
         const result = part.output as { success: boolean; matches?: HostMatch[] };
@@ -409,9 +432,9 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
         aria-label={isOpen ? 'Close chat' : 'Open chat'}
       >
         {isOpen ? (
-          <Cancel01Icon className="w-6 h-6 text-white" />
+          <HugeiconsIcon icon={Cancel01Icon} className="w-6 h-6 text-white" />
         ) : (
-          <BubbleChatIcon className="w-6 h-6 text-white" />
+          <HugeiconsIcon icon={BubbleChatIcon} className="w-6 h-6 text-white" />
         )}
       </button>
 
@@ -425,13 +448,13 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
           <div ref={containerRef} style={containerStyle}>
             <div className="w-[380px] max-w-[calc(100vw-48px)] bg-[var(--background)] rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden">
               {/* Draggable Header - ONLY this element has drag listeners */}
-              <div 
+              <div
                 {...dragHandleProps}
                 className={`bg-gradient-to-r from-[var(--princeton-orange)] to-[var(--blue-green)] px-5 py-4 select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
               >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                    <uiConfig.Icon className="w-6 h-6 text-white" />
+                    <HugeiconsIcon icon={uiConfig.Icon} className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1">
                     <h3 className="text-white font-semibold">{uiConfig.title}</h3>
@@ -448,7 +471,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                       className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
                       title="Reset position"
                     >
-                      <ReloadIcon className="w-4 h-4 text-white" />
+                      <HugeiconsIcon icon={ReloadIcon} className="w-4 h-4 text-white" />
                     </button>
                   )}
                 </div>
@@ -457,7 +480,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
 
               {/* Messages Container - relative wrapper for scroll button positioning */}
               <div className="relative" onClick={(e) => e.stopPropagation()}>
-                <div 
+                <div
                   ref={messagesContainerRef}
                   data-testid="chat-messages"
                   onScroll={handleScroll}
@@ -470,7 +493,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                     <p className="text-xs mt-2">{uiConfig.emptyStateHint}</p>
                   </div>
                 )}
-                
+
                 {messages.map((message: any) => {
                   // Debug: log full parts structure for first few renders only
                   if (message.parts?.length > 0) {
@@ -481,11 +504,11 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                       state: p.state,
                     })));
                   }
-                  
+
                   // Extract text content from parts
                   let textContent = '';
                   const toolCalls: any[] = [];
-                  
+
                   if (message.parts && Array.isArray(message.parts)) {
                     for (const part of message.parts) {
                       if (part.type === 'text' && part.text) {
@@ -500,7 +523,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                       }
                     }
                   }
-                  
+
                   // Fallback: check message.content directly
                   if (!textContent && typeof message.content === 'string') {
                     textContent = message.content;
@@ -512,9 +535,9 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                   if (isHiddenHandshakeMessage) {
                     return null;
                   }
-                  
+
                   const hostMatches = message.role === 'assistant' ? getHostMatches(message) : [];
-                  
+
                   // Show something even if only tool calls (no text)
                   const hasToolCalls = toolCalls.length > 0;
                   const hasNonCompletionToolCall = toolCalls.some((toolCall) => toolCall.name !== 'completeProfile');
@@ -527,11 +550,11 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                     ? getHostToolOnlyFallbackQuestion(onboardingStage)
                     : textContent;
                   const showMessage = displayContent || hasToolCalls;
-                  
+
                   if (!showMessage && message.role === 'assistant') {
                     return null; // Skip empty assistant messages
                   }
-                  
+
                   return (
                     <div key={message.id}>
                       {displayContent && (
@@ -540,7 +563,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                           content={displayContent}
                         />
                       )}
-                      
+
                       {/* Tool Call Status Display */}
                       {hasToolCalls && !textContent && (
                         <div className="flex justify-start mb-2">
@@ -549,7 +572,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                               {toolCalls.map((tc, i) => (
                                 <div key={i} className="flex items-center gap-2">
                                   <span className={`w-2 h-2 rounded-full ${tc.state === 'result' || tc.state === 'output-available' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
-                                  <Wrench01Icon className="w-4 h-4 text-[var(--foreground)]" />
+                                  <HugeiconsIcon icon={Wrench01Icon} className="w-4 h-4 text-[var(--foreground)]" />
                                   <span className="font-medium text-[var(--foreground)]">{tc.name}</span>
                                   {tc.output?.message && <span className="text-[var(--foreground)]">- {tc.output.message}</span>}
                                 </div>
@@ -558,7 +581,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                           </div>
                         </div>
                       )}
-                      
+
                       {/* Host Match Cards */}
                       {hostMatches.length > 0 && (
                         <div className="mt-3 space-y-2">
@@ -577,11 +600,11 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                                 <div className="flex-1 min-w-0">
                                   <h4 className="font-medium text-[var(--foreground)] text-sm">{host.name}</h4>
                                   <p className="flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
-                                    <Location01Icon className="w-3 h-3" />
+                                    <HugeiconsIcon icon={Location01Icon} className="w-3 h-3" />
                                     {host.city}, {host.country}
                                   </p>
                                 </div>
-                                <ArrowRight01Icon className="w-4 h-4 text-[var(--muted)]" />
+                                <HugeiconsIcon icon={ArrowRight01Icon} className="w-4 h-4 text-[var(--muted)]" />
                               </div>
                               <p className="text-xs text-[var(--muted-foreground)] mt-2 italic line-clamp-1">"{host.quote}"</p>
                               <div className="flex flex-wrap gap-1 mt-2">
@@ -598,7 +621,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                     </div>
                   );
                 })}
-                
+
                 {isLoading && (
                   <div className="flex justify-start">
                     <div className="bg-[var(--card-background)] border border-[var(--border)] px-4 py-3 rounded-2xl rounded-bl-md">
@@ -616,10 +639,10 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                     Something went wrong. Please try again.
                   </div>
                 )}
-                
+
                   <div ref={messagesEndRef} />
                 </div>
-                
+
                 {/* Scroll to bottom button */}
                 {showScrollButton && (
                   <button
@@ -627,7 +650,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                     className="absolute bottom-3 left-1/2 -translate-x-1/2 w-8 h-8 bg-[var(--card-background)] border border-[var(--border)] rounded-full shadow-lg flex items-center justify-center hover:bg-[var(--muted)] transition-all duration-200 animate-fade-in z-10"
                     aria-label="Scroll to bottom"
                   >
-                    <ArrowDown01Icon className="w-4 h-4 text-[var(--foreground)]" />
+                    <HugeiconsIcon icon={ArrowDown01Icon} className="w-4 h-4 text-[var(--foreground)]" />
                   </button>
                 )}
               </div>
@@ -650,7 +673,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                     disabled={isLoading || !localInput.trim()}
                     className="w-10 h-10 bg-[var(--princeton-orange)] rounded-full flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--blue-green)] transition-colors"
                   >
-                    <SentIcon className="w-5 h-5 text-white" />
+                    <HugeiconsIcon icon={SentIcon} className="w-5 h-5 text-white" />
                   </button>
                 </div>
               </form>

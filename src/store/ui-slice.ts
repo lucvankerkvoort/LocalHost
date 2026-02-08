@@ -6,6 +6,8 @@ interface UIState {
   contactHostId: string | null;
   contactExperienceId: string | null;
   showTimeline: boolean;
+  isItineraryCollapsed: boolean;
+  itineraryPanelTab: 'ITINERARY' | 'EXPERIENCES';
 }
 
 const initialState: UIState = {
@@ -13,6 +15,8 @@ const initialState: UIState = {
   contactHostId: null,
   contactExperienceId: null,
   showTimeline: true,
+  isItineraryCollapsed: false,
+  itineraryPanelTab: 'ITINERARY',
 };
 
 export const uiSlice = createSlice({
@@ -35,6 +39,12 @@ export const uiSlice = createSlice({
     },
     toggleTimeline: (state) => {
       state.showTimeline = !state.showTimeline;
+    },
+    setItineraryCollapsed: (state, action: PayloadAction<boolean>) => {
+      state.isItineraryCollapsed = action.payload;
+    },
+    setItineraryPanelTab: (state, action: PayloadAction<UIState['itineraryPanelTab']>) => {
+      state.itineraryPanelTab = action.payload;
     }
   },
 });
@@ -44,7 +54,9 @@ export const {
   openContactHost, 
   closeContactHost,
   setShowTimeline,
-  toggleTimeline
+  toggleTimeline,
+  setItineraryCollapsed,
+  setItineraryPanelTab
 } = uiSlice.actions;
 
 export const selectUI = (state: RootState) => state.ui;

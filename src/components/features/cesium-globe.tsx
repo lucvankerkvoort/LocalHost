@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState, useMemo } from 'react';
-import { CityMarkerData, GlobeDestination, HostMarkerData, PlaceMarkerData, RouteMarkerData } from '@/types/globe';
+import { CityMarkerData, GlobeDestination, HostMarkerData, PlaceMarkerData, RouteMarkerData, TravelRoute } from '@/types/globe';
 
 // Set Cesium base URL BEFORE importing Cesium
 if (typeof window !== 'undefined') {
@@ -11,6 +11,7 @@ if (typeof window !== 'undefined') {
 // Now import Cesium and Resium
 import { Viewer, Entity } from 'resium';
 import { 
+  ArcType,
   Cartesian2,
   Cartesian3, 
   Color, 
@@ -19,6 +20,7 @@ import {
   ScreenSpaceEventType,
   UrlTemplateImageryProvider,
   VerticalOrigin,
+  Rectangle,
   defined,
 } from 'cesium';
 import type { Viewer as CesiumViewer, Entity as CesiumEntity } from 'cesium';
@@ -76,19 +78,20 @@ function getPlaceMarkerColor(marker: PlaceMarkerData): string {
   return PLACE_MARKER_DEFAULT_COLOR;
 }
 
-interface CesiumGlobeProps {
-  destinations: GlobeDestination[];
-  cityMarkers: CityMarkerData[];
-  hostMarkers?: HostMarkerData[];
-  placeMarkers?: PlaceMarkerData[];
-  routeMarkers?: RouteMarkerData[];
-  selectedDestination?: string | null;
-  onCityMarkerClick?: (marker: CityMarkerData) => void;
-  onHostClick?: (host: HostMarkerData) => void;
-  visualTarget?: { lat: number; lng: number; height?: number } | null;
-  activeItemId?: string | null;
-  hoveredItemId?: string | null;
-  onItemHover?: (itemId: string | null) => void;
+function getBoundingRectangle(locations: { lat: number; lng: number }[]) {
+  if (!locations || locations.length < 2) return null;
+  
+  let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+  locations.forEach(loc => {
+    minLat = Math.min(minLat, loc.lat);
+    maxLat = Math.max(maxLat, loc.lat);
+    minLng = Math.min(minLng, loc.lng);
+    maxLng = Math.max(maxLng, loc.lng);
+  });
+  
+  // Add some padding
+  const padding = 0.5; 
+  return Rectangle.fromDegrees(minLng - padding, minLat - padding, maxLng + padding, maxLat + padding);
 }
 
 // Helper to create circular avatar image from URL
@@ -151,15 +154,36 @@ function createCircularAvatar(imageUrl: string, size: number = 48): Promise<stri
   });
 }
 
+interface CesiumGlobeProps {
+  destinations: GlobeDestination[];
+  cityMarkers: CityMarkerData[];
+  hostMarkers?: HostMarkerData[];
+  placeMarkers?: PlaceMarkerData[];
+  routeMarkers?: RouteMarkerData[];
+  routes?: TravelRoute[];
+  selectedDestination?: string | null;
+  onCityMarkerClick?: (marker: CityMarkerData) => void;
+  onHostClick?: (host: HostMarkerData) => void;
+  onMapBackgroundClick?: () => void;
+  visualTarget?: { lat: number; lng: number; height?: number } | null;
+  activeItemId?: string | null;
+  hoveredItemId?: string | null;
+  onItemHover?: (itemId: string | null) => void;
+}
+
+// ... (existing code)
+
 export default function CesiumGlobe({
   destinations,
   cityMarkers,
   hostMarkers = [],
   placeMarkers = [],
   routeMarkers = [],
+  routes = [],
   selectedDestination,
   onCityMarkerClick,
   onHostClick,
+  onMapBackgroundClick,
   visualTarget,
   activeItemId,
   hoveredItemId,
@@ -262,13 +286,20 @@ export default function CesiumGlobe({
       onItemHover?.(null); // Clear item hover if not over a marker
     }, ScreenSpaceEventType.MOUSE_MOVE);
 
+    handler.setInputAction((movement: { position: Cartesian2 }) => {
+      const pickedObject = viewer.scene.pick(movement.position);
+      if (!defined(pickedObject) || !pickedObject.id) {
+        onMapBackgroundClick?.();
+      }
+    }, ScreenSpaceEventType.LEFT_CLICK);
+
     return () => {
       if (handlerRef.current) {
         handlerRef.current.destroy();
         handlerRef.current = null;
       }
     };
-  }, [isReady, hostMarkers, onItemHover]);
+  }, [isReady, hostMarkers, onItemHover, onMapBackgroundClick]);
 
   // Handle explicit visual target (e.g. from chat command)
   useEffect(() => {
@@ -289,6 +320,19 @@ export default function CesiumGlobe({
     if (selectedDestination && viewerRef.current && isReady && !visualTarget) {
       const dest = destinations.find(d => d.id === selectedDestination);
       if (dest) {
+        // Check for multi-location anchor
+        if (dest.locations && dest.locations.length > 1) {
+          const rect = getBoundingRectangle(dest.locations);
+          if (rect) {
+            viewerRef.current.camera.flyTo({
+              destination: rect,
+              duration: 2,
+            });
+            return;
+          }
+        }
+
+        // Fallback to single point flyTo
         viewerRef.current.camera.flyTo({
           destination: Cartesian3.fromDegrees(dest.lng, dest.lat, 15000), // 15km - city level zoom
           duration: 2,
@@ -382,7 +426,50 @@ export default function CesiumGlobe({
           );
         })}
         
-        {/* Route Lines */}
+        {/* Route Lines (Road Trip Anchors) */}
+        {destinations.map(dest => {
+          if (dest.type === 'ROAD_TRIP' && dest.locations && dest.locations.length > 1) {
+             const positions = dest.locations.map(loc => Cartesian3.fromDegrees(loc.lng, loc.lat));
+             return (
+               <Entity
+                 key={`polyline-${dest.id}`}
+                 polyline={{
+                   positions: positions,
+                   width: 5,
+                   material: Color.fromCssColorString(dest.color || '#fb8500').withAlpha(0.8),
+                   clampToGround: true,
+                 }}
+               />
+             );
+          }
+          return null;
+        })}
+
+        {/* Inter-City Travel Routes */}
+        {routes.map((route) => {
+           // Skip if we are filtering by day and this route is for a different day
+           // (Optional: usually we want to see the whole trip context, or just the current leg)
+           // For now, show all routes to give the "Grand Tour" feel
+           
+           const isFlight = route.mode === 'flight';
+           const color = isFlight ? Color.fromCssColorString('#8ecae6') : Color.fromCssColorString('#fb8500');
+           
+           return (
+             <Entity
+               key={`route-${route.id}`}
+               polyline={{
+                 positions: [
+                   Cartesian3.fromDegrees(route.fromLng, route.fromLat),
+                   Cartesian3.fromDegrees(route.toLng, route.toLat)
+                 ],
+                 width: isFlight ? 3 : 4,
+                 material: color.withAlpha(0.7),
+                 arcType: isFlight ? ArcType.GEODESIC : ArcType.RHUMB,
+                 clampToGround: false, // Arcs need to fly
+               }}
+             />
+           );
+        })}
 
 
         {/* Route markers */}

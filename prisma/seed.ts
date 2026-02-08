@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
-import { BookingStatus, ExperienceCategory, PrismaClient, SyntheticResponseStyle } from '@prisma/client';
+import { BookingStatus, ExperienceCategory, Prisma, PrismaClient, SyntheticResponseStyle } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 import { HOSTS } from '../src/lib/data/hosts';
@@ -213,6 +213,31 @@ async function main() {
   await clearSyntheticDataset();
 
   const password = await bcrypt.hash('password', 10);
+
+  // Ensure Demo User
+  const demoUserId = 'demo-user';
+  await prisma.user.upsert({
+    where: { id: demoUserId },
+    create: {
+      id: demoUserId,
+      email: 'demo@localhost.com',
+      password,
+      name: 'Demo Traveler',
+      city: 'San Francisco',
+      country: 'USA',
+      languages: ['English'],
+      interests: ['travel', 'food'],
+      bio: 'Demo user for testing.',
+      isHost: false,
+      isVerified: true,
+      verificationTier: 'BASIC',
+      trustScore: 100,
+    },
+    update: {
+      password, // Update password to ensure it matches
+    },
+  });
+
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
 
@@ -421,6 +446,7 @@ async function main() {
     });
   }
 
+  const availabilityData: Prisma.ExperienceAvailabilityCreateManyInput[] = [];
   for (const experience of experienceRecords) {
     for (let dayOffset = 1; dayOffset <= config.availabilityDays; dayOffset++) {
       const date = new Date(today);
@@ -428,23 +454,23 @@ async function main() {
       const dateKey = date.toISOString().slice(0, 10);
       const availabilityId = stableId('syn-avail', `${experience.id}:${dateKey}`);
 
-      await prisma.experienceAvailability.upsert({
-        where: { id: availabilityId },
-        create: {
-          id: availabilityId,
-          experienceId: experience.id,
-          date,
-          spotsLeft: 2 + (hashInt(`${availabilityId}:spots`) % 7),
-          timezone: 'UTC',
-        },
-        update: {
-          experienceId: experience.id,
-          date,
-          spotsLeft: 2 + (hashInt(`${availabilityId}:spots`) % 7),
-          timezone: 'UTC',
-        },
+      availabilityData.push({
+        id: availabilityId,
+        experienceId: experience.id,
+        date,
+        spotsLeft: 2 + (hashInt(`${availabilityId}:spots`) % 7),
+        timezone: 'UTC',
       });
     }
+  }
+
+  const BATCH_SIZE = 2000;
+  for (let i = 0; i < availabilityData.length; i += BATCH_SIZE) {
+    console.log(`Seeding availability batch ${i / BATCH_SIZE + 1}...`);
+    await prisma.experienceAvailability.createMany({
+      data: availabilityData.slice(i, i + BATCH_SIZE),
+      skipDuplicates: true,
+    });
   }
 
   const tripRecords = Array.from({ length: config.trips }, (_, i) => {

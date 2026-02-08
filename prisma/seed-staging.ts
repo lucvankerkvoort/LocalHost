@@ -217,9 +217,9 @@ async function clearDatabase() {
       for (const day of stop.days) {
         await prisma.itineraryItem.deleteMany({ where: { dayId: day.id } });
       }
-      await prisma.itineraryDay.deleteMany({ where: { tripStopId: stop.id } });
+      await prisma.itineraryDay.deleteMany({ where: { tripAnchorId: stop.id } });
     }
-    await prisma.tripStop.deleteMany({ where: { tripId: trip.id } });
+    await prisma.tripAnchor.deleteMany({ where: { tripId: trip.id } });
   }
   await prisma.trip.deleteMany({ where: { id: { startsWith: 'trip-e2e' } } });
   
@@ -473,10 +473,9 @@ async function seedScenarios() {
       stops: {
         create: [
           {
-            city: 'Rome',
-            country: 'Italy',
-            lat: 41.9028,
-            lng: 12.4964,
+            title: 'Rome',
+            type: 'CITY',
+            locations: [{ name: 'Rome', lat: 41.9028, lng: 12.4964 }],
             order: 0,
             days: {
               create: [

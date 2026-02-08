@@ -194,7 +194,7 @@ model Trip {
   startDate   DateTime?
   endDate     DateTime?
   
-  stops       TripStop[]
+  stops       TripAnchor[]
   bookings    Booking[]
   
   createdAt   DateTime   @default(now())
@@ -203,15 +203,17 @@ model Trip {
   @@index([userId])
 }
 
-model TripStop {
+model TripAnchor {
   id        String   @id @default(cuid())
   tripId    String
   trip      Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
   
-  country   String
-  city      String
-  lat       Float
-  lng       Float
+  title     String
+  type      AnchorType @default(CITY)
+  
+  // Flexible Location Definition
+  locations Json     // Array of { name: string, lat: number, lng: number, placeId?: string }[]
+  
   order     Int
   
   days      ItineraryDay[]
@@ -222,10 +224,17 @@ model TripStop {
   @@unique([tripId, order])
 }
 
+enum AnchorType {
+  CITY
+  REGION
+  ROAD_TRIP
+  TRAIL
+}
+
 model ItineraryDay {
   id         String   @id @default(cuid())
-  tripStopId String
-  tripStop   TripStop @relation(fields: [tripStopId], references: [id], onDelete: Cascade)
+  tripAnchorId String
+  tripAnchor   TripAnchor @relation(fields: [tripAnchorId], references: [id], onDelete: Cascade)
   
   dayIndex   Int
   date       DateTime?
@@ -237,7 +246,7 @@ model ItineraryDay {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  @@unique([tripStopId, dayIndex])
+  @@unique([tripAnchorId, dayIndex])
 }
 
 model ItineraryItem {

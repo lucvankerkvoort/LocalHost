@@ -18,9 +18,9 @@ test('convertTripToGlobeDestinations sorts days and activity orderIndex', () => 
     stops: [
       {
         id: 'stop-1',
-        city: 'Rome',
-        lat: 41.9,
-        lng: 12.5,
+        title: 'Rome',
+        type: 'CITY',
+        locations: [{ name: 'Rome', lat: 41.9, lng: 12.5 }],
         days: [
           {
             id: 'day-2',
@@ -83,9 +83,9 @@ test('convertTripToGlobeDestinations resolves host id from experience fallback',
     stops: [
       {
         id: 'stop-1',
-        city: 'Lisbon',
-        lat: 38.72,
-        lng: -9.13,
+        title: 'Lisbon',
+        type: 'CITY',
+        locations: [{ name: 'Lisbon', lat: 38.72, lng: -9.13 }],
         days: [
           {
             id: 'day-1',
@@ -126,9 +126,9 @@ test('convertTripToGlobeDestinations preserves itinerary item status', () => {
     stops: [
       {
         id: 'stop-1',
-        city: 'Rome',
-        lat: 41.9,
-        lng: 12.5,
+        title: 'Rome',
+        type: 'CITY',
+        locations: [{ name: 'Rome', lat: 41.9, lng: 12.5 }],
         days: [
           {
             id: 'day-1',
@@ -169,9 +169,9 @@ test('convertTripToGlobeDestinations derives BOOKED status from confirmed bookin
     stops: [
       {
         id: 'stop-1',
-        city: 'Rome',
-        lat: 41.9,
-        lng: 12.5,
+        title: 'Rome',
+        type: 'CITY',
+        locations: [{ name: 'Rome', lat: 41.9, lng: 12.5 }],
         days: [
           {
             id: 'day-1',
@@ -220,9 +220,9 @@ test('convertTripToGlobeDestinations derives PENDING status and candidateId from
     stops: [
       {
         id: 'stop-1',
-        city: 'Rome',
-        lat: 41.9,
-        lng: 12.5,
+        title: 'Rome',
+        type: 'CITY',
+        locations: [{ name: 'Rome', lat: 41.9, lng: 12.5 }],
         days: [
           {
             id: 'day-1',
@@ -271,9 +271,9 @@ test('convertTripToGlobeDestinations derives FAILED status from latest failed bo
     stops: [
       {
         id: 'stop-1',
-        city: 'Rome',
-        lat: 41.9,
-        lng: 12.5,
+        title: 'Rome',
+        type: 'CITY',
+        locations: [{ name: 'Rome', lat: 41.9, lng: 12.5 }],
         days: [
           {
             id: 'day-1',
@@ -322,9 +322,9 @@ test('convertTripToGlobeDestinations falls back to stop city and coordinates whe
     stops: [
       {
         id: 'stop-1',
-        city: 'Kyoto',
-        lat: 35.0116,
-        lng: 135.7681,
+        title: 'Kyoto',
+        type: 'CITY',
+        locations: [{ name: 'Kyoto', lat: 35.0116, lng: 135.7681 }],
         days: [
           {
             id: 'day-1',
@@ -400,12 +400,12 @@ test('convertGlobeDestinationsToApiPayload sorts by day and groups stops by city
   );
 
   assert.equal(payload.stops.length, 2);
-  assert.equal(payload.stops[0].city, 'Rome');
+  assert.equal(payload.stops[0].title, 'Rome');
   assert.deepEqual(
     (payload.stops[0].days as Array<{ dayIndex: number }>).map((d) => d.dayIndex),
     [1, 2]
   );
-  assert.equal(payload.stops[1].city, 'Paris');
+  assert.equal(payload.stops[1].title, 'Paris');
   assert.deepEqual(
     (payload.stops[1].days as Array<{ dayIndex: number }>).map((d) => d.dayIndex),
     [3]
@@ -458,9 +458,9 @@ test('convertTripToGlobeDestinations assigns day color based on day index', () =
     stops: [
       {
         id: 'stop-1',
-        city: 'Rome',
-        lat: 41.9,
-        lng: 12.5,
+        title: 'Rome',
+        type: 'CITY',
+        locations: [{ name: 'Rome', lat: 41.9, lng: 12.5 }],
         days: [
           { id: 'day-1', dayIndex: 1, title: 'Day 1', items: [], suggestedHosts: [] },
           { id: 'day-2', dayIndex: 2, title: 'Day 2', items: [], suggestedHosts: [] },
@@ -487,7 +487,7 @@ test('convertGlobeDestinationsToApiPayload uses destination name when city is mi
     } as unknown as GlobePayloadDestination,
   ]);
 
-  assert.equal(payload.stops[0].city, 'Fallback City Name');
+  assert.equal(payload.stops[0].title, 'Fallback City Name');
 });
 
 test('convertGlobeDestinationsToApiPayload preserves explicit item type', () => {

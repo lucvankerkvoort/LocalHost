@@ -79,8 +79,14 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
       continue;
     }
     const anchorLocation = day.anchorLocation;
+    // Prefer explicit city from AI, fallback to extraction
+    const currentCity = day.city || extractCityName(anchorLocation);
+
+    console.log(`[PlanConverter] Day ${day.dayNumber}: currentCity="${currentCity}" (explicit: ${day.city})`);
+
     // Create items first to preserve IDs
     const dayItems = day.activities.map((act, idx): ItineraryItem => {
+      // ... (existing mapping logic) ...
         // Map category to item type
         let type: any = 'EXPERIENCE'; // Default to Anchor/Experience
         const cat = act.place.category?.toLowerCase();
@@ -112,18 +118,28 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
         });
     });
 
-    // Create destination from anchor location
+    // MARKER CONSOLIDATION LOGIC:
+    // DISABLED: We want each day to be a distinct column in the UI.
+    // The globe component handles visual clustering of markers sharing the same city.
+    
+    // Create NEW destination from anchor location (One destination per day)
     const destination: GlobeDestination = {
       id: generateId(),
       name: day.title,
       lat: anchorLocation.location.lat,
       lng: anchorLocation.location.lng,
+      type: 'CITY',
+      locations: [{
+        name: currentCity || anchorLocation.name,
+        lat: anchorLocation.location.lat,
+        lng: anchorLocation.location.lng
+      }],
       day: day.dayNumber,
       date: undefined, // Plan doesn't inherently have dates yet
       activities: dayItems,
       color: getColorForDay(day.dayNumber),
-      suggestedHosts: day.suggestedHosts,
-      city: extractCityName(anchorLocation),
+      suggestedHosts: [...(day.suggestedHosts || [])], // Clone array
+      city: currentCity,
     };
     destinations.push(destination);
 

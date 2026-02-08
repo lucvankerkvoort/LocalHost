@@ -89,10 +89,9 @@ export async function createTrip(data: CreateTripData) {
         endDate,
         stops: {
           create: {
-            city: resolvedCity,
-            country: '', // Could be improved with geocoding result if it returned more info
-            lat,
-            lng,
+            title: resolvedCity,
+            type: 'CITY',
+            locations: [{ name: resolvedCity, lat, lng }],
             order: 0
           }
         }
@@ -102,6 +101,7 @@ export async function createTrip(data: CreateTripData) {
     revalidatePath('/trips');
     return { success: true, tripId: newTrip.id };
   } catch (error) {
+    console.error('Failed to create trip:', error);
     return { success: false, error: 'Failed to create trip' };
   }
 }

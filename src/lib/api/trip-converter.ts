@@ -35,11 +35,16 @@ interface ApiItineraryDay {
   suggestedHosts?: any[];
 }
 
-export interface ApiTripStop {
+export interface ApiTripAnchor {
   id: string;
-  city: string;
-  lat: number;
-  lng: number;
+  title: string;
+  type?: 'CITY' | 'REGION' | 'ROAD_TRIP' | 'TRAIL';
+  locations: Array<{
+    name: string;
+    lat: number;
+    lng: number;
+    placeId?: string;
+  }>;
   days: ApiItineraryDay[];
 }
 
@@ -47,7 +52,7 @@ export interface ApiTrip {
   id: string;
   userId: string;
   title: string;
-  stops: ApiTripStop[];
+  stops: ApiTripAnchor[];
 }
 
 function deriveItineraryItemStatus(item: ApiItineraryItem): ItineraryItem['status'] {
@@ -89,6 +94,9 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
   const destinations: GlobeDestination[] = [];
 
   for (const stop of trip.stops) {
+    // Determine primary location (first one)
+    const primaryLoc = stop.locations?.[0] || { lat: 0, lng: 0, name: 'Unknown' };
+
     for (const day of stop.days) {
         const activities: ItineraryItem[] = day.items
             .sort((a, b) => a.orderIndex - b.orderIndex)
@@ -107,23 +115,25 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
                 price: undefined,
                 place: {
                     id: item.locationName ? `loc-${item.id}` : 'unknown',
-                    name: item.locationName || stop.city,
+                    name: item.locationName || primaryLoc.name,
                     location: {
-                        lat: item.lat ?? stop.lat,
-                        lng: item.lng ?? stop.lng,
+                        lat: item.lat ?? primaryLoc.lat,
+                        lng: item.lng ?? primaryLoc.lng,
                     }
                 }
             } as ItineraryItem));
 
         destinations.push({
             id: day.id, 
-            name: day.title || stop.city,
-            lat: stop.lat,
-            lng: stop.lng,
+            name: day.title || stop.title,
+            lat: primaryLoc.lat,
+            lng: primaryLoc.lng,
+            type: stop.type || 'CITY',
+            locations: stop.locations,
             day: day.dayIndex, 
             activities,
             color: getColorForDay(day.dayIndex),
-            city: stop.city,
+            city: primaryLoc.name, // Legacy fallback
             suggestedHosts: day.suggestedHosts || [],
         });
     }
@@ -146,18 +156,21 @@ export function convertGlobeDestinationsToApiPayload(destinations: GlobeDestinat
   const sortedDestinations = [...destinations].sort((a, b) => a.day - b.day);
 
   for (const dest of sortedDestinations) {
-    // Check if we can merge into current stop (same city)
-    // Note: strict name check might be fragile if multiple stops in same city are desired, 
-    // but for now it recreates the structure well enough.
-    if (!currentStop || currentStop.city !== dest.city) {
+    const groupingKey = dest.city || dest.name;
+
+    // Use city/name for grouping anchors
+    if (!currentStop || currentStop.title !== groupingKey) {
       if (currentStop) {
         stops.push(currentStop);
       }
       currentStop = {
-        city: dest.city || dest.name, // Fallback
-        country: '', // simplified, we might lose country if not stored in dest
-        lat: dest.lat,
-        lng: dest.lng,
+        title: groupingKey,
+        type: dest.type || 'CITY',
+        locations: dest.locations || [{
+           name: dest.city || dest.name,
+           lat: dest.lat,
+           lng: dest.lng
+        }],
         order: stops.length,
         days: []
       };

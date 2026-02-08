@@ -4,6 +4,8 @@ import { conversationController } from '@/lib/conversation/controller';
 import { validateAgentOutput, withExecution } from '@/lib/agent-constraints';
 import type { HostOnboardingStage } from '@/lib/agents/agent';
 
+export const maxDuration = 300; // Allow 5 minutes for generation
+
 const HOST_ONBOARDING_STAGES: HostOnboardingStage[] = [
   'CITY_MISSING',
   'STOPS_MISSING',

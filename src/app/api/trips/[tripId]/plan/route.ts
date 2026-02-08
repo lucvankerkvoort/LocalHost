@@ -60,19 +60,26 @@ export async function POST(
 
     await prisma.$transaction(async (tx) => {
         // Clear old plan
-        await tx.tripStop.deleteMany({
+        await tx.tripAnchor.deleteMany({
             where: { tripId: tripId }
         });
 
         // Insert new plan
         for (const stop of stops) {
-            const createdStop = await tx.tripStop.create({
+            // Map legacy fields if needed
+            const locationArray = stop.locations || [{
+                name: stop.city || 'Unknown',
+                lat: stop.lat || 0,
+                lng: stop.lng || 0,
+                placeId: stop.placeId
+            }];
+
+            const createdAnchor = await tx.tripAnchor.create({
                 data: {
                     tripId: tripId,
-                    city: stop.city,
-                    country: stop.country || '',
-                    lat: stop.lat || 0,
-                    lng: stop.lng || 0,
+                    title: stop.title || stop.city || 'Stop',
+                    type: stop.type || 'CITY',
+                    locations: locationArray,
                     order: stop.order,
                 }
             });
@@ -81,7 +88,7 @@ export async function POST(
                 for (const day of stop.days) {
                     const createdDay = await tx.itineraryDay.create({
                         data: {
-                            tripStopId: createdStop.id,
+                            tripAnchorId: createdAnchor.id,
                             dayIndex: day.dayIndex,
                             date: day.date ? new Date(day.date) : null,
                             title: day.title,
