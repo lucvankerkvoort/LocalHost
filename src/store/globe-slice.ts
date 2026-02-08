@@ -20,6 +20,19 @@ interface GlobeState {
   hoveredItemId: string | null;
   activeItemId: string | null;
   focusedItemId: string | null;
+  selectedHostId: string | null;
+  selectedExperienceId: string | null;
+}
+
+function deduplicate<T extends { id: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.id)) {
+      return false;
+    }
+    seen.add(item.id);
+    return true;
+  });
 }
 
 const initialState: GlobeState = {
@@ -34,6 +47,8 @@ const initialState: GlobeState = {
   hoveredItemId: null,
   activeItemId: null,
   focusedItemId: null,
+  selectedHostId: null,
+  selectedExperienceId: null,
 };
 
 function applyPlan(state: GlobeState, plan: ItineraryPlan) {
@@ -47,6 +62,8 @@ function applyPlan(state: GlobeState, plan: ItineraryPlan) {
   state.hoveredItemId = null;
   state.activeItemId = null;
   state.focusedItemId = null; 
+  state.selectedHostId = null;
+  state.selectedExperienceId = null;
   // Note: Localhost AI generated plans don't strictly have a DB TripID yet unless saved.
 }
 
@@ -82,6 +99,18 @@ const globeSlice = createSlice({
     },
     setSelectedDestination(state, action: PayloadAction<string | null>) {
       state.selectedDestination = action.payload;
+    },
+    setSelectedHostId(state, action: PayloadAction<string | null>) {
+      state.selectedHostId = action.payload;
+    },
+    clearSelectedHostId(state) {
+      state.selectedHostId = null;
+    },
+    setSelectedExperienceId(state, action: PayloadAction<string | null>) {
+      state.selectedExperienceId = action.payload;
+    },
+    clearSelectedExperienceId(state) {
+      state.selectedExperienceId = null;
     },
     setHostMarkers(state, action: PayloadAction<HostMarkerData[]>) {
       state.hostMarkers = action.payload;
@@ -121,6 +150,11 @@ const globeSlice = createSlice({
       state.visualTarget = null;
       state.hostMarkers = [];
       state.placeMarkers = [];
+      state.hoveredItemId = null;
+      state.activeItemId = null;
+      state.focusedItemId = null;
+      state.selectedHostId = null;
+      state.selectedExperienceId = null;
     },
     setItineraryFromPlan(state, action: PayloadAction<ItineraryPlan>) {
       applyPlan(state, action.payload);
@@ -136,13 +170,18 @@ const globeSlice = createSlice({
     ) {
       state.destinations = action.payload.destinations;
       state.routes = action.payload.routes;
-      state.routeMarkers = action.payload.routeMarkers ?? [];
+      state.routeMarkers = deduplicate(action.payload.routeMarkers ?? []);
       state.selectedDestination =
         action.payload.selectedDestinationId ??
         action.payload.destinations[0]?.id ??
         null;
       state.visualTarget = null;
       state.placeMarkers = [];
+      state.hoveredItemId = null;
+      state.activeItemId = null;
+      state.focusedItemId = null;
+      state.selectedHostId = null;
+      state.selectedExperienceId = null;
     },
     hydrateGlobeState(
       state,
@@ -155,7 +194,7 @@ const globeSlice = createSlice({
         state.routes = action.payload.routes;
       }
       if (action.payload.routeMarkers) {
-        state.routeMarkers = action.payload.routeMarkers;
+        state.routeMarkers = deduplicate(action.payload.routeMarkers);
       }
       if (Object.prototype.hasOwnProperty.call(action.payload, 'selectedDestination')) {
         state.selectedDestination = action.payload.selectedDestination ?? null;
@@ -164,10 +203,16 @@ const globeSlice = createSlice({
         state.visualTarget = action.payload.visualTarget ?? null;
       }
       if (action.payload.hostMarkers) {
-        state.hostMarkers = action.payload.hostMarkers;
+        state.hostMarkers = deduplicate(action.payload.hostMarkers);
       }
       if (action.payload.placeMarkers) {
-        state.placeMarkers = action.payload.placeMarkers;
+        state.placeMarkers = deduplicate(action.payload.placeMarkers);
+      }
+      if (Object.prototype.hasOwnProperty.call(action.payload, 'selectedHostId')) {
+        state.selectedHostId = action.payload.selectedHostId ?? null;
+      }
+      if (Object.prototype.hasOwnProperty.call(action.payload, 'selectedExperienceId')) {
+        state.selectedExperienceId = action.payload.selectedExperienceId ?? null;
       }
     },
     addLocalExperience(
@@ -322,6 +367,10 @@ export const {
   setRoutes,
   setRouteMarkers,
   setSelectedDestination,
+  setSelectedHostId,
+  clearSelectedHostId,
+  setSelectedExperienceId,
+  clearSelectedExperienceId,
   setHostMarkers,
   addHostMarkers,
   clearHostMarkers,

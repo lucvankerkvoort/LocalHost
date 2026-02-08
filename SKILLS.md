@@ -82,6 +82,7 @@ Core Responsibilities:
 - Translate product or architectural intent into unambiguous technical instructions.
 - Optimize specs for execution by junior engineers or AI agents.
 - Reduce decision-making during implementation to near-zero.
+- When asked to save a spec, write Markdown files only under `docs/specs/`.
 
 Specification MUST include:
 1. Scope

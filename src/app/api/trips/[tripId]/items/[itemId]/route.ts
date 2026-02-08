@@ -20,7 +20,7 @@ export async function DELETE(
         include: {
             day: {
                 include: {
-                    tripStop: {
+                    tripAnchor: {
                         include: {
                             trip: true
                         }
@@ -30,7 +30,7 @@ export async function DELETE(
         }
     });
 
-    if (!item || item.day.tripStop.trip.id !== tripId || item.day.tripStop.trip.userId !== session.user.id) {
+    if (!item || item.day.tripAnchor.trip.id !== tripId || item.day.tripAnchor.trip.userId !== session.user.id) {
          return new NextResponse('Forbidden or Not Found', { status: 403 });
     }
 

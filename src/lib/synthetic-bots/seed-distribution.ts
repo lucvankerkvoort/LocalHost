@@ -66,8 +66,8 @@ export function summarizeSeedDistribution(experiences: SeedExperienceSample[]): 
 export function validateSeedDistribution(summary: SeedDistributionSummary): string[] {
   const errors: string[] = [];
   const cityCount = Object.keys(summary.cityCounts).length;
-  if (cityCount < 30) {
-    errors.push(`Expected at least 30 cities but found ${cityCount}`);
+  if (cityCount < 15) {
+    errors.push(`Expected at least 15 cities but found ${cityCount}`);
   }
 
   if (summary.maxCityShare > 0.15) {

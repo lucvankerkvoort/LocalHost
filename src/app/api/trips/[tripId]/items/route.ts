@@ -36,7 +36,7 @@ export async function POST(
         day = await prisma.itineraryDay.findFirst({
             where: {
                 id: dayId,
-                tripStop: { tripId: tripId }
+                tripAnchor: { tripId: tripId }
             },
             include: { items: true }
         });
@@ -58,7 +58,7 @@ export async function POST(
                 // Let's check plan-converter.ts: `dayIndex: day.dayNumber` -> wait, schema says: `dayIndex Int`
                 // Let's check `candidates/route.ts`: `d.dayIndex + 1 === parseInt(dayNumber)`
                 // So dayNumber is 1-based, dayIndex is 0-based.
-                tripStop: { tripId: tripId }
+                tripAnchor: { tripId: tripId }
             },
             include: { items: true }
          });
@@ -69,7 +69,7 @@ export async function POST(
               day = await prisma.itineraryDay.findFirst({
                 where: {
                     dayIndex: dayNumber - 1, // Try 1-based to 0-based conversion
-                    tripStop: { tripId: tripId }
+                    tripAnchor: { tripId: tripId }
                 },
                 include: { items: true }
              });

@@ -26,6 +26,8 @@ const DraftItinerarySchema = z.object({
   days: z.array(z.object({
     dayNumber: z.number(),
     title: z.string(),
+    city: z.string().nullable().describe('City for this specific day, if different from main trip city; otherwise null'),
+    country: z.string().nullable().describe('Country for this specific day, if different from main trip country; otherwise null'),
     anchorArea: z.string().describe('Neighborhood or area name, e.g. "Jordaan"'),
     activities: z.array(z.object({
       name: z.string().describe('Name of the place/activity'),
@@ -598,7 +600,24 @@ export class ItineraryOrchestrator {
     const draft = await this.draftItinerary(userPrompt);
     this.callbacks.onDraftComplete?.(draft);
 
-    const tripAnchor = await this.resolveTripAnchor(draft);
+    let tripAnchor = await this.resolveTripAnchor(draft);
+    
+    // Fallback: If main trip anchor failed (e.g. "Europe" or multi-city list strings), 
+    // try to use the first day's location as the anchor
+    if (!tripAnchor && draft.days.length > 0) {
+      const firstDay = draft.days[0];
+      const fallbackCity = firstDay.city || draft.city;
+      const fallbackCountry = firstDay.country || draft.country;
+      
+      console.log(`[Orchestrator] Main anchor failed. Trying fallback to Day 1: ${fallbackCity}, ${fallbackCountry}`);
+      
+      const cityResult = await this.executeTool<{
+        location: { lat: number; lng: number };
+      }>('resolve_place', { name: fallbackCity, context: fallbackCountry });
+      
+      tripAnchor = cityResult?.location ?? null;
+    }
+
     const plan = this.buildDraftPlan(userPrompt, draft, tripAnchor);
 
     return {
@@ -746,22 +765,29 @@ export class ItineraryOrchestrator {
     });
     return object;
   }
-
   /**
    * Process a single day: Resolve places, find anchor, get hosts, add navigation.
    * Now uses tool registry for all operations.
    */
   private async processDay(
     draftDay: DraftItinerary['days'][0], 
-    city: string, 
-    country: string,
+    mainCity: string, 
+    mainCountry: string,
     tripAnchor: { lat: number; lng: number } | null
   ) {
-    const baseContext = `${city}, ${country}`;
+    // 1. Determine local context for this day
+    const dayCity = draftDay.city || mainCity;
+    const dayCountry = draftDay.country || mainCountry;
+    const dayContext = `${dayCity}, ${dayCountry}`;
+    
+    // Only use the global trip anchor as a bias if we are in the main city
+    // otherwise we risk biasing search results in Venice to coordinates in Rome
+    const isMainCity = dayCity.toLowerCase() === mainCity.toLowerCase();
+    const effectiveAnchor = isMainCity ? tripAnchor : null;
 
     // B. Resolve Anchor Location
     // Use RateLimiter for safety
-    const anchorResult = await rateLimiter.schedule(() => 
+    let anchorResult = await rateLimiter.schedule(() => 
       this.executeTool<{
         id: string;
         name: string;
@@ -772,27 +798,59 @@ export class ItineraryOrchestrator {
         city?: string;
       }>('resolve_place', { 
         name: draftDay.anchorArea, 
-        context: baseContext,
-        anchorPoint: tripAnchor
+        context: dayContext,
+        anchorPoint: effectiveAnchor
       })
     );
     
     // Only create anchor if geocoding succeeded with valid coordinates
-    const anchorDistance = getDistanceToAnchor(anchorResult ?? null, tripAnchor);
+    const anchorDistance = getDistanceToAnchor(anchorResult ?? null, effectiveAnchor);
     const hasValidAnchor = anchorResult && 
       !(anchorResult.location.lat === 0 && anchorResult.location.lng === 0) &&
-      (anchorDistance === null || anchorDistance <= MAX_ANCHOR_DISTANCE_METERS);
+      (anchorDistance === null || !effectiveAnchor || anchorDistance <= MAX_ANCHOR_DISTANCE_METERS);
     
-    // Fallback to tripAnchor if specific area fails
-    const finalAnchorLocation = hasValidAnchor ? anchorResult.location : tripAnchor;
+    // Fallback to tripAnchor ONLY if we are in the main city and have it
+    let finalAnchorLocation = hasValidAnchor ? anchorResult.location : (isMainCity ? tripAnchor : null);
+    
+    // Fallback: If no anchor yet and we are in a secondary city, try to resolve the city itself
+    if (!finalAnchorLocation && !isMainCity && dayCity) {
+       console.log(`[Orchestrator] Anchor failed for area "${draftDay.anchorArea}" in ${dayCity}. Resolving city center as fallback...`);
+       const cityResult = await rateLimiter.schedule(() => 
+        this.executeTool<{
+          id: string;
+          name: string;
+          formattedAddress: string;
+          location: { lat: number; lng: number };
+          category: string;
+          city?: string;
+        }>('resolve_place', { 
+          name: dayCity, 
+          context: dayCountry
+        })
+      );
+      
+      if (cityResult?.location && !(cityResult.location.lat === 0 && cityResult.location.lng === 0)) {
+        finalAnchorLocation = cityResult.location;
+        // Mock an anchor result so the next block creates the anchorPlace
+        if (!anchorResult) {
+            // @ts-ignore - we only need the basic props
+            anchorResult = {
+                ...cityResult,
+                name: draftDay.anchorArea || dayCity, // Keep the area name if possible, else city
+                formattedAddress: cityResult.formattedAddress,
+                category: 'neighborhood'
+            };
+        }
+      }
+    }
     
     const anchorPlace = finalAnchorLocation ? {
       id: anchorResult?.id || `anchor-${crypto.randomUUID()}`,
       name: anchorResult?.name || draftDay.anchorArea,
       location: finalAnchorLocation,
       category: (anchorResult?.category as any) || 'other',
-      description: anchorResult?.formattedAddress || `${draftDay.anchorArea}, ${city}`,
-      city: anchorResult?.city || city,
+      description: anchorResult?.formattedAddress || `${draftDay.anchorArea}, ${dayCity}`,
+      city: anchorResult?.city || dayCity,
     } : undefined;
     
     if (!anchorPlace) {
@@ -817,7 +875,7 @@ export class ItineraryOrchestrator {
             city?: string;
           }>('resolve_place', { 
             name: act.name, 
-            context: baseContext,
+            context: dayContext,
             anchorPoint: activityAnchor ?? undefined
           })
         );
@@ -859,8 +917,8 @@ export class ItineraryOrchestrator {
             name: placeResult?.name || act.name,
             location: placeLocation,
             category: (placeResult?.category as any) || 'other',
-            description: placeResult?.formattedAddress || `${act.name} in ${city}`,
-            city: placeResult?.city || city,
+            description: placeResult?.formattedAddress || `${act.name} in ${dayCity}`,
+            city: placeResult?.city || dayCity,
           },
           timeSlot: act.timeSlot,
           notes: act.notes ?? undefined,
@@ -887,12 +945,12 @@ export class ItineraryOrchestrator {
       }>;
     }>('search_localhosts', {
       query: draftDay.title,
-      location: `${city}, ${country}`,
+      location: `${dayCity}, ${dayCountry}`,
       limit: 6,
       searchType: 'hosts',
     });
 
-    console.log(`[Orchestrator] Day ${draftDay.dayNumber}: search_localhosts for "${city}, ${country}" returned ${searchResult?.results?.length ?? 0} hosts`);
+    console.log(`[Orchestrator] Day ${draftDay.dayNumber}: search_localhosts for "${dayCity}, ${dayCountry}" returned ${searchResult?.results?.length ?? 0} hosts`);
 
     const suggestedHosts = searchResult?.results.map(r => ({
       id: r.id,
@@ -943,6 +1001,8 @@ export class ItineraryOrchestrator {
     return {
       dayNumber: draftDay.dayNumber,
       title: draftDay.title,
+      city: dayCity,
+      country: dayCountry,
       anchorLocation: anchorPlace,
       activities: validActivities,
       navigationEvents,

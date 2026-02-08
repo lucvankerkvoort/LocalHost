@@ -7,6 +7,7 @@ import { getHostExperienceCtaState } from './host-panel-state';
 import { Home01Icon } from 'hugeicons-react';
 
 interface HostPanelProps {
+  variant?: 'sidebar' | 'panel';
   hosts: HostMarkerData[];
   selectedHostId?: string | null;
   selectedDayNumber?: number;
@@ -14,10 +15,12 @@ interface HostPanelProps {
   bookedExperienceIds?: Set<string>;
   onHostClick: (host: HostMarkerData) => void;
   onViewProfile: (host: HostMarkerData) => void;
-  onAddExperience: (host: Host, experience: HostExperience) => void;
+  onAddExperience: (host: Host, experience: HostExperience, marker: HostMarkerData) => void;
+  onFocusExperience?: (host: Host, experience: HostExperience, marker: HostMarkerData) => void;
 }
 
 export function HostPanel({
+  variant = 'sidebar',
   hosts,
   selectedHostId,
   selectedDayNumber,
@@ -26,6 +29,7 @@ export function HostPanel({
   onHostClick,
   onViewProfile,
   onAddExperience,
+  onFocusExperience,
 }: HostPanelProps) {
   // Get full host data to access experiences
   const hostsWithExperiences = hosts.map(marker => {
@@ -33,19 +37,31 @@ export function HostPanel({
     return { marker, fullHost };
   }).filter(({ fullHost }) => fullHost !== undefined);
 
+  const containerClasses = variant === 'panel'
+    ? 'w-full border-transparent'
+    : 'w-96 border-l border-[var(--border)]/50';
+  const emptyContainerClasses = variant === 'panel'
+    ? 'w-full border-transparent'
+    : 'w-80 border-l border-[var(--border)]/50';
+  const headerLabel = variant === 'panel' ? 'Experiences' : 'Local Hosts';
+
   if (hosts.length === 0) {
     return (
-      <div className="w-80 flex-shrink-0 bg-[var(--background)]/60 backdrop-blur-xl border-l border-[var(--border)]/50 flex flex-col">
+      <div className={`${emptyContainerClasses} flex-shrink-0 bg-[var(--background)]/60 backdrop-blur-xl flex flex-col`}>
         <div className="p-4 border-b border-[var(--border)]/50">
           <h2 className="font-semibold text-[var(--foreground)] flex items-center gap-2">
             <Home01Icon className="w-5 h-5 text-[var(--princeton-orange)]" />
-            <span>Local Hosts</span>
+            <span>{headerLabel}</span>
           </h2>
         </div>
         <div className="flex-1 flex items-center justify-center p-6 text-center">
           <div className="text-[var(--muted-foreground)]">
             <p className="text-4xl mb-3">🔍</p>
-            <p className="text-sm">No hosts found for this destination yet</p>
+            <p className="text-sm">
+              {variant === 'panel'
+                ? 'No experiences found for this destination yet'
+                : 'No hosts found for this destination yet'}
+            </p>
           </div>
         </div>
       </div>
@@ -53,12 +69,12 @@ export function HostPanel({
   }
 
   return (
-    <div className="w-96 flex-shrink-0 bg-[var(--background)]/60 backdrop-blur-xl border-l border-[var(--border)]/50 flex flex-col">
+    <div className={`${containerClasses} flex-shrink-0 bg-[var(--background)]/60 backdrop-blur-xl flex flex-col`}>
       {/* Header */}
       <div className="p-4 border-b border-[var(--border)]/50">
         <h2 className="font-semibold text-[var(--foreground)] flex items-center gap-2">
           <Home01Icon className="w-5 h-5 text-[var(--princeton-orange)]" />
-          <span>Local Hosts</span>
+          <span>{headerLabel}</span>
           <span className="ml-auto text-sm font-normal text-[var(--muted-foreground)]">
             {hosts.length} available
           </span>
@@ -78,7 +94,8 @@ export function HostPanel({
             bookedExperienceIds={bookedExperienceIds}
             onClick={() => onHostClick(marker)}
             onViewProfile={() => onViewProfile(marker)}
-            onAddExperience={(exp) => onAddExperience(fullHost!, exp)}
+            onAddExperience={(exp) => onAddExperience(fullHost!, exp, marker)}
+            onFocusExperience={(exp) => onFocusExperience?.(fullHost!, exp, marker)}
           />
         ))}
       </div>
@@ -96,6 +113,7 @@ interface HostCardWithExperiencesProps {
   onClick: () => void;
   onViewProfile: () => void;
   onAddExperience: (experience: HostExperience) => void;
+  onFocusExperience?: (experience: HostExperience) => void;
 }
 
 function HostCardWithExperiences({
@@ -108,6 +126,7 @@ function HostCardWithExperiences({
   onClick,
   onViewProfile,
   onAddExperience,
+  onFocusExperience,
 }: HostCardWithExperiencesProps) {
   return (
     <div
@@ -169,6 +188,7 @@ function HostCardWithExperiences({
               <div
                 key={exp.id}
                 className="p-3 hover:bg-[var(--muted)]/20 transition-colors"
+                onClick={() => onFocusExperience?.(exp)}
               >
                 <div className="flex gap-3">
                   <img
@@ -190,7 +210,8 @@ function HostCardWithExperiences({
                   </div>
                 </div>
                 <button
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.stopPropagation();
                     if (ctaState === 'BOOKED') return;
                     onAddExperience(exp);
                   }}

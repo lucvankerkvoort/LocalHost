@@ -52,6 +52,8 @@ export const DayPlanSchema = z.object({
   dayNumber: z.number(),
   date: z.string().optional(), // ISO date string if available
   title: z.string().describe('Theme of the day, e.g. "Art & History"'),
+  city: z.string().optional().describe('Explicit city context for this day'),
+  country: z.string().optional().describe('Explicit country context for this day'),
   anchorLocation: PlaceSchema.optional().describe('Central geographic point used to find nearby hosts (null if geocoding failed)'),
   activities: z.array(ActivitySchema),
   navigationEvents: z.array(NavigationActionSchema).optional(),

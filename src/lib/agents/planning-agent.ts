@@ -255,7 +255,9 @@ export class PlanningAgent implements Agent {
   
             try {
               const orchestrator = new ItineraryOrchestrator();
+              const startTime = Date.now();
               const draftResult = await orchestrator.planTripDraft(request);
+              console.log(`[PlanningAgent] planTripDraft completed in ${Date.now() - startTime}ms`);
   
               if (!draftResult.plan) {
                 return {

@@ -177,7 +177,7 @@ export async function POST(req: Request) {
                 id: itemId,
                 dayId: targetDay.id,
                 day: {
-                    tripStop: {
+                    tripAnchor: {
                         tripId: trip.id,
                     },
                 },

@@ -7,6 +7,8 @@ import reducer, {
   selectUI,
   setP2PChatOpen,
   setShowTimeline,
+  setItineraryCollapsed,
+  setItineraryPanelTab,
   toggleTimeline,
 } from './ui-slice';
 
@@ -60,6 +62,24 @@ test('toggleTimeline flips timeline visibility', () => {
 
   assert.equal(first.showTimeline, false);
   assert.equal(second.showTimeline, true);
+});
+
+test('setItineraryCollapsed sets itinerary panel collapsed state', () => {
+  const collapsed = reducer(getInitialState(), setItineraryCollapsed(true));
+  const expanded = reducer(collapsed, setItineraryCollapsed(false));
+
+  assert.equal(collapsed.isItineraryCollapsed, true);
+  assert.equal(expanded.isItineraryCollapsed, false);
+});
+
+test('setItineraryPanelTab switches between tabs', () => {
+  const initial = getInitialState();
+  const experiences = reducer(initial, setItineraryPanelTab('EXPERIENCES'));
+  const itinerary = reducer(experiences, setItineraryPanelTab('ITINERARY'));
+
+  assert.equal(initial.itineraryPanelTab, 'ITINERARY');
+  assert.equal(experiences.itineraryPanelTab, 'EXPERIENCES');
+  assert.equal(itinerary.itineraryPanelTab, 'ITINERARY');
 });
 
 test('selectUI returns ui slice from root state', () => {

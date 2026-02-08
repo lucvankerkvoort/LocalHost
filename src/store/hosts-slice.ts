@@ -1,5 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import { createSelector } from 'reselect';
+import { createSelector } from '@reduxjs/toolkit';
 import { HOSTS, type Host } from '@/lib/data/hosts';
 import { getCityCoordinates } from '@/lib/data/city-coordinates';
 
