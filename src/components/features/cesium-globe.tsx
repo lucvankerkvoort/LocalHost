@@ -1,6 +1,9 @@
 'use client';
 
 import { useRef, useEffect, useState, useMemo } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server.browser';
+import type { LucideIcon } from 'lucide-react';
+import { MapPin, Landmark, Building2, Utensils, Trees, Map as MapIcon } from 'lucide-react';
 import { CityMarkerData, GlobeDestination, HostMarkerData, PlaceMarkerData, RouteMarkerData, TravelRoute } from '@/types/globe';
 
 // Set Cesium base URL BEFORE importing Cesium
@@ -33,9 +36,7 @@ const cleanImageryProvider = new UrlTemplateImageryProvider({
 });
 
 const MARKER_DEPTH_TEST_DISTANCE = 2500000;
-const ROUTE_MARKER_SIZE = 8;
 const ROUTE_MARKER_COLOR = '#64748b';
-const ROUTE_MARKER_FILL_ALPHA = 0.18;
 const ROUTE_MARKER_MAX_DISTANCE_METERS = 120000;
 const PLACE_MARKER_DEFAULT_COLOR = '#94a3b8';
 const PLACE_MARKER_COLORS: Record<string, string> = {
@@ -46,9 +47,50 @@ const PLACE_MARKER_COLORS: Record<string, string> = {
   neighborhood: '#8ecae6',
   city: '#023047',
 };
+const LUCIDE_STROKE_WIDTH = 2.25;
+const CITY_MARKER_FALLBACK_COLOR = '#fb8500';
+const CITY_MARKER_ICON_SIZE = 26;
+const CITY_MARKER_ICON_SELECTED_SIZE = 30;
+const ROUTE_MARKER_ICON_SIZE = 16;
+const ROUTE_MARKER_ICON_HOVER_SIZE = 20;
+const ROUTE_MARKER_ICON_ACTIVE_SIZE = 24;
+const PLACE_MARKER_ICON_SIZE = 14;
+const PLACE_MARKER_ICON_MAP: Record<string, { icon: LucideIcon; name: string }> = {
+  landmark: { icon: Landmark, name: 'Landmark' },
+  museum: { icon: Building2, name: 'Building2' },
+  restaurant: { icon: Utensils, name: 'Utensils' },
+  park: { icon: Trees, name: 'Trees' },
+  neighborhood: { icon: MapIcon, name: 'Map' },
+  city: { icon: MapPin, name: 'MapPin' },
+};
+const LUCIDE_ICON_CACHE = new Map<string, string>();
 
 function getRouteMarkerColor(_marker: RouteMarkerData): string {
   return ROUTE_MARKER_COLOR;
+}
+
+function encodeSvgData(svg: string): string {
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function getLucideIconDataUrl(
+  iconName: string,
+  Icon: LucideIcon,
+  options: { color: string; size: number; strokeWidth?: number }
+): string {
+  const strokeWidth = options.strokeWidth ?? LUCIDE_STROKE_WIDTH;
+  const cacheKey = `${iconName}-${options.color}-${options.size}-${strokeWidth}`;
+  const cached = LUCIDE_ICON_CACHE.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const svg = renderToStaticMarkup(
+    <Icon color={options.color} size={options.size} strokeWidth={strokeWidth} />
+  );
+  const dataUrl = encodeSvgData(svg);
+  LUCIDE_ICON_CACHE.set(cacheKey, dataUrl);
+  return dataUrl;
 }
 
 function calculateDistanceMeters(
@@ -76,6 +118,13 @@ function getPlaceMarkerColor(marker: PlaceMarkerData): string {
     return PLACE_MARKER_COLORS[marker.category];
   }
   return PLACE_MARKER_DEFAULT_COLOR;
+}
+
+function getPlaceMarkerIcon(marker: PlaceMarkerData) {
+  if (marker.category && PLACE_MARKER_ICON_MAP[marker.category]) {
+    return PLACE_MARKER_ICON_MAP[marker.category];
+  }
+  return { icon: MapPin, name: 'MapPin' };
 }
 
 function getBoundingRectangle(locations: { lat: number; lng: number }[]) {
@@ -392,20 +441,27 @@ export default function CesiumGlobe({
           const isSelected = Boolean(
             selectedDestination && marker.dayIds.includes(selectedDestination)
           );
-          const baseColor = Color.fromCssColorString(marker.color);
           const labelText = marker.name;
+          const iconSize = isSelected ? CITY_MARKER_ICON_SELECTED_SIZE : CITY_MARKER_ICON_SIZE;
+          const cityColor = marker.color.toLowerCase() === ROUTE_MARKER_COLOR
+            ? CITY_MARKER_FALLBACK_COLOR
+            : marker.color;
+          const iconUrl = getLucideIconDataUrl('MapPin', MapPin, {
+            color: cityColor,
+            size: iconSize,
+          });
 
           return (
           <Entity
             key={marker.id}
             name={marker.name}
             position={Cartesian3.fromDegrees(marker.lng, marker.lat, 0)}
-            point={{
-              pixelSize: isSelected ? 22 : 18,
-              color: baseColor,
-              outlineColor: Color.WHITE,
-              outlineWidth: 3,
+            billboard={{
+              image: iconUrl,
+              width: iconSize,
+              height: iconSize,
               heightReference: HeightReference.CLAMP_TO_GROUND,
+              verticalOrigin: VerticalOrigin.BOTTOM,
               disableDepthTestDistance: MARKER_DEPTH_TEST_DISTANCE,
             }}
             label={{
@@ -416,7 +472,7 @@ export default function CesiumGlobe({
               outlineWidth: 3,
               style: 2, // FILL_AND_OUTLINE
               verticalOrigin: VerticalOrigin.BOTTOM,
-              pixelOffset: { x: 0, y: -20 } as any,
+              pixelOffset: new Cartesian2(0, -(iconSize + 6)),
               heightReference: HeightReference.CLAMP_TO_GROUND,
               disableDepthTestDistance: MARKER_DEPTH_TEST_DISTANCE,
               show: isSelected || cityMarkers.length <= 1,
@@ -486,9 +542,13 @@ export default function CesiumGlobe({
             const isHovered = hoveredItemId === marker.id;
             
             // Visual state priority: Active > Hovered > Default
-            const size = isActive ? 16 : (isHovered ? 12 : ROUTE_MARKER_SIZE);
-            const alpha = isActive ? 0.9 : (isHovered ? 0.7 : ROUTE_MARKER_FILL_ALPHA);
-            const outlineWidth = isActive ? 4 : (isHovered ? 3 : 2);
+            const iconSize = isActive
+              ? ROUTE_MARKER_ICON_ACTIVE_SIZE
+              : (isHovered ? ROUTE_MARKER_ICON_HOVER_SIZE : ROUTE_MARKER_ICON_SIZE);
+            const iconUrl = getLucideIconDataUrl('MapPin', MapPin, {
+              color: ROUTE_MARKER_COLOR,
+              size: iconSize,
+            });
             
             return (
               <Entity
@@ -496,12 +556,12 @@ export default function CesiumGlobe({
                 id={`route-marker-${marker.id}`}
                 name={marker.name ?? 'Route marker'}
                 position={Cartesian3.fromDegrees(marker.lng, marker.lat, 0)}
-                point={{
-                  pixelSize: size,
-                  color: markerColor.withAlpha(alpha),
-                  outlineColor: markerColor,
-                  outlineWidth: outlineWidth,
+                billboard={{
+                  image: iconUrl,
+                  width: iconSize,
+                  height: iconSize,
                   heightReference: HeightReference.CLAMP_TO_GROUND,
+                  verticalOrigin: VerticalOrigin.BOTTOM,
                   disableDepthTestDistance: MARKER_DEPTH_TEST_DISTANCE,
                 }}
                 label={{
@@ -512,7 +572,7 @@ export default function CesiumGlobe({
                   outlineWidth: 2,
                   style: 2, // FILL_AND_OUTLINE
                   verticalOrigin: VerticalOrigin.BOTTOM,
-                  pixelOffset: new Cartesian2(0, isActive ? -20 : -12),
+                  pixelOffset: new Cartesian2(0, -(iconSize + 6)),
                   heightReference: HeightReference.CLAMP_TO_GROUND,
                   disableDepthTestDistance: MARKER_DEPTH_TEST_DISTANCE,
                   show: Boolean(marker.name) || isActive || isHovered,
@@ -529,22 +589,33 @@ export default function CesiumGlobe({
             const isNotZeroZero = !(marker.lat === 0 && marker.lng === 0);
             return isValidLat && isValidLng && isNotZeroZero;
           })
-          .map((marker) => (
-            <Entity
-              key={`place-${marker.id}`}
-              id={`place-${marker.id}`}
-              name={marker.name}
-              position={Cartesian3.fromDegrees(marker.lng, marker.lat, 0)}
-              point={{
-                pixelSize: 10,
-                color: Color.fromCssColorString(getPlaceMarkerColor(marker)).withAlpha(0.85),
-                outlineColor: Color.WHITE,
-                outlineWidth: 1.5,
-                heightReference: HeightReference.CLAMP_TO_GROUND,
-                disableDepthTestDistance: MARKER_DEPTH_TEST_DISTANCE,
-              }}
-            />
-          ))}
+          .map((marker) => {
+            const iconInfo = getPlaceMarkerIcon(marker);
+            const iconColor = Color.fromCssColorString(getPlaceMarkerColor(marker))
+              .withAlpha(0.85)
+              .toCssColorString();
+            const iconUrl = getLucideIconDataUrl(iconInfo.name, iconInfo.icon, {
+              color: iconColor,
+              size: PLACE_MARKER_ICON_SIZE,
+            });
+
+            return (
+              <Entity
+                key={`place-${marker.id}`}
+                id={`place-${marker.id}`}
+                name={marker.name}
+                position={Cartesian3.fromDegrees(marker.lng, marker.lat, 0)}
+                billboard={{
+                  image: iconUrl,
+                  width: PLACE_MARKER_ICON_SIZE,
+                  height: PLACE_MARKER_ICON_SIZE,
+                  heightReference: HeightReference.CLAMP_TO_GROUND,
+                  verticalOrigin: VerticalOrigin.BOTTOM,
+                  disableDepthTestDistance: MARKER_DEPTH_TEST_DISTANCE,
+                }}
+              />
+            );
+          })}
 
         {/* Host markers - billboard with photo */}
         {hostMarkers

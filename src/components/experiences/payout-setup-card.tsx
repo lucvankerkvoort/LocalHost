@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { CreditCardIcon, CheckmarkCircle01Icon, AlertCircleIcon, Loading03Icon } from 'hugeicons-react';
+import { CreditCard, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 interface PayoutSetupCardProps {
   status: 'NOT_STARTED' | 'PENDING' | 'COMPLETE' | 'RESTRICTED' | null;
@@ -36,7 +36,7 @@ export function PayoutSetupCard({ status, payoutsEnabled }: PayoutSetupCardProps
       <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-green-100 dark:bg-green-800 rounded-full">
-            <CheckmarkCircle01Icon className="w-5 h-5 text-green-600 dark:text-green-400" />
+            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
           </div>
           <div>
             <h3 className="font-semibold text-green-900 dark:text-green-100">Payouts Active</h3>
@@ -60,7 +60,7 @@ export function PayoutSetupCard({ status, payoutsEnabled }: PayoutSetupCardProps
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-start gap-4">
           <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-full shrink-0">
-            <CreditCardIcon className="w-6 h-6 text-[var(--princeton-orange)]" />
+            <CreditCard className="w-6 h-6 text-[var(--princeton-orange)]" />
           </div>
           <div>
             <h3 className="text-lg font-semibold text-[var(--foreground)]">Set up Payouts</h3>
@@ -77,7 +77,7 @@ export function PayoutSetupCard({ status, payoutsEnabled }: PayoutSetupCardProps
           className="bg-[var(--princeton-orange)] hover:bg-[#E04F2E] text-white shrink-0 min-w-[140px]"
         >
           {isLoading ? (
-            <Loading03Icon className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
             status === 'NOT_STARTED' ? 'Connect Stripe' : 'Continue Setup'
           )}
@@ -85,7 +85,7 @@ export function PayoutSetupCard({ status, payoutsEnabled }: PayoutSetupCardProps
       </div>
       {status === 'PENDING' && (
          <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
-            <AlertCircleIcon className="w-4 h-4" />
+            <AlertCircle className="w-4 h-4" />
             <span>Verification in progress. You can continue setting up, but payouts may be paused until verified.</span>
          </div>
       )}

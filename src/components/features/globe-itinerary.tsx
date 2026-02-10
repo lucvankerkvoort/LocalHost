@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft01Icon, ArrowRight01Icon } from 'hugeicons-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { 
   CityMarkerData,
   GlobeDestination, 
@@ -883,7 +883,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                     className="p-1 hover:bg-white/10 rounded-md text-white/70 transition-colors"
                     aria-label="Expand itinerary panel"
                   >
-                    <ArrowRight01Icon className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               ) : (
@@ -898,7 +898,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                         onClick={() => dispatch(setItineraryCollapsed(true))}
                         className="p-1 hover:bg-white/10 rounded-md text-white/70 transition-colors"
                       >
-                        <ArrowLeft01Icon className="w-4 h-4" />
+                        <ArrowLeft className="w-4 h-4" />
                       </button>
                     </div>
                   </div>

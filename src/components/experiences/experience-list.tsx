@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { getUserExperiences, deleteExperience, type MyExperience } from '@/actions/experiences';
 import { ExperienceCard } from './experience-card';
 import { Button } from '@/components/ui/button';
-import { Add01Icon } from 'hugeicons-react';
+import { Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export function ExperienceList() {
@@ -80,7 +80,7 @@ export function ExperienceList() {
           className="mt-4 bg-[var(--princeton-orange)] hover:bg-[var(--princeton-dark)] text-white gap-2"
           onClick={() => router.push('/become-host')}
         >
-          <Add01Icon className="w-4 h-4" />
+          <Plus className="w-4 h-4" />
           Create Experience
         </Button>
       </div>

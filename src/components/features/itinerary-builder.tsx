@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { Itinerary, ItineraryItem, ItineraryItemType } from '@/types/itinerary';
 import { ItineraryDayColumn } from './itinerary-day';
 import { AddItemModal } from './add-item-modal';
-import { Location01Icon, Calendar01Icon } from 'hugeicons-react';
+import { MapPin, Calendar } from 'lucide-react';
 
 interface ItineraryBuilderProps {
   itinerary: Itinerary;
@@ -102,10 +102,10 @@ export function ItineraryBuilder({
               </h1>
               <div className="flex items-center gap-3 mt-1 text-sm text-[var(--muted-foreground)]">
                 <span className="flex items-center gap-1">
-                  <Location01Icon className="w-4 h-4" /> {itinerary.destination}
+                  <MapPin className="w-4 h-4" /> {itinerary.destination}
                 </span>
                 <span className="flex items-center gap-1">
-                  <Calendar01Icon className="w-4 h-4" /> {formatDateRange()}
+                  <Calendar className="w-4 h-4" /> {formatDateRange()}
                 </span>
                 <span className="flex items-center gap-1">
                   {itinerary.days.length} {itinerary.days.length === 1 ? 'day' : 'days'}

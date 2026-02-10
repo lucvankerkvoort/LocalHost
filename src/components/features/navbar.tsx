@@ -7,7 +7,7 @@ import { useSession } from 'next-auth/react';
 import { SignInButton, AuthButton, UserMenu } from '@/components/features';
 import { P2PChatPanel } from '@/components/features/p2p-chat-panel';
 
-import { Home01Icon, Comment01Icon } from 'hugeicons-react';
+import { Home, MessageSquare } from 'lucide-react';
 
 import { useAppSelector } from '@/store/hooks';
 import { selectTotalUnreadCount } from '@/store/p2p-chat-slice';
@@ -30,7 +30,7 @@ export function Navbar() {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 group">
-              <Home01Icon className="w-6 h-6 text-[var(--princeton-orange)] group-hover:text-[var(--foreground)] transition-colors" />
+              <Home className="w-6 h-6 text-[var(--princeton-orange)] group-hover:text-[var(--foreground)] transition-colors" />
               <span className="font-bold text-xl text-[var(--foreground)]">Localhost</span>
             </Link>
 
@@ -43,7 +43,7 @@ export function Navbar() {
                 className="relative p-2 rounded-lg hover:bg-[var(--muted)] transition-colors"
                 title="Messages"
               >
-                <Comment01Icon className="w-6 h-6 text-[var(--foreground)]" />
+                <MessageSquare className="w-6 h-6 text-[var(--foreground)]" />
                 {/* Notification Badge */}
                 {unreadCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-[var(--princeton-orange)] text-white text-xs font-bold rounded-full flex items-center justify-center">

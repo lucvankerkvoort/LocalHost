@@ -1,6 +1,6 @@
 'use client';
 
-import { Airplane01Icon, Location01Icon, Calendar01Icon, ArrowRight01Icon } from 'hugeicons-react';
+import { Plane, MapPin, Calendar, ArrowRight } from 'lucide-react';
 import { Trip, TripAnchor } from '@prisma/client';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -67,7 +67,7 @@ export function TripCard({ trip }: TripCardProps) {
             <div className="bg-[#1a1f2e] border border-white/10 rounded-xl overflow-hidden hover:border-white/20 transition-all shadow-lg hover:shadow-xl group-hover:-translate-y-1 h-full flex flex-col">
                 {/* Placeholder Image Area */}
                 <div className="h-40 bg-gradient-to-br from-indigo-900/50 to-purple-900/50 flex items-center justify-center relative shrink-0">
-                    <Airplane01Icon className="w-8 h-8 text-[var(--princeton-orange)]" />
+                    <Plane className="w-8 h-8 text-[var(--princeton-orange)]" />
                     <div className="absolute top-2 right-2 bg-black/40 px-2 py-1 rounded text-xs font-medium text-white/80 uppercase backdrop-blur-sm">
                         {trip.status}
                     </div>
@@ -79,7 +79,7 @@ export function TripCard({ trip }: TripCardProps) {
                     {trip.title}
                 </h3>
                 <div className="flex items-center text-sm text-gray-400 mb-2">
-                    <span className="mr-2 flex items-center gap-1"><Location01Icon className="w-4 h-4" /> {city}</span>
+                    <span className="mr-2 flex items-center gap-1"><MapPin className="w-4 h-4" /> {city}</span>
                 </div>
                 <div className="text-xs text-gray-500 flex justify-between items-center mt-auto">
                     <span>{dateRange}</span>

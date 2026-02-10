@@ -26,19 +26,18 @@ import {
   resolveHostOnboardingStage,
   shouldStartHostOnboardingHandshake,
 } from './chat-widget-handshake';
-import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  UserSearch01Icon,
-  House01Icon,
-  BubbleChatIcon,
-  Cancel01Icon,
-  ArrowDown01Icon,
-  ArrowRight01Icon,
-  ReloadIcon,
-  Location01Icon,
-  Wrench01Icon,
-  SentIcon
-} from '@hugeicons/core-free-icons';
+  UserSearch,
+  House,
+  MessageCircle,
+  X,
+  ArrowDown,
+  ArrowRight,
+  RotateCw,
+  MapPin,
+  Wrench,
+  Send,
+} from 'lucide-react';
 
 interface HostMatch {
   id: string;
@@ -89,7 +88,7 @@ function useDraggablePanel(position: Position, onPositionChange: (pos: Position)
 // Intent-based UI configuration
 const INTENT_UI_CONFIG = {
   general: {
-    Icon: UserSearch01Icon,
+    Icon: UserSearch,
     title: 'Find Your Person',
     subtitle: 'Tell me where you\'re going!',
     emptyStateGreeting: 'Hey! I can help you find locals who match your vibe.',
@@ -97,7 +96,7 @@ const INTENT_UI_CONFIG = {
     inputPlaceholder: 'Where are you heading?',
   },
   become_host: {
-    Icon: House01Icon,
+    Icon: House,
     title: 'Create Your Experience',
     subtitle: 'I\'ll help you set up your hosting profile',
     emptyStateGreeting: 'Ready to become a host? Let\'s start with your city!',
@@ -432,9 +431,9 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
         aria-label={isOpen ? 'Close chat' : 'Open chat'}
       >
         {isOpen ? (
-          <HugeiconsIcon icon={Cancel01Icon} className="w-6 h-6 text-white" />
+          <X className="w-6 h-6 text-white" />
         ) : (
-          <HugeiconsIcon icon={BubbleChatIcon} className="w-6 h-6 text-white" />
+          <MessageCircle className="w-6 h-6 text-white" />
         )}
       </button>
 
@@ -454,7 +453,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
               >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                    <HugeiconsIcon icon={uiConfig.Icon} className="w-6 h-6 text-white" />
+                    <uiConfig.Icon className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1">
                     <h3 className="text-white font-semibold">{uiConfig.title}</h3>
@@ -471,7 +470,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                       className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
                       title="Reset position"
                     >
-                      <HugeiconsIcon icon={ReloadIcon} className="w-4 h-4 text-white" />
+                      <RotateCw className="w-4 h-4 text-white" />
                     </button>
                   )}
                 </div>
@@ -572,7 +571,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                               {toolCalls.map((tc, i) => (
                                 <div key={i} className="flex items-center gap-2">
                                   <span className={`w-2 h-2 rounded-full ${tc.state === 'result' || tc.state === 'output-available' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
-                                  <HugeiconsIcon icon={Wrench01Icon} className="w-4 h-4 text-[var(--foreground)]" />
+                                  <Wrench className="w-4 h-4 text-[var(--foreground)]" />
                                   <span className="font-medium text-[var(--foreground)]">{tc.name}</span>
                                   {tc.output?.message && <span className="text-[var(--foreground)]">- {tc.output.message}</span>}
                                 </div>
@@ -600,11 +599,11 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                                 <div className="flex-1 min-w-0">
                                   <h4 className="font-medium text-[var(--foreground)] text-sm">{host.name}</h4>
                                   <p className="flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
-                                    <HugeiconsIcon icon={Location01Icon} className="w-3 h-3" />
+                                    <MapPin className="w-3 h-3" />
                                     {host.city}, {host.country}
                                   </p>
                                 </div>
-                                <HugeiconsIcon icon={ArrowRight01Icon} className="w-4 h-4 text-[var(--muted)]" />
+                                <ArrowRight className="w-4 h-4 text-[var(--muted)]" />
                               </div>
                               <p className="text-xs text-[var(--muted-foreground)] mt-2 italic line-clamp-1">"{host.quote}"</p>
                               <div className="flex flex-wrap gap-1 mt-2">
@@ -650,7 +649,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                     className="absolute bottom-3 left-1/2 -translate-x-1/2 w-8 h-8 bg-[var(--card-background)] border border-[var(--border)] rounded-full shadow-lg flex items-center justify-center hover:bg-[var(--muted)] transition-all duration-200 animate-fade-in z-10"
                     aria-label="Scroll to bottom"
                   >
-                    <HugeiconsIcon icon={ArrowDown01Icon} className="w-4 h-4 text-[var(--foreground)]" />
+                    <ArrowDown className="w-4 h-4 text-[var(--foreground)]" />
                   </button>
                 )}
               </div>
@@ -673,7 +672,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                     disabled={isLoading || !localInput.trim()}
                     className="w-10 h-10 bg-[var(--princeton-orange)] rounded-full flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--blue-green)] transition-colors"
                   >
-                    <HugeiconsIcon icon={SentIcon} className="w-5 h-5 text-white" />
+                    <Send className="w-5 h-5 text-white" />
                   </button>
                 </div>
               </form>

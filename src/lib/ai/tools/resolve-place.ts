@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { createTool, ToolResult } from './tool-registry';
+import { validateCoordinate, isObviouslyInvalid } from '../validation/geo-validator';
 
 // ============================================================================
 // Schema
@@ -26,6 +27,8 @@ type ResolvePlaceResult = {
   confidence: number;
   distanceToAnchor?: number;
   city?: string;
+  /** Geocoding validation confidence level */
+  geoValidation?: 'HIGH' | 'MEDIUM' | 'LOW' | 'FAILED';
 };
 
 // ============================================================================
@@ -262,6 +265,28 @@ export const resolvePlaceTool = createTool({
               console.log(`[resolve_place] Triangulated best match for "${params.name}": ${bestResult.name} (${Math.round(minDistance)}m away)`);
             } else {
                console.log(`[resolve_place] Found "${params.name}" (no anchor provided)`);
+            }
+
+            // Validate the best result's coordinates against trust boundaries
+            const { lat, lng } = bestResult.location;
+            const validation = validateCoordinate(lat, lng);
+            
+            if (!validation.valid) {
+              // Log violations for debugging/monitoring
+              console.warn(`[resolve_place] Coordinate validation failed for "${params.name}":`, 
+                validation.violations.map(v => `${v.code}: ${v.message}`));
+              
+              // Reduce confidence to 0 if validation fails
+              bestResult = {
+                ...bestResult,
+                confidence: 0,
+                geoValidation: 'FAILED',
+              };
+            } else {
+              bestResult = {
+                ...bestResult,
+                geoValidation: validation.confidence,
+              };
             }
 
             return { success: true, data: attachDistanceToAnchor(bestResult, params.anchorPoint) };

@@ -3,29 +3,29 @@
 import Link from 'next/link';
 import { formatPrice, formatDuration, formatGroupSize } from '@/lib/utils';
 import { 
-  BookOpen01Icon, 
-  Location01Icon, 
-  Moon01Icon, 
-  MountainIcon, 
-  PaintBoardIcon, 
-  Restaurant01Icon, 
-  SparklesIcon, 
-  StarIcon, 
-  UserGroupIcon, 
-  Yoga01Icon,
-  SmileIcon
-} from 'hugeicons-react';
+  BookOpen, 
+  MapPin, 
+  Moon, 
+  Mountain, 
+  Palette, 
+  Utensils, 
+  Sparkles, 
+  Star, 
+  Users, 
+  PersonStanding,
+  Smile
+} from 'lucide-react';
 
 // Map database enum to display values
 // Map database enum to display values
 const CATEGORY_DISPLAY: Record<string, { label: string; icon: React.ReactNode }> = {
-  FOOD_DRINK: { label: 'Food & Drink', icon: <Restaurant01Icon className="w-3.5 h-3.5" /> },
-  ARTS_CULTURE: { label: 'Arts & Culture', icon: <PaintBoardIcon className="w-3.5 h-3.5" /> },
-  OUTDOOR_ADVENTURE: { label: 'Outdoor & Adventure', icon: <MountainIcon className="w-3.5 h-3.5" /> },
-  WELLNESS: { label: 'Wellness', icon: <Yoga01Icon className="w-3.5 h-3.5" /> },
-  LEARNING: { label: 'Learning', icon: <BookOpen01Icon className="w-3.5 h-3.5" /> },
-  NIGHTLIFE_SOCIAL: { label: 'Nightlife & Social', icon: <Moon01Icon className="w-3.5 h-3.5" /> },
-  FAMILY: { label: 'Family', icon: <UserGroupIcon className="w-3.5 h-3.5" /> },
+  FOOD_DRINK: { label: 'Food & Drink', icon: <Utensils className="w-3.5 h-3.5" /> },
+  ARTS_CULTURE: { label: 'Arts & Culture', icon: <Palette className="w-3.5 h-3.5" /> },
+  OUTDOOR_ADVENTURE: { label: 'Outdoor & Adventure', icon: <Mountain className="w-3.5 h-3.5" /> },
+  WELLNESS: { label: 'Wellness', icon: <PersonStanding className="w-3.5 h-3.5" /> },
+  LEARNING: { label: 'Learning', icon: <BookOpen className="w-3.5 h-3.5" /> },
+  NIGHTLIFE_SOCIAL: { label: 'Nightlife & Social', icon: <Moon className="w-3.5 h-3.5" /> },
+  FAMILY: { label: 'Family', icon: <Users className="w-3.5 h-3.5" /> },
 };
 
 interface ExperienceCardProps {
@@ -65,7 +65,7 @@ export function ExperienceCard({
   reviewCount,
   host,
 }: ExperienceCardProps) {
-  const categoryInfo = CATEGORY_DISPLAY[category] || { label: category, icon: <SparklesIcon className="w-3.5 h-3.5" /> };
+  const categoryInfo = CATEGORY_DISPLAY[category] || { label: category, icon: <Sparkles className="w-3.5 h-3.5" /> };
   const mainImage = photos[0] || 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=600&h=400&fit=crop';
 
   return (
@@ -95,7 +95,7 @@ export function ExperienceCard({
         <div className="p-4 flex-1 flex flex-col">
           {/* Location */}
           <div className="flex items-center gap-1 text-sm text-[var(--muted-foreground)] mb-1">
-            <Location01Icon className="w-3.5 h-3.5" />
+            <MapPin className="w-3.5 h-3.5" />
             <span>{city}, {country}</span>
           </div>
 
@@ -126,13 +126,13 @@ export function ExperienceCard({
 
           {/* Group size */}
           <div className="flex items-center gap-1.5 text-sm text-[var(--muted-foreground)] mb-3">
-            <UserGroupIcon className="w-3.5 h-3.5" /> {formatGroupSize(minGroupSize, maxGroupSize)}
+            <Users className="w-3.5 h-3.5" /> {formatGroupSize(minGroupSize, maxGroupSize)}
           </div>
 
           {/* Footer: Rating & Price */}
           <div className="mt-auto pt-3 border-t border-[var(--border)] flex items-center justify-between">
             <div className="flex items-center gap-1">
-              <span className="text-[var(--accent)]"><StarIcon className="w-3.5 h-3.5 fill-current" /></span>
+              <span className="text-[var(--accent)]"><Star className="w-3.5 h-3.5 fill-current" /></span>
               <span className="font-medium">{rating.toFixed(1)}</span>
               <span className="text-[var(--muted-foreground)] text-sm">
                 ({reviewCount})

@@ -2,7 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ArrowUp01Icon, ArrowDown01Icon, Delete02Icon, DragDropVerticalIcon } from 'hugeicons-react';
+import { ArrowUp, ArrowDown, Trash2, GripVertical } from 'lucide-react';
 import { HostCreationStop } from '@/store/host-creation-slice';
 
 interface SortableStopCardProps {
@@ -67,7 +67,7 @@ export function SortableStopCard({
             
           {/* Drag Handle Icon (Alternative) - Optional, but clarify */}
           <div {...attributes} {...listeners} className="cursor-grab text-[var(--muted-foreground)]/50 hover:text-[var(--foreground)] mt-1">
-             <DragDropVerticalIcon className="w-4 h-4" />
+             <GripVertical className="w-4 h-4" />
           </div>
 
           <input 
@@ -86,7 +86,7 @@ export function SortableStopCard({
                 className="p-1 hover:bg-red-50 hover:text-red-500 rounded text-[var(--muted-foreground)] ml-1"
                 title="Remove Stop"
              >
-               <Delete02Icon className="w-3 h-3" />
+               <Trash2 className="w-3 h-3" />
              </button>
           </div>
         </div>

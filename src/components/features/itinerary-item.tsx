@@ -2,18 +2,18 @@
 
 import { ItineraryItem as ItineraryItemData, ItineraryItemType, ITEM_TYPE_CONFIG } from '@/types/itinerary';
 import { 
-  Location01Icon, 
-  Time01Icon, 
-  Edit02Icon, 
-  Delete02Icon,
-  ViewIcon,
-  SparklesIcon,
-  Restaurant01Icon,
-  Sun01Icon,
-  Car01Icon,
-  Note01Icon,
-  House01Icon
-} from 'hugeicons-react';
+  MapPin, 
+  Clock, 
+  Pencil, 
+  Trash2,
+  Eye,
+  Sparkles,
+  Utensils,
+  Sun,
+  Car,
+  StickyNote,
+  House
+} from 'lucide-react';
 
 interface ItineraryItemProps {
   item: ItineraryItemData;
@@ -82,13 +82,13 @@ export function ItineraryItem({
           className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-lg"
           style={{ backgroundColor: `${config.color}20`, color: config.color }}
         >
-          {configKey === 'SIGHT' && <ViewIcon className="w-4 h-4" />}
-          {configKey === 'EXPERIENCE' && <SparklesIcon className="w-4 h-4" />}
-          {configKey === 'MEAL' && <Restaurant01Icon className="w-4 h-4" />}
-          {configKey === 'FREE_TIME' && <Sun01Icon className="w-4 h-4" />}
-          {configKey === 'TRANSPORT' && <Car01Icon className="w-4 h-4" />}
-          {configKey === 'NOTE' && <Note01Icon className="w-4 h-4" />}
-          {configKey === 'LODGING' && <House01Icon className="w-4 h-4" />}
+          {configKey === 'SIGHT' && <Eye className="w-4 h-4" />}
+          {configKey === 'EXPERIENCE' && <Sparkles className="w-4 h-4" />}
+          {configKey === 'MEAL' && <Utensils className="w-4 h-4" />}
+          {configKey === 'FREE_TIME' && <Sun className="w-4 h-4" />}
+          {configKey === 'TRANSPORT' && <Car className="w-4 h-4" />}
+          {configKey === 'NOTE' && <StickyNote className="w-4 h-4" />}
+          {configKey === 'LODGING' && <House className="w-4 h-4" />}
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -103,7 +103,7 @@ export function ItineraryItem({
           </div>
           {item.location && (
             <p className="flex items-center gap-1 text-xs text-[var(--muted-foreground)] truncate mt-0.5">
-              <Location01Icon className="w-3 h-3" /> {item.location}
+              <MapPin className="w-3 h-3" /> {item.location}
             </p>
           )}
         </div>
@@ -112,7 +112,7 @@ export function ItineraryItem({
       {/* Time */}
       {(item.startTime || item.endTime) && (
         <div className="flex items-center gap-1 mt-2 text-xs text-[var(--muted-foreground)]">
-          <Time01Icon className="w-3 h-3" /> {item.startTime || '??:??'} - {item.endTime || '??:??'}
+          <Clock className="w-3 h-3" /> {item.startTime || '??:??'} - {item.endTime || '??:??'}
         </div>
       )}
       
@@ -146,7 +146,7 @@ export function ItineraryItem({
                      hover:text-[var(--blue-green)] transition-colors"
           title="Edit"
         >
-          <Edit02Icon className="w-4 h-4" />
+          <Pencil className="w-4 h-4" />
         </button>
         <button
           onClick={() => onDelete(dayId, item.id)}
@@ -155,7 +155,7 @@ export function ItineraryItem({
                      hover:text-red-600 transition-colors"
           title="Delete"
         >
-          <Delete02Icon className="w-4 h-4" />
+          <Trash2 className="w-4 h-4" />
         </button>
       </div>
     </div>

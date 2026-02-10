@@ -17,6 +17,15 @@ import {
   updateSessionPlan, 
   updateSessionHosts 
 } from './trip-session';
+import {
+  validateDirectionality,
+  inferOriginAndTerminus,
+  buildRegenerationConstraints,
+  TripType,
+} from './validation/direction-validator';
+import { validatePacing } from './validation/pacing-validator';
+import { validateCorridorAdherence } from './validation/corridor-validator';
+import { fetchRoutePolyline } from './services/route-service';
 
 // Define the shape of the initial draft from the LLM - simpler than proper schema to give it freedom before hydration
 const DraftItinerarySchema = z.object({
@@ -591,38 +600,172 @@ export class ItineraryOrchestrator {
 
   /**
    * Fast draft mode: build a lightweight plan using the city anchor only.
+   * Includes regeneration loop for blocking violations.
    */
   async planTripDraft(userPrompt: string): Promise<{
     plan: ItineraryPlan | null;
     context: { draft: DraftItinerary; tripAnchor: GeoPoint | null };
   }> {
     console.log(`[Orchestrator] Drafting plan for: "${userPrompt}"`);
-    const draft = await this.draftItinerary(userPrompt);
-    this.callbacks.onDraftComplete?.(draft);
-
-    let tripAnchor = await this.resolveTripAnchor(draft);
     
-    // Fallback: If main trip anchor failed (e.g. "Europe" or multi-city list strings), 
-    // try to use the first day's location as the anchor
-    if (!tripAnchor && draft.days.length > 0) {
-      const firstDay = draft.days[0];
-      const fallbackCity = firstDay.city || draft.city;
-      const fallbackCountry = firstDay.country || draft.country;
+    const MAX_REGENERATION_ATTEMPTS = 3;
+    let attempt = 0;
+    let constraints: string[] = [];
+    let draft: DraftItinerary | null = null;
+    let plan: ItineraryPlan | null = null;
+    let tripAnchor: GeoPoint | null = null;
+    
+    // Regeneration loop: retry up to 3x for blocking directional violations
+    while (attempt < MAX_REGENERATION_ATTEMPTS) {
+      attempt++;
       
-      console.log(`[Orchestrator] Main anchor failed. Trying fallback to Day 1: ${fallbackCity}, ${fallbackCountry}`);
+      draft = await this.draftItinerary(userPrompt, constraints.length > 0 ? constraints : undefined);
+      this.callbacks.onDraftComplete?.(draft);
+
+      tripAnchor = await this.resolveTripAnchor(draft);
       
-      const cityResult = await this.executeTool<{
-        location: { lat: number; lng: number };
-      }>('resolve_place', { name: fallbackCity, context: fallbackCountry });
+      // Fallback: If main trip anchor failed (e.g. "Europe" or multi-city list strings), 
+      // try to use the first day's location as the anchor
+      if (!tripAnchor && draft.days.length > 0) {
+        const firstDay = draft.days[0];
+        const fallbackCity = firstDay.city || draft.city;
+        const fallbackCountry = firstDay.country || draft.country;
+        
+        console.log(`[Orchestrator] Main anchor failed. Trying fallback to Day 1: ${fallbackCity}, ${fallbackCountry}`);
+        
+        const cityResult = await this.executeTool<{
+          location: { lat: number; lng: number };
+        }>('resolve_place', { name: fallbackCity, context: fallbackCountry });
+        
+        tripAnchor = cityResult?.location ?? null;
+      }
+
+      plan = this.buildDraftPlan(userPrompt, draft, tripAnchor);
+
+      // Validate directionality for road trips
+      if (plan && plan.days.length > 1) {
+        const dayAnchors = plan.days
+          .filter(d => d.anchorLocation?.location)
+          .map(d => ({
+            dayNumber: d.dayNumber,
+            lat: d.anchorLocation!.location.lat,
+            lng: d.anchorLocation!.location.lng,
+            city: d.city,
+          }));
+
+        if (dayAnchors.length >= 2) {
+          // Infer trip type from prompt (default to ONE_WAY for road trips)
+          const tripType: TripType = 'ONE_WAY';
+          const endpoints = inferOriginAndTerminus(dayAnchors, tripType);
+
+          if (endpoints) {
+            const directionResult = validateDirectionality({
+              origin: endpoints.origin,
+              terminus: endpoints.terminus,
+              tripType,
+              dayAnchors,
+            });
+
+            if (!directionResult.valid) {
+              const newConstraints = buildRegenerationConstraints(directionResult.violations);
+              
+              if (attempt < MAX_REGENERATION_ATTEMPTS) {
+                console.warn(`[Orchestrator] Directional validation failed (attempt ${attempt}/${MAX_REGENERATION_ATTEMPTS}):`, 
+                  directionResult.violations.map(v => `${v.code}: ${v.message}`));
+                console.log(`[Orchestrator] Regenerating with constraints:`, newConstraints);
+                
+                constraints = [...constraints, ...newConstraints];
+                continue; // Retry with new constraints
+              }
+              
+              // Final attempt failed, attach violations and proceed
+              console.warn('[Orchestrator] Max regeneration attempts reached, proceeding with violations');
+              plan.violations = directionResult.violations.map(v => ({
+                code: v.code,
+                severity: v.severity,
+                message: v.message,
+              }));
+            }
+          }
+        }
+      }
       
-      tripAnchor = cityResult?.location ?? null;
+      break; // Valid plan or max attempts reached
     }
 
-    const plan = this.buildDraftPlan(userPrompt, draft, tripAnchor);
+    // Validate pacing (activity density per day)
+    if (plan && plan.days.length > 0) {
+      const dayPacing = plan.days.map(d => ({
+        dayNumber: d.dayNumber,
+        city: d.city,
+        activityCount: d.activities?.length ?? 0,
+      }));
+
+      const pacingResult = validatePacing({ days: dayPacing });
+      
+      if (pacingResult.violations.length > 0) {
+        console.warn('[Orchestrator] Pacing validation warnings:', 
+          pacingResult.violations.map(v => `${v.code}: ${v.message}`));
+        
+        // Append pacing violations to plan
+        plan.violations = [
+          ...(plan.violations ?? []),
+          ...pacingResult.violations.map(v => ({
+            code: v.code,
+            severity: v.severity,
+            message: v.message,
+          })),
+        ];
+      }
+    }
+
+    // Validate corridor adherence (fetch OSRM route)
+    if (plan && plan.days.length >= 2) {
+      const dayAnchors = plan.days
+        .filter(d => d.anchorLocation?.location)
+        .map(d => ({
+          dayNumber: d.dayNumber,
+          lat: d.anchorLocation!.location.lat,
+          lng: d.anchorLocation!.location.lng,
+          city: d.city,
+        }));
+
+      if (dayAnchors.length >= 2) {
+        const origin = { lat: dayAnchors[0].lat, lng: dayAnchors[0].lng };
+        const terminus = { lat: dayAnchors[dayAnchors.length - 1].lat, lng: dayAnchors[dayAnchors.length - 1].lng };
+
+        try {
+          const route = await fetchRoutePolyline(origin, terminus);
+          
+          if (route) {
+            const corridorResult = validateCorridorAdherence({
+              polyline: route.polyline,
+              dayAnchors,
+            });
+
+            if (corridorResult.violations.length > 0) {
+              console.warn('[Orchestrator] Corridor validation warnings:',
+                corridorResult.violations.map(v => `${v.code}: ${v.message}`));
+
+              plan.violations = [
+                ...(plan.violations ?? []),
+                ...corridorResult.violations.map(v => ({
+                  code: v.code,
+                  severity: v.severity,
+                  message: v.message,
+                })),
+              ];
+            }
+          }
+        } catch (error) {
+          console.warn('[Orchestrator] Failed to fetch route for corridor validation:', error);
+        }
+      }
+    }
 
     return {
       plan,
-      context: { draft, tripAnchor },
+      context: { draft: draft!, tripAnchor },
     };
   }
 
@@ -746,25 +889,32 @@ export class ItineraryOrchestrator {
   }
 
   /**
-   * Step 1: Ask LLM to structure the days and activities using known POIs.
-   */
-  private async draftItinerary(prompt: string): Promise<DraftItinerary> {
-    const { object } = await generateObject({
-      model: this.model,
-      schema: DraftItinerarySchema,
-      prompt: `
-        You are an expert travel planner. Create a structured itinerary based on this request: "${prompt}".
-        
-        Rules:
-        - IMPORTANT: Include the country and main city for this trip.
-        - Ensure 1-3 main stops per day.
-        - Stops must be real, physical locations (museums, parks, restaurants, landmarks).
-        - Pick a logical flow (places near each other).
-        - Assign a general "anchor area" for the day (e.g. the neighborhood center).
-      `,
-    });
-    return object;
-  }
+ * Step 1: Ask LLM to structure the days and activities using known POIs.
+ * @param prompt - User's travel request
+ * @param constraints - Optional constraints from regeneration loop (e.g., "Day 3 MUST NOT be at origin")
+ */
+private async draftItinerary(prompt: string, constraints?: string[]): Promise<DraftItinerary> {
+  const constraintText = constraints?.length
+    ? `\n\nIMPORTANT CONSTRAINTS (you MUST follow these):\n${constraints.map(c => `- ${c}`).join('\n')}`
+    : '';
+
+  const { object } = await generateObject({
+    model: this.model,
+    schema: DraftItinerarySchema,
+    prompt: `
+      You are an expert travel planner. Create a structured itinerary based on this request: "${prompt}".
+      
+      Rules:
+      - IMPORTANT: Include the country and main city for this trip.
+      - Ensure 1-3 main stops per day.
+      - Stops must be real, physical locations (museums, parks, restaurants, landmarks).
+      - Pick a logical flow (places near each other).
+      - Assign a general "anchor area" for the day (e.g. the neighborhood center).
+      ${constraintText}
+    `,
+  });
+  return object;
+}
   /**
    * Process a single day: Resolve places, find anchor, get hosts, add navigation.
    * Now uses tool registry for all operations.
