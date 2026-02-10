@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft01Icon, Calendar01Icon, Delete02Icon, SparklesIcon } from 'hugeicons-react';
+import { ArrowLeft, Calendar, Trash2, Sparkles } from 'lucide-react';
 
 type AvailabilitySlot = {
   id: string;
@@ -175,13 +175,13 @@ export default function ExperienceAvailabilityPage() {
             onClick={() => router.back()}
             className="inline-flex items-center gap-2 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
           >
-            <ArrowLeft01Icon className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4" />
             Back
           </button>
 
           <div className="mt-12 text-center">
             <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
-              <Calendar01Icon className="w-8 h-8 text-amber-600" />
+              <Calendar className="w-8 h-8 text-amber-600" />
             </div>
             <h1 className="text-xl font-bold text-[var(--foreground)]">This isn't your experience</h1>
             <p className="text-sm text-[var(--muted-foreground)] mt-2 mb-6">
@@ -208,13 +208,13 @@ export default function ExperienceAvailabilityPage() {
             onClick={() => router.back()}
             className="inline-flex items-center gap-2 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
           >
-            <ArrowLeft01Icon className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4" />
             Back
           </button>
 
           <div className="mt-12 text-center">
             <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
-              <Calendar01Icon className="w-8 h-8 text-blue-600" />
+              <Calendar className="w-8 h-8 text-blue-600" />
             </div>
             <h1 className="text-xl font-bold text-[var(--foreground)]">Publish your experience first</h1>
             <p className="text-sm text-[var(--muted-foreground)] mt-2 mb-6">
@@ -239,13 +239,13 @@ export default function ExperienceAvailabilityPage() {
           onClick={() => router.back()}
           className="inline-flex items-center gap-2 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
         >
-          <ArrowLeft01Icon className="w-4 h-4" />
+          <ArrowLeft className="w-4 h-4" />
           Back
         </button>
 
         <div className="mt-6 mb-8 flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-[var(--princeton-orange)]/10 flex items-center justify-center">
-            <Calendar01Icon className="w-5 h-5 text-[var(--princeton-orange)]" />
+            <Calendar className="w-5 h-5 text-[var(--princeton-orange)]" />
           </div>
           <div>
             <h1 className="text-2xl font-bold">Availability</h1>
@@ -274,7 +274,7 @@ export default function ExperienceAvailabilityPage() {
               }}
               className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
             >
-              <SparklesIcon className="w-3.5 h-3.5" />
+              <Sparkles className="w-3.5 h-3.5" />
               Ask AI
             </button>
           </div>
@@ -374,7 +374,7 @@ export default function ExperienceAvailabilityPage() {
                   <div>
                     <div className="font-medium">{slot.dateLabel}</div>
                     <div className="text-[var(--muted-foreground)] flex items-center gap-2 mt-1">
-                      <Calendar01Icon className="w-4 h-4" />
+                      <Calendar className="w-4 h-4" />
                       <span>
                         {slot.startTime && slot.endTime
                           ? `${slot.startTime}–${slot.endTime}`
@@ -389,7 +389,7 @@ export default function ExperienceAvailabilityPage() {
                     className="rounded-lg p-2 text-red-500 hover:bg-red-50"
                     title="Remove"
                   >
-                    <Delete02Icon className="w-4 h-4" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               ))}

@@ -4,7 +4,7 @@
  * 
  * NOTE: Uses element-based waits, not networkidle (incompatible with Cesium)
  */
-import { test, expect, waitForGlobe, waitForItinerary, openChat } from './fixtures';
+import { test, expect, waitForGlobe, waitForItinerary } from './fixtures';
 
 test.describe('Trip Creation and Itinerary Hydration', () => {
   
@@ -26,9 +26,10 @@ test.describe('Trip Creation and Itinerary Hydration', () => {
     await waitForGlobe(page);
     
     // Chat toggle should be accessible
-    const chatToggle = page.locator('[data-testid="chat-toggle"]');
+    const chatToggle = page.locator('[data-testid="chat-toggle"]').first();
     await expect(chatToggle).toBeVisible();
     await expect(chatToggle).toBeEnabled();
+    await expect(chatToggle.locator('svg.lucide')).toBeVisible();
   });
 
   test('load demo button works', async ({ page }) => {

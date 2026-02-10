@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { Host } from '@/lib/data/hosts';
-import { Location01Icon, Calendar01Icon, StarIcon } from 'hugeicons-react';
+import { MapPin, Calendar, Star } from 'lucide-react';
 
 interface HostCardProps {
   host: Host;
@@ -21,7 +21,7 @@ export function HostCard({ host }: HostCardProps) {
         />
         <div className="absolute bottom-3 left-3 right-3">
           <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/90 backdrop-blur-sm text-sm font-medium">
-            <Location01Icon className="w-3.5 h-3.5" /> {host.city}, {host.country}
+            <MapPin className="w-3.5 h-3.5" /> {host.city}, {host.country}
           </span>
         </div>
       </div>
@@ -57,7 +57,7 @@ export function HostCard({ host }: HostCardProps) {
         {/* Stats */}
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-1 text-[var(--muted-foreground)]">
-            <span className="text-[var(--accent)]"><StarIcon className="w-3.5 h-3.5 fill-current" /></span>
+            <span className="text-[var(--accent)]"><Star className="w-3.5 h-3.5 fill-current" /></span>
             {host.experiences.length > 0 && (
               <span className="font-medium">
                 {host.experiences[0].rating} 
@@ -81,7 +81,7 @@ export function HostCard({ host }: HostCardProps) {
             }}
             className="w-full py-2 px-4 bg-[var(--secondary)]/10 hover:bg-[var(--primary)] hover:text-white text-[var(--foreground)] rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2"
           >
-            <Calendar01Icon className="w-4 h-4" />
+            <Calendar className="w-4 h-4" />
             Add to Plan
           </button>
         </div>

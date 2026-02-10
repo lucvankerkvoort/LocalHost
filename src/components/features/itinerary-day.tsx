@@ -1,7 +1,7 @@
 'use client';
 
 import { ItineraryItem as ItineraryItemType } from '@/types/itinerary';
-import { Calendar01Icon, Location01Icon, Time01Icon, Add01Icon } from 'hugeicons-react';
+import { Calendar, MapPin, Clock, Plus } from 'lucide-react';
 
 interface ItineraryDayProps {
   dayId: string;
@@ -121,7 +121,7 @@ export function ItineraryDayColumn({
                         <div className="flex items-center gap-2 mt-1 text-xs text-[var(--muted-foreground)]">
                        {item.duration && (
                                <span className="flex items-center gap-1">
-                                   <Time01Icon className="w-3 h-3" />
+                                   <Clock className="w-3 h-3" />
                                    {Math.round(item.duration / 60) > 0 ? `${Math.round(item.duration / 60)}h` : `${item.duration}m`}
                                </span>
                            )}
@@ -153,7 +153,7 @@ export function ItineraryDayColumn({
             onClick={() => onAddActivity(dayId)}
             className="w-full py-2 border-2 border-dashed border-[var(--border)] rounded-lg text-sm font-semibold text-[var(--foreground)]/80 hover:bg-[var(--secondary)]/10 hover:text-[var(--secondary)] hover:border-[var(--secondary)]/50 transition-all flex items-center justify-center gap-1"
         >
-            <Add01Icon className="w-4 h-4" /> Add to Day {dayNumber}
+            <Plus className="w-4 h-4" /> Add to Day {dayNumber}
         </button>
       </div>
     </div>

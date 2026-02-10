@@ -1,6 +1,6 @@
 'use client';
 
-import { Location01Icon, Time01Icon, UserGroupIcon, BubbleChatIcon } from 'hugeicons-react';
+import { MapPin, Clock, Users, MessageCircle } from 'lucide-react';
 import { useAppSelector } from '@/store/hooks';
 import { selectHostCreation } from '@/store/host-creation-slice';
 import Link from 'next/link';
@@ -82,7 +82,7 @@ export default function ProfilePage() {
                 </span>
               </div>
               <p className="text-[var(--muted-foreground)] flex items-center gap-2">
-                <span className="flex items-center gap-1"><Location01Icon className="w-4 h-4" /> {city}</span>
+                <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {city}</span>
                 <span>•</span>
                 <span>Joined {host.joined}</span>
               </p>
@@ -111,15 +111,15 @@ export default function ProfilePage() {
                 </p>
                 <div className="mt-4 flex gap-4 text-sm font-medium">
                   <div className="flex items-center gap-2 bg-[var(--muted)]/20 px-3 py-1.5 rounded-lg border border-[var(--border)]">
-                    <Time01Icon className="w-4 h-4" />
+                    <Clock className="w-4 h-4" />
                     <span>{duration || 120} mins</span>
                   </div>
                   <div className="flex items-center gap-2 bg-[var(--muted)]/20 px-3 py-1.5 rounded-lg border border-[var(--border)]">
-                    <UserGroupIcon className="w-4 h-4" />
+                    <Users className="w-4 h-4" />
                     <span>Max 4 people</span>
                   </div>
                   <div className="flex items-center gap-2 bg-[var(--muted)]/20 px-3 py-1.5 rounded-lg border border-[var(--border)]">
-                    <BubbleChatIcon className="w-4 h-4" />
+                    <MessageCircle className="w-4 h-4" />
                     <span>English, Spanish</span>
                   </div>
                 </div>

@@ -66,6 +66,12 @@ export const ItineraryPlanSchema = z.object({
   request: z.string().describe('Original user prompt'),
   days: z.array(DayPlanSchema),
   summary: z.string().describe('Brief executive summary of the entire trip'),
+  tripType: z.enum(['ONE_WAY', 'ROUND_TRIP', 'CITY']).optional().describe('Trip type for road trips'),
+  violations: z.array(z.object({
+    code: z.string(),
+    severity: z.enum(['ERROR', 'WARN']),
+    message: z.string(),
+  })).optional().describe('Validation violations detected during planning'),
 });
 
 // --- Types ---

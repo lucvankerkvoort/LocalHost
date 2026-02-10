@@ -4,13 +4,13 @@ import { MyExperience } from '@/actions/experiences';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { 
-  Location01Icon, 
-  Time01Icon, 
-  SparklesIcon, 
-  Calendar01Icon,
-  Share01Icon,
-  Delete02Icon
-} from 'hugeicons-react';
+  MapPin, 
+  Clock, 
+  Sparkles, 
+  Calendar,
+  Share,
+  Trash2
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface ExperienceCardProps {
@@ -54,7 +54,7 @@ export function ExperienceCard({
 
         {/* Location */}
         <div className="flex items-center gap-1.5 text-sm text-[var(--muted-foreground)]">
-          <Location01Icon className="w-4 h-4 text-[var(--princeton-orange)]" />
+          <MapPin className="w-4 h-4 text-[var(--princeton-orange)]" />
           <span>{experience.location}</span>
         </div>
 
@@ -65,7 +65,7 @@ export function ExperienceCard({
 
         {/* Date */}
         <div className="mt-auto pt-2 flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]/80">
-          <Time01Icon className="w-3.5 h-3.5" />
+          <Clock className="w-3.5 h-3.5" />
           <span>Updated {formatDistanceToNow(experience.updatedAt)} ago</span>
         </div>
       </div>
@@ -76,7 +76,7 @@ export function ExperienceCard({
           onClick={() => onRefine?.(experience.id)}
           className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]/50 transition-colors"
         >
-          <SparklesIcon className="w-4 h-4 text-[var(--princeton-orange)]" />
+          <Sparkles className="w-4 h-4 text-[var(--princeton-orange)]" />
           Refine
         </button>
         
@@ -92,7 +92,7 @@ export function ExperienceCard({
           }`}
           title={isPublished ? 'Manage availability' : 'Publish to enable availability'}
         >
-          <Calendar01Icon className="w-4 h-4 text-[var(--blue-green)]" />
+          <Calendar className="w-4 h-4 text-[var(--blue-green)]" />
           {isPublished ? 'Availability' : 'Publish first'}
         </button>
 
@@ -102,7 +102,7 @@ export function ExperienceCard({
           onClick={() => onShare?.(experience.id)}
           className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted)]/50 transition-colors"
         >
-          <Share01Icon className="w-4 h-4" />
+          <Share className="w-4 h-4" />
           Share
         </button>
 
@@ -113,7 +113,7 @@ export function ExperienceCard({
           className="flex items-center justify-center gap-2 py-3 px-4 text-sm font-medium text-red-500 hover:bg-red-500/10 transition-colors"
           title="Delete"
         >
-          <Delete02Icon className="w-4 h-4" />
+          <Trash2 className="w-4 h-4" />
         </button>
       </div>
     </div>

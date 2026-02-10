@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setP2PChatOpen } from '@/store/ui-slice';
 import { selectTotalUnreadCount } from '@/store/p2p-chat-slice';
-import { Comment01Icon, UserCircleIcon } from 'hugeicons-react';
+import { MessageSquare, UserCircle } from 'lucide-react';
 
 interface HeaderProps {
   onToggleTimeline?: () => void;
@@ -86,7 +86,7 @@ export function Header({ onToggleTimeline, showTimeline }: HeaderProps) {
             }`}
             title="Messages"
           >
-            <Comment01Icon className="w-5 h-5" />
+            <MessageSquare className="w-5 h-5" />
             {unreadMessageCount > 0 && (
               <span className="absolute -top-1 -right-1 w-5 h-5 bg-[var(--princeton-orange)] text-white text-xs font-bold rounded-full flex items-center justify-center">
                 {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
@@ -106,7 +106,7 @@ export function Header({ onToggleTimeline, showTimeline }: HeaderProps) {
               }`}
               title="My Profile"
              >
-               <UserCircleIcon className="w-5 h-5" />
+               <UserCircle className="w-5 h-5" />
              </Link>
           )}
 

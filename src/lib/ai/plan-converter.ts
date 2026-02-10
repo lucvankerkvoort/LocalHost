@@ -7,6 +7,7 @@
 import { GlobeDestination, RouteMarkerData, TravelRoute, generateId, getColorForDay } from '@/types/globe';
 import { createItem, ItineraryItem } from '@/types/itinerary';
 import type { ItineraryPlan as OrchestratorPlan } from '@/lib/ai/types';
+import { isObviouslyInvalid } from '@/lib/ai/validation/geo-validator';
 
 /**
  * Convert an orchestrator ItineraryPlan to globe visualization data.
@@ -21,14 +22,8 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
   const routes: TravelRoute[] = [];
   const routeMarkers: RouteMarkerData[] = [];
 
-  const isValidCoordinate = (lat: number, lng: number) =>
-    Number.isFinite(lat) &&
-    Number.isFinite(lng) &&
-    lat >= -90 &&
-    lat <= 90 &&
-    lng >= -180 &&
-    lng <= 180 &&
-    !(lat === 0 && lng === 0);
+  // Use centralized geo-validator for coordinate validation
+  const isValidCoordinate = (lat: number, lng: number) => !isObviouslyInvalid(lat, lng);
 
   const addRouteMarker = (
     routeId: string,
