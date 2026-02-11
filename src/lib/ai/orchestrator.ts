@@ -1023,6 +1023,7 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
             confidence: number;
             distanceToAnchor?: number;
             city?: string;
+            geoValidation?: 'HIGH' | 'MEDIUM' | 'LOW' | 'FAILED';
           }>('resolve_place', { 
             name: act.name, 
             context: dayContext,
@@ -1069,6 +1070,10 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
             category: (placeResult?.category as any) || 'other',
             description: placeResult?.formattedAddress || `${act.name} in ${dayCity}`,
             city: placeResult?.city || dayCity,
+            // Preserve resolve_place metadata as source of truth
+            confidence: placeResult?.confidence,
+            geoValidation: placeResult?.geoValidation as any,
+            distanceToAnchor: placeResult?.distanceToAnchor,
           },
           timeSlot: act.timeSlot,
           notes: act.notes ?? undefined,

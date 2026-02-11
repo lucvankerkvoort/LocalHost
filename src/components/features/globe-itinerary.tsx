@@ -619,9 +619,6 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     if (destinations.length === 0) return [];
 
     type CityCluster = CityMarkerData & {
-      count: number;
-      latSum: number;
-      lngSum: number;
       minDay: number;
     };
 
@@ -646,9 +643,6 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
         dayIds: [dest.id],
         dayNumbers: [dest.day],
         color: dest.color,
-        count: 1,
-        latSum: dest.lat,
-        lngSum: dest.lng,
         minDay: dest.day,
       };
       clusters.push(cluster);
@@ -658,11 +652,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     const addToCluster = (cluster: CityCluster, dest: GlobeDestination) => {
       cluster.dayIds.push(dest.id);
       cluster.dayNumbers.push(dest.day);
-      cluster.count += 1;
-      cluster.latSum += dest.lat;
-      cluster.lngSum += dest.lng;
-      cluster.lat = cluster.latSum / cluster.count;
-      cluster.lng = cluster.lngSum / cluster.count;
+      // Keep first day's position as canonical — don't average/drift
       if (dest.day < cluster.minDay) {
         cluster.minDay = dest.day;
         cluster.color = dest.color;
