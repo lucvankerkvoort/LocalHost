@@ -16,13 +16,23 @@ interface TripCardProps {
   trip: TripWithStops;
 }
 
+type TripAnchorLocation = {
+  name?: string;
+  lat?: number;
+  lng?: number;
+  placeId?: string;
+};
+
 export function TripCard({ trip }: TripCardProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Determine display location from first anchor
   const firstStop = trip.stops[0];
-  const city = firstStop?.title || (firstStop?.locations as any)?.[0]?.name || 'Unknown Destination';
+  const locations = Array.isArray(firstStop?.locations)
+    ? (firstStop?.locations as TripAnchorLocation[])
+    : [];
+  const city = firstStop?.title || locations[0]?.name || 'Unknown Destination';
   
   // Format dates if available
   const dateRange = trip.startDate 

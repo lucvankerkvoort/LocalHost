@@ -4,5 +4,5 @@ export interface ConversationSession {
   id: string;
   intent: AgentIntent;
   lastActiveAt: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }

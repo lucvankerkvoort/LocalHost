@@ -26,7 +26,7 @@ export interface GlobeDestination {
   lng: number;
   day: number;
   color: string;
-  activities: any[];
+  activities: ItineraryPlan['days'][number]['activities'];
 }
 
 export interface TravelRoute {

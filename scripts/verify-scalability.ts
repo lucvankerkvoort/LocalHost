@@ -22,7 +22,8 @@ const mockPlan: ItineraryPlan = {
         description: 'Paris Center',
         city: 'Paris'
       },
-      activities: []
+      activities: [],
+      suggestedHosts: []
     },
     {
       dayNumber: 2,
@@ -37,7 +38,8 @@ const mockPlan: ItineraryPlan = {
         description: 'London Center',
         city: 'London'
       },
-      activities: []
+      activities: [],
+      suggestedHosts: []
     },
     {
       dayNumber: 3,
@@ -52,7 +54,8 @@ const mockPlan: ItineraryPlan = {
         description: 'Berlin Center',
         city: 'Berlin'
       },
-      activities: []
+      activities: [],
+      suggestedHosts: []
     },
     {
       dayNumber: 4,
@@ -67,7 +70,8 @@ const mockPlan: ItineraryPlan = {
         description: 'Rome Center',
         city: 'Rome'
       },
-      activities: []
+      activities: [],
+      suggestedHosts: []
     },
     {
       dayNumber: 5,
@@ -82,7 +86,8 @@ const mockPlan: ItineraryPlan = {
         description: 'Madrid Center',
         city: 'Madrid'
       },
-      activities: []
+      activities: [],
+      suggestedHosts: []
     }
   ]
 };

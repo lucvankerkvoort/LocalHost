@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { StripeOnboardingStatus } from '@prisma/client';
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -20,9 +21,10 @@ export async function POST(req: Request) {
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
-  } catch (error: any) {
-    console.error('Webhook signature verification failed.', error.message);
-    return NextResponse.json({ error: 'Webhook signature verification failed.' }, { status: 400 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Webhook signature verification failed.';
+    console.error('Webhook signature verification failed.', message);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   try {
@@ -41,7 +43,7 @@ export async function POST(req: Request) {
         if (user) {
            const payoutsEnabled = account.payouts_enabled;
            const chargesEnabled = account.charges_enabled;
-           let status = 'PENDING';
+           let status: StripeOnboardingStatus = 'PENDING';
            if (payoutsEnabled && chargesEnabled && account.details_submitted) {
              status = 'COMPLETE';
            } else if (account.requirements?.disabled_reason) {
@@ -53,7 +55,7 @@ export async function POST(req: Request) {
              data: {
                payoutsEnabled,
                chargesEnabled,
-               stripeOnboardingStatus: status as any,
+               stripeOnboardingStatus: status,
              },
            });
         }

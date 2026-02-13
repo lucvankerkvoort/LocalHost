@@ -1,7 +1,7 @@
 'use client';
 
 import { ItineraryItem as ItineraryItemType } from '@/types/itinerary';
-import { Clock, Plus } from 'lucide-react';
+import { Clock, Plus, MapPin, CheckCircle2 } from 'lucide-react';
 import {
   isHostedExperienceItem,
   resolveItineraryDayCaption,
@@ -111,25 +111,44 @@ export function ItineraryDayColumn({
                             )}
                             {showCategory && (
                                 <span className="text-[10px] uppercase tracking-wider text-[var(--muted-foreground)]">
-                                    {item.category.replace('_', ' ')}
+                                    {item.category?.replace('_', ' ')}
                                 </span>
                             )}
                         </div>
                         <h4 className={`font-medium text-[var(--foreground)] truncate pr-6 ${isAnchor ? 'text-sm' : 'text-xs'}`}>
                             {item.title}
                         </h4>
-                        {item.description?.trim() && (
-                            <p className="mt-1 text-xs text-[var(--muted-foreground)] line-clamp-2">
-                                {item.description}
+
+                        {/* Location / Address Line */}
+                        {(item.place?.address || item.place?.city || item.location) && (
+                            <div className="flex items-center gap-1 mt-0.5 text-[10px] text-[var(--muted-foreground)]/80">
+                                <MapPin className="w-3 h-3 flex-shrink-0" />
+                                <span className="truncate">{item.place?.address || item.place?.city || item.location}</span>
+                            </div>
+                        )}
+
+                        {/* Description */}
+                        {(item.place?.description || item.description)?.trim() && (
+                            <p className="mt-1.5 text-xs text-[var(--muted-foreground)] line-clamp-2 leading-relaxed">
+                                {item.place?.description || item.description}
                             </p>
                         )}
-                        <div className="flex items-center gap-2 mt-1 text-xs text-[var(--muted-foreground)]">
-                       {item.duration && (
-                               <span className="flex items-center gap-1">
+                        
+                        {/* Footer Meta */}
+                        <div className="flex items-center gap-3 mt-2 text-xs text-[var(--muted-foreground)]">
+                           {item.duration && (
+                               <span className="flex items-center gap-1 bg-[var(--muted)]/30 px-1.5 py-0.5 rounded-sm">
                                    <Clock className="w-3 h-3" />
                                    {Math.round(item.duration / 60) > 0 ? `${Math.round(item.duration / 60)}h` : `${item.duration}m`}
-                               </span>
+                                </span>
                            )}
+
+                           {/* Validation Indicator */}
+                            {item.place?.confidence && item.place.confidence > 0.8 && (
+                                <span title="Verified Location" className="text-[10px] text-green-600/70 flex items-center gap-0.5">
+                                    <CheckCircle2 className="w-3 h-3" /> Verified
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>

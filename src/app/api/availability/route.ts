@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing experienceId' }, { status: 400 });
     }
 
-    const where: any = { experienceId };
+    const where: Prisma.ExperienceAvailabilityWhereInput = { experienceId };
     if (from || to) {
       where.date = {};
       if (from) where.date.gte = new Date(`${from}T00:00:00.000Z`);

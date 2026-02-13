@@ -110,10 +110,16 @@ export async function saveExperienceDraft(
     title?: string; 
     shortDesc?: string; 
     longDesc?: string;
-    sections?: any; 
+    sections?: Record<string, unknown>; 
     price?: number;
     currency?: string;
-    stops?: any[]; 
+    stops?: Array<{
+      name: string;
+      description?: string | null;
+      address?: string | null;
+      lat: number;
+      lng: number;
+    }>; 
     city?: string;
     cityLat?: number;
     cityLng?: number;
@@ -166,7 +172,7 @@ export async function saveExperienceDraft(
         // Create new stops
         if (data.stops.length > 0) {
           await tx.experienceStop.createMany({
-            data: data.stops.map((stop: any, index: number) => ({
+            data: data.stops.map((stop, index) => ({
               draftId,
               name: stop.name,
               description: stop.description || '',

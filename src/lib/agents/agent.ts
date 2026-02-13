@@ -1,4 +1,4 @@
-import { StreamTextResult } from 'ai';
+import { StreamTextResult, type ToolSet, Output } from 'ai';
 
 export type HostOnboardingStage =
   | 'CITY_MISSING'
@@ -13,6 +13,11 @@ export interface AgentContext {
   onboardingStage?: HostOnboardingStage;
 }
 
+export type AgentStreamResult = StreamTextResult<
+  ToolSet,
+  ReturnType<typeof Output.text>
+>;
+
 /**
  * Interface that all Domain Agents must implement.
  * Each agent encapsulates its own system prompt, tools, and logic.
@@ -24,5 +29,8 @@ export interface Agent {
   /**
    * Process a conversation history and return a streaming response.
    */
-  process(messages: any[], context: AgentContext): Promise<StreamTextResult<any, any>>;
+  process(
+    messages: Array<{ role?: string; content?: unknown }>,
+    context: AgentContext
+  ): Promise<AgentStreamResult>;
 }

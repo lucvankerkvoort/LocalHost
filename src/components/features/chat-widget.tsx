@@ -6,6 +6,7 @@ import Link from 'next/link';
 import {
   DndContext,
   useDraggable,
+  type DragEndEvent,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { usePathname } from 'next/navigation';
@@ -38,6 +39,35 @@ import {
   Wrench,
   Send,
 } from 'lucide-react';
+
+type ChatToolInvocation = {
+  toolName?: string;
+  state?: string;
+  result?: unknown;
+};
+
+type ChatMessagePart = {
+  type?: string;
+  text?: string;
+  toolName?: string;
+  state?: string;
+  output?: unknown;
+};
+
+type ChatMessageRecord = {
+  id?: string;
+  role?: string;
+  content?: string;
+  parts?: ChatMessagePart[];
+  toolInvocations?: ChatToolInvocation[];
+};
+
+type UseChatResult = {
+  messages: ChatMessageRecord[];
+  sendMessage?: (message: { text: string }, options?: { body?: Record<string, unknown> }) => Promise<void> | void;
+  status: string;
+  error?: Error | null;
+};
 
 interface HostMatch {
   id: string;
@@ -150,7 +180,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
   });
 
   // Use the chatId to maintain separate conversations per intent
-  const { messages, sendMessage, status, error } = useChat({ id: chatId }) as any;
+  const { messages, sendMessage, status, error } = useChat({ id: chatId }) as UseChatResult;
   const isLoading = status === 'submitted' || status === 'streaming';
 
   const [localInput, setLocalInput] = useState('');
@@ -200,7 +230,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
 
     const trigger = buildHostOnboardingTrigger(onboardingStage);
 
-    void sendMessage({ text: trigger }, { body: chatRequestBody() }).catch(() => {
+    void Promise.resolve(sendMessage({ text: trigger }, { body: chatRequestBody() })).catch(() => {
       // Keep one-shot behavior to avoid duplicate handshake sends in Strict Mode.
     });
   }, [
@@ -216,6 +246,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
   ]);
 
   // Auto-open/close on specific routes
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     // Define "Globe Pages" where chat should be auto-opened
     // Only open on specific Trip or Draft pages, not on the list/root pages.
@@ -237,8 +268,10 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
       }
     };
   }, [pathname]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Load saved position from localStorage on mount
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     try {
       const saved = localStorage.getItem(POSITION_STORAGE_KEY);
@@ -252,6 +285,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
       // Ignore parse errors
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Save position helper
   const savePosition = useCallback((pos: Position) => {
@@ -266,7 +300,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
   }, [panelPosition, savePosition]);
 
   // Handle panel drag
-  const handleDragEnd = useCallback((event: any) => {
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
     const delta = event.delta;
     setPanelPosition((prev) => {
       const newPos = {
@@ -325,6 +359,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
   }, [messages, shouldAutoScroll]);
 
   // Initial scroll to bottom on open
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (isOpen) {
       messagesContainerRef.current?.scrollTo({
@@ -335,10 +370,11 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
       setShowScrollButton(false);
     }
   }, [isOpen]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Handle tool results - dispatch tool events for shared reducers
   useEffect(() => {
-    const lastMessage = messages[messages.length - 1] as any;
+    const lastMessage = messages[messages.length - 1];
 
     // Debug: Log messages and tool invocations
     if (lastMessage) {
@@ -346,7 +382,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
         role: lastMessage.role,
         hasToolInvocations: !!lastMessage.toolInvocations,
         toolCount: lastMessage.toolInvocations?.length || 0,
-        toolNames: lastMessage.toolInvocations?.map((t: any) => t.toolName) || [],
+        toolNames: lastMessage.toolInvocations?.map((t) => t.toolName) || [],
       });
 
       if (lastMessage.toolInvocations) {
@@ -404,7 +440,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
   }, [chatRequestBody, sendMessage]);
 
   // Extract host matches from messages
-  const getHostMatches = (message: any): HostMatch[] => {
+  const getHostMatches = (message: ChatMessageRecord): HostMatch[] => {
     if (!message.parts) return [];
 
     for (const part of message.parts) {
@@ -498,10 +534,12 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                   </div>
                 )}
 
-                {messages.map((message: any) => {
+                {messages.map((message) => {
+                  const parts = Array.isArray(message.parts) ? message.parts : [];
+
                   // Debug: log full parts structure for first few renders only
-                  if (message.parts?.length > 0) {
-                    console.log('[ChatWidget] Parts structure:', message.parts.map((p: any) => ({
+                  if (parts.length > 0) {
+                    console.log('[ChatWidget] Parts structure:', parts.map((p) => ({
                       type: p.type,
                       text: p.text,
                       toolName: p.toolName,
@@ -511,20 +549,18 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
 
                   // Extract text content from parts
                   let textContent = '';
-                  const toolCalls: any[] = [];
+                  const toolCalls: Array<{ name: string; state?: string; output?: unknown }> = [];
 
-                  if (message.parts && Array.isArray(message.parts)) {
-                    for (const part of message.parts) {
-                      if (part.type === 'text' && part.text) {
-                        textContent += part.text;
-                      } else if (part.type?.startsWith('tool-') && part.type !== 'tool-result') {
-                        // Collect tool calls for display
-                        toolCalls.push({
-                          name: part.type.replace('tool-', ''),
-                          state: part.state,
-                          output: part.output,
-                        });
-                      }
+                  for (const part of parts) {
+                    if (part.type === 'text' && part.text) {
+                      textContent += part.text;
+                    } else if (part.type?.startsWith('tool-') && part.type !== 'tool-result') {
+                      // Collect tool calls for display
+                      toolCalls.push({
+                        name: part.type.replace('tool-', ''),
+                        state: part.state,
+                        output: part.output,
+                      });
                     }
                   }
 
@@ -578,7 +614,15 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                                   <span className={`w-2 h-2 rounded-full ${tc.state === 'result' || tc.state === 'output-available' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
                                   <Wrench className="w-4 h-4 text-[var(--foreground)]" />
                                   <span className="font-medium text-[var(--foreground)]">{tc.name}</span>
-                                  {tc.output?.message && <span className="text-[var(--foreground)]">- {tc.output.message}</span>}
+                                  {(() => {
+                                    if (!tc.output || typeof tc.output !== 'object') return null;
+                                    if (!('message' in tc.output)) return null;
+                                    const value = (tc.output as { message?: unknown }).message;
+                                    if (typeof value !== 'string' || value.length === 0) return null;
+                                    return (
+                                      <span className="text-[var(--foreground)]">- {value}</span>
+                                    );
+                                  })()}
                                 </div>
                               ))}
                             </div>
@@ -610,7 +654,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                                 </div>
                                 <ArrowRight className="w-4 h-4 text-[var(--muted)]" />
                               </div>
-                              <p className="text-xs text-[var(--muted-foreground)] mt-2 italic line-clamp-1">"{host.quote}"</p>
+                              <p className="text-xs text-[var(--muted-foreground)] mt-2 italic line-clamp-1">&quot;{host.quote}&quot;</p>
                               <div className="flex flex-wrap gap-1 mt-2">
                                 {host.interests.slice(0, 3).map((interest) => (
                                   <span key={interest} className="px-2 py-0.5 text-xs rounded-full bg-[var(--sand-beige)] text-[var(--foreground)]">

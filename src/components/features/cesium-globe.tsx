@@ -6,9 +6,15 @@ import type { LucideIcon } from 'lucide-react';
 import { MapPin, Landmark, Building2, Utensils, Trees, Map as MapIcon } from 'lucide-react';
 import { CityMarkerData, GlobeDestination, HostMarkerData, PlaceMarkerData, RouteMarkerData, TravelRoute } from '@/types/globe';
 
+declare global {
+  interface Window {
+    CESIUM_BASE_URL?: string;
+  }
+}
+
 // Set Cesium base URL BEFORE importing Cesium
 if (typeof window !== 'undefined') {
-  (window as any).CESIUM_BASE_URL = '/cesium';
+  window.CESIUM_BASE_URL = '/cesium';
 }
 
 // Now import Cesium and Resium

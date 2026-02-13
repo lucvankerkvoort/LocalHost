@@ -59,7 +59,7 @@ export async function createTrip(data: CreateTripData) {
   // Resolve coordinates
   let lat = 0;
   let lng = 0;
-  let resolvedCity = city;
+  const resolvedCity = city;
 
   // 1. Try static map
   const staticCoords = getCityCoordinates(city);

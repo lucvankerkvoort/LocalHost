@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import { auth } from '@/auth';
+
+type TripWithStops = Prisma.TripGetPayload<{
+  include: { stops: { include: { days: true } } };
+}>;
+
+type TripDay = TripWithStops['stops'][number]['days'][number];
 
 export async function GET(req: Request) {
   try {
@@ -42,32 +49,34 @@ export async function GET(req: Request) {
     
     // Let's implement a basic lookup for the most recent trip's candidates on that day.
     
-    const trip = tripId
-      ? await prisma.trip.findFirst({
+    const trip: TripWithStops | null = tripId
+      ? (await prisma.trip.findFirst({
           where: { id: tripId, userId: session.user.id },
           include: { stops: { include: { days: true } } },
-        })
-      : await prisma.trip.findFirst({
+        })) as TripWithStops | null
+      : (await prisma.trip.findFirst({
           where: { userId: session.user.id },
           orderBy: { updatedAt: 'desc' },
           include: { stops: { include: { days: true } } },
-        });
+        })) as TripWithStops | null;
 
     if (!trip) {
         return NextResponse.json({ candidates: [] });
     }
     
     // Find the day ID
-    let dayId = null;
+    let dayId: string | null = null;
     if (dayNumber) {
-        const parsedDayNumber = parseInt(dayNumber);
-        for (const stop of (trip as any).stops) {
-            const day = stop.days.find((d: any) => d.dayIndex + 1 === parsedDayNumber || d.dayIndex === parsedDayNumber);
-            if (day) {
-                dayId = day.id;
-                break;
-            }
+      const parsedDayNumber = Number.parseInt(dayNumber, 10);
+      for (const stop of trip.stops) {
+        const day = stop.days.find(
+          (d) => d.dayIndex + 1 === parsedDayNumber || d.dayIndex === parsedDayNumber
+        );
+        if (day) {
+          dayId = day.id;
+          break;
         }
+      }
     }
 
     const candidates = await prisma.booking.findMany({
@@ -112,13 +121,13 @@ export async function POST(req: Request) {
     const { tripId, hostId, experienceId, dayId, dayNumber, date, itemId } = body;
 
     // 1. Find the active trip
-    let trip;
+    let trip: TripWithStops | null;
     
     if (tripId) {
-        trip = await prisma.trip.findUnique({
+        trip = (await prisma.trip.findUnique({
             where: { id: tripId },
             include: { stops: { include: { days: true } } }
-        });
+        })) as TripWithStops | null;
         
         // Verify ownership
         if (trip && trip.userId !== session.user.id) {
@@ -126,11 +135,11 @@ export async function POST(req: Request) {
         }
     } else {
         // Fallback to most recent
-        trip = await prisma.trip.findFirst({
+        trip = (await prisma.trip.findFirst({
             where: { userId: session.user.id },
             orderBy: { updatedAt: 'desc' },
             include: { stops: { include: { days: true } } }
-        });
+        })) as TripWithStops | null;
     }
 
     if (!trip) {
@@ -138,14 +147,14 @@ export async function POST(req: Request) {
     }
 
     // 2. Resolve Day
-    let targetDay = null;
+    let targetDay: TripDay | null = null;
     
     // Try finding by dayId first if available
     if (dayId) {
         // We can search directly in the DB or within the loaded trip
         // Searching within loaded trip avoids an extra DB call if we trust the structure
-        for (const stop of (trip as any).stops) {
-             const d = stop.days.find((day: any) => day.id === dayId);
+        for (const stop of trip.stops) {
+             const d = stop.days.find((day) => day.id === dayId);
              if (d) {
                  targetDay = d;
                  break;
@@ -156,8 +165,9 @@ export async function POST(req: Request) {
     // Fallback to dayNumber
     if (!targetDay && dayNumber) {
         // Simple search across stops
-        for (const stop of (trip as any).stops) {
-            const d = stop.days.find((day: any) => day.dayIndex + 1 === parseInt(dayNumber));
+        const parsedDayNumber = Number.parseInt(dayNumber, 10);
+        for (const stop of trip.stops) {
+            const d = stop.days.find((day) => day.dayIndex + 1 === parsedDayNumber);
             if (d) {
                 targetDay = d;
                 break;

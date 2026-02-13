@@ -3,6 +3,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 
+type DraftStopInput = {
+  name: string;
+  description?: string | null;
+  address?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+};
+
 /**
  * GET /api/host/draft
  * Get current user's experience draft
@@ -96,7 +104,7 @@ export async function POST(request: NextRequest) {
       // Create new stops
       if (stops.length > 0) {
         await prisma.experienceStop.createMany({
-          data: stops.map((stop: any, index: number) => ({
+          data: stops.map((stop: DraftStopInput, index: number) => ({
             draftId: draft.id,
             name: stop.name,
             description: stop.description || null,

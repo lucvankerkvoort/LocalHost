@@ -7,8 +7,10 @@ import { CheckoutForm } from './checkout-form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Loader2 } from 'lucide-react';
 
-// Initialize Stripe outside of render
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+const STRIPE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+const stripePromise = STRIPE_PUBLISHABLE_KEY
+  ? loadStripe(STRIPE_PUBLISHABLE_KEY)
+  : null;
 
 interface PaymentModalProps {
   bookingId: string;
@@ -24,12 +26,14 @@ export function PaymentModal({ bookingId, isOpen, onClose, onSuccess }: PaymentM
   const [error, setError] = useState<string | null>(null);
 
   // Reset state when bookingId changes to prevent stale clientSecret
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setClientSecret(null);
     setAmount(0);
     setCurrency('USD');
     setError(null);
   }, [bookingId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Reset state when modal closes
   const handleClose = () => {
@@ -41,6 +45,8 @@ export function PaymentModal({ bookingId, isOpen, onClose, onSuccess }: PaymentM
   };
 
   useEffect(() => {
+    if (!STRIPE_PUBLISHABLE_KEY) return;
+
     if (isOpen && bookingId) {
       // Create Payment Intent
       fetch(`/api/bookings/${bookingId}/pay`, { method: 'POST' })
@@ -54,7 +60,7 @@ export function PaymentModal({ bookingId, isOpen, onClose, onSuccess }: PaymentM
             setCurrency(data.currency);
           }
         })
-        .catch((err) => setError('Failed to initialize payment'));
+        .catch(() => setError('Failed to initialize payment'));
     }
   }, [isOpen, bookingId]);
 
@@ -65,9 +71,11 @@ export function PaymentModal({ bookingId, isOpen, onClose, onSuccess }: PaymentM
           <DialogTitle>Complete Your Booking</DialogTitle>
         </DialogHeader>
         
-        {error ? (
-          <div className="text-red-500 p-4">{error}</div>
-        ) : clientSecret ? (
+        {(!STRIPE_PUBLISHABLE_KEY || error) ? (
+          <div className="text-red-500 p-4">
+            {error ?? 'Payments are not configured.'}
+          </div>
+        ) : clientSecret && stripePromise ? (
           <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe' } }}>
             <CheckoutForm 
               amount={amount}

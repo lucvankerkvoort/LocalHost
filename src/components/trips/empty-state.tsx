@@ -10,7 +10,7 @@ export function EmptyState() {
       </div>
       <h3 className="text-xl font-bold text-white mb-2">No trips yet</h3>
       <p className="text-gray-400 max-w-sm mb-8">
-        It looks like you haven't started planning any adventures. Create your first trip to get started.
+        It looks like you haven&apos;t started planning any adventures. Create your first trip to get started.
       </p>
       
       <CreateTripModal>

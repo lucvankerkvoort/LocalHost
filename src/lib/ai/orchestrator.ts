@@ -2,10 +2,9 @@ import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { 
-  ItineraryPlanSchema, 
-  PlaceSchema, 
   GeoPoint, 
-  ItineraryPlan 
+  ItineraryPlan,
+  Place,
 } from './types';
 import {
   extractExplicitLocationHint,
@@ -69,6 +68,23 @@ type DraftDayAnchor = {
   category?: string;
   city?: string;
 };
+
+type PlaceCategory = Place['category'];
+
+function normalizePlaceCategory(category?: string): PlaceCategory {
+  switch (category) {
+    case 'landmark':
+    case 'museum':
+    case 'restaurant':
+    case 'park':
+    case 'neighborhood':
+    case 'city':
+    case 'other':
+      return category;
+    default:
+      return 'other';
+  }
+}
 
 /**
  * Callback for receiving real-time updates during orchestration
@@ -910,15 +926,7 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
     // B. Resolve Anchor Location
     // Use RateLimiter for safety
     let anchorResult = await rateLimiter.schedule(() => 
-      this.executeTool<{
-        id: string;
-        name: string;
-        formattedAddress: string;
-        location: { lat: number; lng: number };
-        category: string;
-        distanceToAnchor?: number;
-        city?: string;
-      }>('resolve_place', { 
+      this.executeTool<DraftDayAnchor & { distanceToAnchor?: number }>('resolve_place', { 
         name: draftDay.anchorArea, 
         context: dayContext,
         anchorPoint: effectiveAnchor ?? undefined
@@ -954,12 +962,13 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
         finalAnchorLocation = cityResult.location;
         // Mock an anchor result so the next block creates the anchorPlace
         if (!anchorResult) {
-          // @ts-ignore - we only need the basic props
           anchorResult = {
-            ...cityResult,
+            id: cityResult.id,
             name: draftDay.anchorArea || baseDayCity,
             formattedAddress: cityResult.formattedAddress,
+            location: cityResult.location,
             category: 'neighborhood',
+            city: cityResult.city ?? baseDayCity,
           };
         }
       }
@@ -985,7 +994,7 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
       id: anchorResult?.id || `anchor-${crypto.randomUUID()}`,
       name: anchorResult?.name || draftDay.anchorArea,
       location: finalAnchorLocation,
-      category: (anchorResult?.category as any) || 'other',
+      category: normalizePlaceCategory(anchorResult?.category),
       description: anchorResult?.formattedAddress || `${draftDay.anchorArea}, ${dayCity}`,
       city: dayCity,
     } : undefined;
@@ -1062,14 +1071,14 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
             id: !isFallback && placeResult?.id ? placeResult.id : `fallback-${crypto.randomUUID()}`,
             name: placeResult?.name || act.name,
             location: placeLocation,
-            category: (placeResult?.category as any) || 'other',
+            category: normalizePlaceCategory(placeResult?.category),
             description:
               placeResult?.formattedAddress ||
               `${act.name} in ${explicitLocation.locationHint || dayCity}`,
             city: placeResult?.city || dayCity,
             // Preserve resolve_place metadata as source of truth
             confidence: placeResult?.confidence,
-            geoValidation: placeResult?.geoValidation as any,
+            geoValidation: placeResult?.geoValidation,
             distanceToAnchor: placeResult?.distanceToAnchor,
           },
           timeSlot: act.timeSlot,

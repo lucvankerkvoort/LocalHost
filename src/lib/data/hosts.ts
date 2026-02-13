@@ -234,21 +234,34 @@ const CURATED_HOSTS: Host[] = [
 // Import generated hosts and merge with curated ones
 import generatedHostsRaw from './generated-hosts.json';
 
+type LegacyExperience = Omit<HostExperience, 'category' | 'photos'> & {
+  category: string;
+  photo?: string;
+  photos?: unknown;
+};
+
+type LegacyHost = Omit<Host, 'experiences'> & {
+  experiences: LegacyExperience[];
+};
+
 // Adapter to convert legacy generated hosts to new schema
-const generatedHosts: Host[] = (generatedHostsRaw as any[]).map((host) => ({
-  ...host,
-  // Ensure category is uppercase (basic mapping, assumes valid enum string exists)
-  experiences: host.experiences.map((exp: any) => ({
-    ...exp,
-    // Map category to uppercase, handling kebab-case to SNAKE_CASE if needed
-    category: (exp.category as string).toUpperCase().replace(/-/g, '_') as ExperienceCategory,
-    // Map single photo to photos array, filtering out undefined values
-    photos: [
-      ...(exp.photo ? [exp.photo] : []),
-      ...(exp.photos || [])
-    ].filter((p: any) => typeof p === 'string' && p.length > 0),
-  })),
-}));
+const generatedHostsRawData: unknown = generatedHostsRaw;
+const generatedHosts: Host[] = Array.isArray(generatedHostsRawData)
+  ? (generatedHostsRawData as LegacyHost[]).map((host) => ({
+      ...host,
+      // Ensure category is uppercase (basic mapping, assumes valid enum string exists)
+      experiences: host.experiences.map((exp) => ({
+        ...exp,
+        // Map category to uppercase, handling kebab-case to SNAKE_CASE if needed
+        category: exp.category.toUpperCase().replace(/-/g, '_') as ExperienceCategory,
+        // Map single photo to photos array, filtering out undefined values
+        photos: [
+          ...(typeof exp.photo === 'string' ? [exp.photo] : []),
+          ...(Array.isArray(exp.photos) ? exp.photos : []),
+        ].filter((p): p is string => typeof p === 'string' && p.length > 0),
+      })),
+    }))
+  : [];
 
 export const HOSTS: Host[] = [...CURATED_HOSTS, ...generatedHosts];
 

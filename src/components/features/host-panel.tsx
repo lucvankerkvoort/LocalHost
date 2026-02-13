@@ -167,7 +167,7 @@ function HostCardWithExperiences({
               {host.name}
             </h3>
             <p className="text-xs text-[var(--muted-foreground)] line-clamp-1 mt-0.5 italic">
-              "{host.quote}"
+              &quot;{host.quote}&quot;
             </p>
           </div>
           <button

@@ -1,7 +1,7 @@
 'use client';
 
 import { Entity, EllipseGraphics } from 'resium';
-import { Cartesian3, Color, HeightReference } from 'cesium';
+import { Cartesian2, Cartesian3, Color, HeightReference } from 'cesium';
 import { ExperienceItem, EXPERIENCE_STATUS_CONFIG } from '@/types/itinerary-plan';
 
 interface AnchorMarkersProps {
@@ -89,7 +89,7 @@ export function AnchorMarkers({
               outlineWidth: 2,
               style: 2, // FILL_AND_OUTLINE
               verticalOrigin: 1, // BOTTOM
-              pixelOffset: { x: 0, y: -20 } as any,
+              pixelOffset: new Cartesian2(0, -20),
               show: isDaySelected || isSelected,
             }}
             onClick={() => onAnchorClick(anchor, dayId)}

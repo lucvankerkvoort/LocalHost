@@ -16,8 +16,9 @@ export async function POST(
     const result = await createBookingPayment(bookingId, session.user.id);
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Payment creation error:', error);
-    return NextResponse.json({ error: error.message || 'Payment creation failed' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Payment creation failed';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -3,6 +3,8 @@ import { EditorLayout } from '@/components/features/host-creation/editor-layout'
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
+import type { HostCreationState } from '@/store/host-creation-slice';
+import { DraftStatus } from '@prisma/client';
 
 interface PageProps {
   params: Promise<{ draftId: string }>;
@@ -22,6 +24,20 @@ export default async function BecomeHostEditorPage({ params }: PageProps) {
     include: { stops: { orderBy: { order: 'asc' } } }
   });
 
+  const mapDraftStatus = (
+    status: DraftStatus | null
+  ): HostCreationState['status'] => {
+    switch (status) {
+      case 'AI_GENERATED':
+        return 'synthesizing';
+      case 'READY_TO_PUBLISH':
+        return 'review';
+      case 'IN_PROGRESS':
+      default:
+        return 'draft';
+    }
+  };
+
   if (draft && draft.userId === session.user.id) {
     // Retroactive Fix: If city exists but no coords, try to heal it
     if (draft.city && (!draft.cityLat || !draft.cityLng)) {
@@ -37,7 +53,11 @@ export default async function BecomeHostEditorPage({ params }: PageProps) {
         });
       }
     }
-    return <EditorLayout draftId={draftId} initialData={draft} />;
+    const initialData = {
+      ...draft,
+      status: mapDraftStatus(draft.status),
+    } as Partial<HostCreationState>;
+    return <EditorLayout draftId={draftId} initialData={initialData} />;
   }
 
   // 2. If no draft, try to find as a Published Experience (Refine flow)

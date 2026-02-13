@@ -170,7 +170,7 @@ export default function ProfilePage() {
                 </button>
                 
                 <p className="text-center text-xs text-[var(--muted-foreground)] mt-4">
-                  You won't be charged yet
+                  You won&apos;t be charged yet
                 </p>
               </div>
             </div>
