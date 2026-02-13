@@ -1,7 +1,6 @@
 import { openai } from '@ai-sdk/openai';
-import { streamText, tool, stepCountIs } from 'ai';
+import { streamText, tool, stepCountIs, type ModelMessage } from 'ai';
 import { z } from 'zod';
-import { HOSTS, type Host } from '@/lib/data/hosts';
 import {
   createOrchestratorJob,
   updateOrchestratorJob,
@@ -15,17 +14,8 @@ import {
   semanticSearchExperiences, 
   type SearchIntent 
 } from '@/lib/semantic-search';
-import { Agent, AgentContext } from './agent';
+import { Agent, AgentContext, type AgentStreamResult } from './agent';
 import { OPENAI_PLANNING_MODEL } from '@/lib/ai/model-config';
-
-// Schema for intent extraction
-const searchIntentSchema = z.object({
-  categories: z.array(z.string()).describe('Relevant experience categories like food-drink, arts-culture, outdoor-adventure, nightlife-social, wellness, learning, family'),
-  keywords: z.array(z.string()).describe('Key terms and concepts the user is interested in'),
-  location: z.string().optional().describe('City or country mentioned'),
-  preferences: z.array(z.string()).describe('User preferences like solo travel, budget, time of day, etc'),
-  activities: z.array(z.string()).describe('Specific activities mentioned like cooking, hiking, tours, etc'),
-});
 
 // System prompt that handles semantic search and itinerary planning
 const SYSTEM_PROMPT = `You are a friendly, helpful travel planner for Localhost, a platform that connects travelers with locals and authentic experiences.
@@ -129,13 +119,19 @@ export class PlanningAgent implements Agent {
   name = 'planning';
   description = 'Helps users plan trips and find hosts';
 
-  async process(messages: any[], context: AgentContext) {
+  async process(
+    messages: Array<{ role?: string; content?: string | Array<{ type?: string; text?: string }> }>,
+    context: AgentContext
+  ): Promise<AgentStreamResult> {
+    void context;
     // Get the last user message text
     const lastUserMessage = messages[messages.length - 1];
     const userMessageText = typeof lastUserMessage?.content === 'string'
       ? lastUserMessage.content
       : (Array.isArray(lastUserMessage?.content)
-          ? lastUserMessage.content.map((p: any) => 'text' in p ? p.text : '').join(' ')
+          ? lastUserMessage.content
+              .map((p) => (p.type === 'text' ? p.text ?? '' : ''))
+              .join(' ')
           : '');
 
     // Trip planning patterns - should use generateItinerary, NOT flyToLocation
@@ -172,7 +168,7 @@ export class PlanningAgent implements Agent {
     return streamText({
       model: openai(OPENAI_PLANNING_MODEL),
       system: SYSTEM_PROMPT,
-      messages,
+      messages: messages as ModelMessage[],
       toolChoice,
       tools: {
         semanticSearch: tool({
@@ -422,6 +418,6 @@ export class PlanningAgent implements Agent {
         }),
       },
       stopWhen: stepCountIs(5),
-    });
+    }) as unknown as AgentStreamResult;
   }
 }

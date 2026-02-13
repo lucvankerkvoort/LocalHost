@@ -31,6 +31,7 @@ export interface ItineraryItem {
   experienceId?: string; // Specific experience ID
   status?: 'DRAFT' | 'PENDING' | 'BOOKED' | 'FAILED';
   candidateId?: string; // Link to ExperienceCandidate for booking
+  isLocal?: boolean; // Local-only item (not persisted)
   position: number;
   place?: {
     id: string;
@@ -40,6 +41,11 @@ export interface ItineraryItem {
       lng: number;
     };
     category?: string;
+    address?: string;
+    city?: string;
+    description?: string;
+    confidence?: number;
+    geoValidation?: 'EXACT' | 'APPROXIMATE' | 'CITY_FALLBACK' | 'FAILED';
   };
   duration?: number; // duration in minutes
   category?: string; // specific category if different from type

@@ -4,7 +4,11 @@ import { TripCard } from '@/components/trips/trip-card';
 import { EmptyState } from '@/components/trips/empty-state';
 import { CreateTripModal } from '@/components/trips/create-trip-modal';
 import Link from 'next/link';
-import { format } from 'date-fns';
+import type { Trip, TripAnchor } from '@prisma/client';
+
+type TripWithStops = Trip & {
+  stops: TripAnchor[];
+};
 
 export const dynamic = 'force-dynamic';
 
@@ -42,7 +46,7 @@ export default async function MyTripsPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {trips.map((trip) => (
-                        <TripCard key={trip.id} trip={trip as any} /> 
+                        <TripCard key={trip.id} trip={trip as TripWithStops} /> 
                     ))}
                     
                     {/* Ghost card for "Explore Experiences" promotion could go here */}

@@ -57,9 +57,11 @@ export function useExperienceCandidates(): UseExperienceCandidatesReturn {
     }
   }, []);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     fetchCandidates();
   }, [fetchCandidates]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Add a new candidate
   const addCandidate = useCallback(async (data: {

@@ -59,8 +59,10 @@ export async function withExecution<T>(
 ): Promise<T> {
   const validation = validateExecutionContract(contract);
   if (!validation.ok) {
-    const error = new Error(validation.failure?.message || 'Execution contract validation failed');
-    (error as any).failure = validation.failure;
+    const error = new Error(validation.failure?.message || 'Execution contract validation failed') as Error & {
+      failure?: ValidationResult['failure'];
+    };
+    error.failure = validation.failure;
     throw error;
   }
 

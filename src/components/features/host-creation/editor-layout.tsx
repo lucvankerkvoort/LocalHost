@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { selectHostCreation, setDraft } from '@/store/host-creation-slice';
+import { selectHostCreation, setDraft, type HostCreationState } from '@/store/host-creation-slice';
 import { SummaryPanel } from '@/components/features/host-creation/summary-panel';
 import HostCreationMap from '@/components/features/host-creation/host-creation-map';
 import { HostCreationToolListener } from '@/components/features/host-creation/tool-listener';
@@ -12,7 +12,7 @@ import { useDebounce } from '@/hooks/use-debounce';
 
 interface EditorLayoutProps {
   draftId?: string;
-  initialData?: any; 
+  initialData?: Partial<HostCreationState>; 
 }
 
 export function EditorLayout({ draftId, initialData }: EditorLayoutProps) {

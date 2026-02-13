@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { GlobeDestination } from '@/types/globe';
+import type { GlobeDestination, RouteMarkerData } from '@/types/globe';
 import { createItem } from '@/types/itinerary';
 import reducer, {
   addLocalExperience,
@@ -478,14 +478,15 @@ test('toolCallReceived(resolve_place) ignores markers too far from anchor', () =
 });
 
 test('hydrateGlobeState deduplicates routeMarkers based on id', () => {
+  const routeMarkers: RouteMarkerData[] = [
+    { id: 'rm-1', routeId: 'r-1', kind: 'start', lat: 10, lng: 10 },
+    { id: 'rm-1', routeId: 'r-1', kind: 'start', lat: 20, lng: 20 },
+    { id: 'rm-2', routeId: 'r-1', kind: 'end', lat: 30, lng: 30 },
+  ];
   const state = reducer(
     getInitialState(),
     hydrateGlobeState({
-      routeMarkers: [
-        { id: 'rm-1', routeId: 'r-1', kind: 'start', lat: 10, lng: 10 },
-        { id: 'rm-1', routeId: 'r-1', kind: 'start', lat: 20, lng: 20 },
-        { id: 'rm-2', routeId: 'r-1', kind: 'end', lat: 30, lng: 30 },
-      ] as any, // Cast as any because RouteMarkerData might have other optional fields, but id is key
+      routeMarkers,
     })
   );
 

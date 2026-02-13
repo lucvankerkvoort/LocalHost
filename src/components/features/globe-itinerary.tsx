@@ -1008,7 +1008,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                       handleFocusExperience({
                         hostId: host.id,
                         hostName: host.name,
-                        hostCity: host.city,
+                        hostCity: host.city ?? undefined,
                         hostLat: marker?.lat,
                         hostLng: marker?.lng,
                         experience,
@@ -1023,7 +1023,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                       handleAddExperience({
                         hostId: host.id,
                         hostName: host.name,
-                        hostCity: host.city,
+                        hostCity: host.city ?? undefined,
                         hostLat: marker?.lat,
                         hostLng: marker?.lng,
                         experience,

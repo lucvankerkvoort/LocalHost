@@ -24,12 +24,14 @@ export function PaymentModal({ bookingId, isOpen, onClose, onSuccess }: PaymentM
   const [error, setError] = useState<string | null>(null);
 
   // Reset state when bookingId changes to prevent stale clientSecret
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setClientSecret(null);
     setAmount(0);
     setCurrency('USD');
     setError(null);
   }, [bookingId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Reset state when modal closes
   const handleClose = () => {

@@ -7,10 +7,10 @@ if (!process.env.STRIPE_SECRET_KEY) {
   console.warn('STRIPE_SECRET_KEY is missing in environment variables. Using placeholder for build.');
 }
 
+const STRIPE_API_VERSION: Stripe.LatestApiVersion = '2026-01-28.clover';
+
 export const stripe = new Stripe(apiKey, {
-  // The error said `2025-01-27.acacia` is not assignable to `2026-01-28.clover`. 
-  // This means the SDK wants `2026-01-28.clover`.
-  apiVersion: '2026-01-28.clover' as any, 
+  apiVersion: STRIPE_API_VERSION,
   typescript: true,
 });
 

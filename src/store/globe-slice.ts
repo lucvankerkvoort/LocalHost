@@ -3,6 +3,7 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { GlobeDestination, RouteMarkerData, TravelRoute, HostMarkerData, PlaceMarkerData } from '@/types/globe';
 import type { PlannerExperienceHost } from '@/types/planner-experiences';
 import type { ItineraryPlan } from '@/lib/ai/types';
+import type { ItineraryItem } from '@/types/itinerary';
 import { convertPlanToGlobeData } from '@/lib/ai/plan-converter';
 import { toolCallReceived, type ToolCallEvent } from './tool-calls-slice';
 
@@ -249,7 +250,7 @@ const globeSlice = createSlice({
     },
     addLocalExperience(
       state,
-      action: PayloadAction<{ dayNumber: number; item: any }>
+      action: PayloadAction<{ dayNumber: number; item: Partial<ItineraryItem> }>
     ) {
       const { dayNumber, item } = action.payload;
       const destination = state.destinations.find((d) => d.day === dayNumber);
@@ -257,10 +258,13 @@ const globeSlice = createSlice({
         // Ensure activities array exists
         if (!destination.activities) destination.activities = [];
         
-        // Add item with temporary ID if needed
-        const newItem = {
-          ...item,
+        const basePosition = destination.activities.length;
+        const newItem: ItineraryItem = {
           id: item.id || `local-${Date.now()}-${Math.random()}`,
+          type: item.type ?? 'EXPERIENCE',
+          title: item.title ?? 'Experience',
+          position: typeof item.position === 'number' ? item.position : basePosition,
+          ...item,
           isLocal: true, // Flag for UI
         };
         

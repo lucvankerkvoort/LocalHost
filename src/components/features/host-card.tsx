@@ -34,7 +34,7 @@ export function HostCard({ host }: HostCardProps) {
         
         {/* Quote */}
         <p className="text-[var(--muted-foreground)] text-sm italic mb-4 line-clamp-2">
-          "{host.quote}"
+          &quot;{host.quote}&quot;
         </p>
 
         {/* Interests */}

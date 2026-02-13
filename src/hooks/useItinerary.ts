@@ -1,14 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { 
   Itinerary, 
-  ItineraryDay, 
   ItineraryItem, 
   ItineraryItemType,
   createItinerary as createNewItinerary,
   createItem,
-  generateId 
 } from '@/types/itinerary';
 
 const STORAGE_KEY = 'localhost_itineraries';
@@ -70,27 +68,25 @@ export interface UseItineraryReturn {
 }
 
 export function useItinerary(initialId?: string): UseItineraryReturn {
-  const [itinerary, setItinerary] = useState<Itinerary | null>(null);
-  const [allItineraries, setAllItineraries] = useState<Itinerary[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Load itinerary on mount
-  useEffect(() => {
-    setAllItineraries(getStoredItineraries());
-    if (initialId) {
-      const stored = getItineraryById(initialId);
-      setItinerary(stored);
-    }
-    setIsLoading(false);
-  }, [initialId]);
+  const [itinerary, setItinerary] = useState<Itinerary | null>(() =>
+    initialId ? getItineraryById(initialId) : null
+  );
+  const [allItineraries, setAllItineraries] = useState<Itinerary[]>(() =>
+    getStoredItineraries()
+  );
+  const [isLoading] = useState(false);
 
   // Auto-save when itinerary changes
-  useEffect(() => {
-    if (itinerary) {
-      saveItinerary(itinerary);
-      setAllItineraries(getStoredItineraries());
-    }
-  }, [itinerary]);
+  // REMOVED: Side-effect based saving caused synchronous setState warnings.
+  // We now explicitly call persistItinerary in mutators.
+
+  // Helper to save current state and update list
+  const persistItinerary = useCallback((newItinerary: Itinerary) => {
+    saveItinerary(newItinerary);
+    setItinerary(newItinerary);
+    // Optimistically update list or fetch fresh
+    setAllItineraries(getStoredItineraries());
+  }, []);
 
   const createItinerary = useCallback((
     title: string, 
@@ -99,80 +95,71 @@ export function useItinerary(initialId?: string): UseItineraryReturn {
     endDate: string
   ): Itinerary => {
     const newItinerary = createNewItinerary(title, destination, startDate, endDate);
-    setItinerary(newItinerary);
+    persistItinerary(newItinerary);
     return newItinerary;
-  }, []);
+  }, [persistItinerary]);
 
   const loadItinerary = useCallback((id: string) => {
     const stored = getItineraryById(id);
     setItinerary(stored);
   }, []);
 
+
+  
+  // WAIT. The previous implementation used functional updates to avoid dependency on 'itinerary'.
+  // If I use 'itinerary' state directly, I add a dependency.
+  // let's rewrite mutators to use current 'itinerary' from closure and add it to dependency.
+  
   const addItem = useCallback((
     dayId: string, 
     type: ItineraryItemType, 
     title: string,
     options?: Partial<ItineraryItem>
   ) => {
-    setItinerary(prev => {
-      if (!prev) return prev;
-      
-      return {
-        ...prev,
-        days: prev.days.map(day => {
+    if (!itinerary) return;
+    
+    const newItinerary = {
+        ...itinerary,
+        days: itinerary.days.map(day => {
           if (day.id !== dayId) return day;
-          
           const newPosition = day.items.length;
           const newItem = createItem(type, title, newPosition, options);
-          
-          return {
-            ...day,
-            items: [...day.items, newItem],
-          };
+          return { ...day, items: [...day.items, newItem] };
         }),
-      };
-    });
-  }, []);
+    };
+    persistItinerary(newItinerary);
+  }, [itinerary, persistItinerary]);
 
   const updateItem = useCallback((dayId: string, itemId: string, updates: Partial<ItineraryItem>) => {
-    setItinerary(prev => {
-      if (!prev) return prev;
-      
-      return {
-        ...prev,
-        days: prev.days.map(day => {
+    if (!itinerary) return;
+    const newItinerary = {
+        ...itinerary,
+        days: itinerary.days.map(day => {
           if (day.id !== dayId) return day;
-          
           return {
             ...day,
-            items: day.items.map(item => 
-              item.id === itemId ? { ...item, ...updates } : item
-            ),
+            items: day.items.map(item => item.id === itemId ? { ...item, ...updates } : item),
           };
         }),
-      };
-    });
-  }, []);
+    };
+    persistItinerary(newItinerary);
+  }, [itinerary, persistItinerary]);
 
   const deleteItem = useCallback((dayId: string, itemId: string) => {
-    setItinerary(prev => {
-      if (!prev) return prev;
-      
-      return {
-        ...prev,
-        days: prev.days.map(day => {
+    if (!itinerary) return;
+    const newItinerary = {
+        ...itinerary,
+        days: itinerary.days.map(day => {
           if (day.id !== dayId) return day;
-          
           const filteredItems = day.items.filter(item => item.id !== itemId);
-          // Re-index positions
           return {
             ...day,
             items: filteredItems.map((item, index) => ({ ...item, position: index })),
           };
         }),
-      };
-    });
-  }, []);
+    };
+    persistItinerary(newItinerary);
+  }, [itinerary, persistItinerary]);
 
   const reorderItem = useCallback((
     fromDayId: string, 
@@ -180,47 +167,30 @@ export function useItinerary(initialId?: string): UseItineraryReturn {
     itemId: string, 
     newPosition: number
   ) => {
-    setItinerary(prev => {
-      if (!prev) return prev;
-      
-      // Find the item
+     if (!itinerary) return;
       let movedItem: ItineraryItem | null = null;
-      
-      const updatedDays = prev.days.map(day => {
-        if (day.id === fromDayId) {
-          const item = day.items.find(i => i.id === itemId);
-          if (item) movedItem = { ...item };
-          
-          const filteredItems = day.items.filter(i => i.id !== itemId);
-          return {
-            ...day,
-            items: filteredItems.map((item, index) => ({ ...item, position: index })),
-          };
-        }
-        return day;
+      const updatedDays = itinerary.days.map(day => {
+        if (day.id !== fromDayId) return day;
+        const item = day.items.find(i => i.id === itemId);
+        if (item) movedItem = { ...item };
+        const filteredItems = day.items.filter(i => i.id !== itemId);
+        return { ...day, items: filteredItems.map((entry, index) => ({ ...entry, position: index })) };
       });
       
-      if (!movedItem) return prev;
-      
-      // Insert into target day
-      return {
-        ...prev,
-        days: updatedDays.map(day => {
-          if (day.id !== toDayId) return day;
-          
-          const items = [...day.items];
-          const insertAt = Math.min(Math.max(0, newPosition), items.length);
-          items.splice(insertAt, 0, { ...movedItem!, position: insertAt });
-          
-          // Re-index all positions
-          return {
-            ...day,
-            items: items.map((item, index) => ({ ...item, position: index })),
-          };
-        }),
-      };
-    });
-  }, []);
+      if (!movedItem) return;
+      const moved = movedItem as ItineraryItem;
+
+      const finalDays = updatedDays.map(day => {
+        if (day.id !== toDayId) return day;
+        const items = [...day.items];
+        const insertAt = Math.min(Math.max(0, newPosition), items.length);
+        const inserted: ItineraryItem = { ...moved, position: insertAt };
+        items.splice(insertAt, 0, inserted);
+        return { ...day, items: items.map((entry, index) => ({ ...entry, position: index })) };
+      });
+
+      persistItinerary({ ...itinerary, days: finalDays });
+  }, [itinerary, persistItinerary]);
 
   const deleteItinerary = useCallback(() => {
     if (itinerary) {

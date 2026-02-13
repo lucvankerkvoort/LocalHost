@@ -149,7 +149,7 @@ export function ExperienceCandidateCard({
       {candidate.preliminaryChat?.hostReply && (
         <div className="px-4 py-2 bg-green-50 border-t border-green-100">
           <p className="text-xs text-green-700 line-clamp-1">
-            💬 "{candidate.preliminaryChat.hostReply}"
+            💬 &quot;{candidate.preliminaryChat.hostReply}&quot;
           </p>
         </div>
       )}

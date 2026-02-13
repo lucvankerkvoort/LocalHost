@@ -156,10 +156,27 @@ export const fetchPlannerExperiencesByCity = createAsyncThunk(
 );
 
 import { addLocalExperience } from './globe-slice';
+import type { PlannerExperience } from '@/types/planner-experiences';
+import type { RootState } from './store';
 
 export const addExperienceToTrip = createAsyncThunk(
     'globe/addExperienceToTrip',
-    async ({ tripId, dayId, experience, host, dayNumber }: { tripId: string | null, dayId?: string, dayNumber: number, experience: any, host: any }, { dispatch }) => {
+    async (
+      {
+        tripId,
+        dayId,
+        experience,
+        host,
+        dayNumber,
+      }: {
+        tripId: string | null;
+        dayId?: string;
+        dayNumber: number;
+        experience: PlannerExperience & { currency?: string };
+        host: { id: string; name: string; city: string; lat: number; lng: number };
+      },
+      { dispatch }
+    ) => {
         const isTemporaryDay = dayId && (dayId.includes('-') || dayId.length < 10);
         
         // Local Mode Check OR Temporary Day Check
@@ -167,7 +184,7 @@ export const addExperienceToTrip = createAsyncThunk(
             console.log('[addExperienceToTrip] Adding locally (No trip or temp day)', { tripId, dayId });
             
             const newItem = {
-                type: 'EXPERIENCE',
+                type: 'EXPERIENCE' as const,
                 title: experience.title,
                 experienceId: experience.id,
                 hostId: host.id, // Add hostId
@@ -211,7 +228,7 @@ export const addExperienceToTrip = createAsyncThunk(
               if (res.status === 404) {
                   console.warn('[addExperienceToTrip] 404 from API, falling back to local');
                   const newItem = {
-                    type: 'EXPERIENCE',
+                    type: 'EXPERIENCE' as const,
                     title: experience.title,
                     experienceId: experience.id,
                     hostId: host.id, // Add hostId for booking validation
@@ -272,7 +289,7 @@ import { convertGlobeDestinationsToApiPayload } from '@/lib/api/trip-converter';
 export const saveTripPlan = createAsyncThunk(
     'globe/saveTripPlan',
     async (_, { getState, dispatch }) => {
-        const state = getState() as any; // Cast to access root state
+        const state = getState() as RootState;
         const tripId = state.globe.tripId;
         const destinations = state.globe.destinations;
 

@@ -183,7 +183,7 @@ export default function ExperienceAvailabilityPage() {
             <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
               <Calendar className="w-8 h-8 text-amber-600" />
             </div>
-            <h1 className="text-xl font-bold text-[var(--foreground)]">This isn't your experience</h1>
+            <h1 className="text-xl font-bold text-[var(--foreground)]">This isn&apos;t your experience</h1>
             <p className="text-sm text-[var(--muted-foreground)] mt-2 mb-6">
               Only the host can edit availability.
             </p>
@@ -250,7 +250,7 @@ export default function ExperienceAvailabilityPage() {
           <div>
             <h1 className="text-2xl font-bold">Availability</h1>
             <p className="text-sm text-[var(--muted-foreground)]">
-              Set which dates you're available to host.
+              Set which dates you&apos;re available to host.
             </p>
           </div>
         </div>

@@ -36,7 +36,8 @@ export class AgentRouter {
   /**
    * Determine intent from the message history or context
    */
-  async route(messages: any[]): Promise<AgentIntent> {
+  async route(messages: Array<{ role?: string; content?: unknown }>): Promise<AgentIntent> {
+    void messages;
     // TODO: Implement actual router (LLM or regex)
     // For now, always return generic, which maps to PlanningAgent
     return 'general';

@@ -32,7 +32,7 @@ interface ApiItineraryDay {
   dayIndex: number; 
   title: string | null;
   items: ApiItineraryItem[]; // Update reference
-  suggestedHosts?: any[];
+  suggestedHosts?: unknown[];
 }
 
 export interface ApiTripAnchor {
@@ -53,6 +53,23 @@ export interface ApiTrip {
   userId: string;
   title: string;
   stops: ApiTripAnchor[];
+}
+
+const ITINERARY_ITEM_TYPES: ItineraryItem['type'][] = [
+  'SIGHT',
+  'EXPERIENCE',
+  'MEAL',
+  'FREE_TIME',
+  'TRANSPORT',
+  'NOTE',
+  'LODGING',
+];
+
+function normalizeItineraryType(type: string): ItineraryItem['type'] {
+  const upper = type.toUpperCase();
+  return ITINERARY_ITEM_TYPES.includes(upper as ItineraryItem['type'])
+    ? (upper as ItineraryItem['type'])
+    : 'SIGHT';
 }
 
 function deriveItineraryItemStatus(item: ApiItineraryItem): ItineraryItem['status'] {
@@ -102,7 +119,7 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
             .sort((a, b) => a.orderIndex - b.orderIndex)
             .map(item => ({
                 id: item.id,
-                type: item.type as any, 
+                type: normalizeItineraryType(item.type), 
                 category: item.type.toLowerCase(), 
                 title: item.title,
                 hostId: item.experience?.hostId || item.hostId || undefined, 
@@ -142,15 +159,47 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
   return destinations.sort((a, b) => a.day - b.day);
 }
 
-export function convertGlobeDestinationsToApiPayload(destinations: GlobeDestination[]): any {
+type ApiTripPayloadItem = {
+  type: ItineraryItem['type'];
+  title: string;
+  description?: string | null;
+  startTime: string | null;
+  experienceId: string | null | undefined;
+  locationName: string;
+  lat?: number;
+  lng?: number;
+  orderIndex: number;
+  createdByAI: boolean;
+};
+
+type ApiTripPayloadDay = {
+  dayIndex: number;
+  title: string;
+  suggestedHosts: unknown[];
+  items: ApiTripPayloadItem[];
+};
+
+type ApiTripPayloadStop = {
+  title: string;
+  type: ApiTripAnchor['type'];
+  locations: ApiTripAnchor['locations'];
+  order: number;
+  days: ApiTripPayloadDay[];
+};
+
+type ApiTripPayload = {
+  stops: ApiTripPayloadStop[];
+};
+
+export function convertGlobeDestinationsToApiPayload(destinations: GlobeDestination[]): ApiTripPayload {
   const mapItemType = (type: ItineraryItem['type'] | undefined) => {
     if (!type) return 'SIGHT';
     return type;
   };
 
   // 1. Group by City to reconstruct Stops
-  const stops: any[] = [];
-  let currentStop: any = null;
+  const stops: ApiTripPayloadStop[] = [];
+  let currentStop: ApiTripPayloadStop | null = null;
 
   // Ensure sorted by day
   const sortedDestinations = [...destinations].sort((a, b) => a.day - b.day);
@@ -172,7 +221,7 @@ export function convertGlobeDestinationsToApiPayload(destinations: GlobeDestinat
            lng: dest.lng
         }],
         order: stops.length,
-        days: []
+        days: [],
       };
     }
 

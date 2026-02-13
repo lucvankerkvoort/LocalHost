@@ -11,7 +11,6 @@ import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient({
-  // @ts-ignore - accelerateUrl is needed for Prisma Accelerate
   accelerateUrl: process.env.DATABASE_URL,
 });
 

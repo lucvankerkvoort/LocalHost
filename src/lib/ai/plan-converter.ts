@@ -4,8 +4,8 @@
  * Converts AI orchestrator output to globe visualization types.
  */
 
-import { GlobeDestination, RouteMarkerData, TravelRoute, generateId, getColorForDay } from '@/types/globe';
-import { createItem, ItineraryItem } from '@/types/itinerary';
+import { GlobeDestination, RouteMarkerData, TravelRoute, generateId, getColorForDay, HostMarkerData } from '@/types/globe';
+import { createItem, ItineraryItem, ItineraryItemType } from '@/types/itinerary';
 import type { ItineraryPlan as OrchestratorPlan } from '@/lib/ai/types';
 import { isObviouslyInvalid } from '@/lib/ai/validation/geo-validator';
 
@@ -83,7 +83,7 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
     const dayItems = day.activities.map((act, idx): ItineraryItem => {
       // ... (existing mapping logic) ...
         // Map category to item type
-        let type: any = 'EXPERIENCE'; // Default to Anchor/Experience
+        let type: ItineraryItemType = 'EXPERIENCE'; // Default to Anchor/Experience
         const cat = act.place.category?.toLowerCase();
         
         if (cat === 'landmark' || cat === 'museum' || cat === 'park' || cat === 'sight') {
@@ -237,11 +237,22 @@ export function mapTransportMode(mode: 'walk' | 'transit' | 'drive'): TravelRout
  */
 export function generateMarkersFromDestinations(destinations: GlobeDestination[]): {
   routeMarkers: RouteMarkerData[];
-  hostMarkers: any[]; // Type as any or HostMarkerData
+  hostMarkers: HostMarkerData[];
 } {
   const routeMarkers: RouteMarkerData[] = [];
-  const hostMarkers: any[] = [];
+  const hostMarkers: HostMarkerData[] = [];
   const seenHostIds = new Set<string>();
+
+  const isHostMarkerData = (value: unknown): value is HostMarkerData => {
+    if (!value || typeof value !== 'object') return false;
+    const candidate = value as Partial<HostMarkerData>;
+    return (
+      typeof candidate.id === 'string' &&
+      typeof candidate.name === 'string' &&
+      typeof candidate.lat === 'number' &&
+      typeof candidate.lng === 'number'
+    );
+  };
 
   const isValidCoordinate = (lat: number, lng: number) =>
     Number.isFinite(lat) &&
@@ -255,7 +266,8 @@ export function generateMarkersFromDestinations(destinations: GlobeDestination[]
   destinations.forEach(dest => {
     // 1. Collect Suggested Hosts
     if (dest.suggestedHosts && Array.isArray(dest.suggestedHosts)) {
-      dest.suggestedHosts.forEach((host: any) => {
+      dest.suggestedHosts.forEach((host) => {
+        if (!isHostMarkerData(host)) return;
         if (!seenHostIds.has(host.id)) {
           seenHostIds.add(host.id);
           hostMarkers.push(host);
@@ -299,4 +311,3 @@ export function getCenterPoint(destinations: GlobeDestination[]): { lat: number;
     lng: sumLng / destinations.length,
   };
 }
-

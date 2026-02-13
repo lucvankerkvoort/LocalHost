@@ -18,8 +18,9 @@ export async function POST(req: Request) {
     const transfer = await releasePayout(bookingId);
 
     return NextResponse.json({ success: true, transfer });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Payout release error:', error);
-    return NextResponse.json({ error: error.message || 'Payout failed' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Payout failed';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

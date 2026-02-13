@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
-import { BookingStatus, ExperienceCategory, Prisma, PrismaClient, SyntheticResponseStyle } from '@prisma/client';
+import { BookingStatus, ExperienceCategory, Prisma, PrismaClient, SyntheticResponseStyle, StripeOnboardingStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 import { HOSTS } from '../src/lib/data/hosts';
@@ -338,7 +338,7 @@ async function main() {
         syntheticResponseLatencyMinSec: host.latencyMin,
         syntheticResponseLatencyMaxSec: host.latencyMax,
         stripeConnectedAccountId: host.stripeAccountId,
-        stripeOnboardingStatus: host.stripeOnboardingStatus,
+        stripeOnboardingStatus: host.stripeOnboardingStatus as StripeOnboardingStatus,
         payoutsEnabled: host.payoutsEnabled,
         chargesEnabled: host.chargesEnabled,
       },
@@ -364,7 +364,7 @@ async function main() {
         syntheticResponseLatencyMinSec: host.latencyMin,
         syntheticResponseLatencyMaxSec: host.latencyMax,
         stripeConnectedAccountId: host.stripeAccountId,
-        stripeOnboardingStatus: host.stripeOnboardingStatus,
+        stripeOnboardingStatus: host.stripeOnboardingStatus as StripeOnboardingStatus,
         payoutsEnabled: host.payoutsEnabled,
         chargesEnabled: host.chargesEnabled,
       },

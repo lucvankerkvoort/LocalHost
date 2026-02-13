@@ -117,7 +117,6 @@ export async function POST(
 
         // If this is an experience, create a tentative booking
         if (experience) {
-            // @ts-ignore - BookingStatus enum might be stale in types
             createdBooking = await tx.booking.create({
                 data: {
                     tripId,

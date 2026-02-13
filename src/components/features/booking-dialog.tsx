@@ -153,7 +153,7 @@ export function BookingDialog({
                   Chat unlocks after booking
                 </p>
                 <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                  Once booked, you'll be able to fully chat with {host.name.split(' ')[0]} to shape the experience together.
+                  Once booked, you&apos;ll be able to fully chat with {host.name.split(' ')[0]} to shape the experience together.
                 </p>
               </div>
             </div>

@@ -28,6 +28,7 @@ export function AddItemModal({ isOpen, onClose, onSave, editingItem }: AddItemMo
   const [endTime, setEndTime] = useState('');
 
   // Reset form when opening/editing
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (editingItem) {
       setType(editingItem.type);
@@ -45,6 +46,7 @@ export function AddItemModal({ isOpen, onClose, onSave, editingItem }: AddItemMo
       setEndTime('');
     }
   }, [editingItem, isOpen]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

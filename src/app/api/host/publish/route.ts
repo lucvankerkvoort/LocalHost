@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
+
+type DraftWithStops = Prisma.ExperienceDraftGetPayload<{
+  include: { stops: true };
+}>;
 
 /**
  * POST /api/host/publish
@@ -32,14 +37,14 @@ export async function POST(request: Request) {
     }
 
     // Get the draft
-    const draft = await prisma.experienceDraft.findUnique({
+    const draft = (await prisma.experienceDraft.findUnique({
       where: { id: draftId },
       include: {
         stops: {
           orderBy: { order: 'asc' },
         },
       },
-    });
+    })) as DraftWithStops | null;
 
     if (!draft || draft.userId !== session.user.id) {
       return NextResponse.json(
@@ -63,7 +68,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if ((draft as any).stops.length === 0) {
+    if (draft.stops.length === 0) {
       return NextResponse.json(
         { error: 'Experience must have at least one stop' },
         { status: 400 }
@@ -114,7 +119,7 @@ export async function POST(request: Request) {
 
     // Create stops for the published experience
     await prisma.experienceStop.createMany({
-      data: (draft as any).stops.map((stop: any) => ({
+      data: draft.stops.map((stop) => ({
         experienceId: experience.id,
         name: stop.name,
         description: stop.description,
