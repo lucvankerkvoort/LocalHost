@@ -45,10 +45,7 @@ export function PaymentModal({ bookingId, isOpen, onClose, onSuccess }: PaymentM
   };
 
   useEffect(() => {
-    if (!STRIPE_PUBLISHABLE_KEY) {
-      setError('Payments are not configured.');
-      return;
-    }
+    if (!STRIPE_PUBLISHABLE_KEY) return;
 
     if (isOpen && bookingId) {
       // Create Payment Intent
@@ -74,8 +71,10 @@ export function PaymentModal({ bookingId, isOpen, onClose, onSuccess }: PaymentM
           <DialogTitle>Complete Your Booking</DialogTitle>
         </DialogHeader>
         
-        {error ? (
-          <div className="text-red-500 p-4">{error}</div>
+        {(!STRIPE_PUBLISHABLE_KEY || error) ? (
+          <div className="text-red-500 p-4">
+            {error ?? 'Payments are not configured.'}
+          </div>
         ) : clientSecret && stripePromise ? (
           <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe' } }}>
             <CheckoutForm 
