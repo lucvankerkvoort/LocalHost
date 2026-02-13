@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
+import { OPENAI_HOST_DRAFT_MODEL } from '@/lib/ai/model-config';
 
 // Schema for AI-generated experience content
 const experienceSchema = z.object({
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     // Generate experience content using AI
     const { object: generatedContent } = await generateObject({
-      model: openai('gpt-4o-mini'),
+      model: openai(OPENAI_HOST_DRAFT_MODEL),
       schema: experienceSchema,
       prompt: `You are creating a local experience listing for a host in ${city}${country ? `, ${country}` : ''}.
 

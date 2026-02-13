@@ -218,6 +218,7 @@ interface CesiumGlobeProps {
   activeItemId?: string | null;
   hoveredItemId?: string | null;
   onItemHover?: (itemId: string | null) => void;
+  onZoomChange?: (height: number) => void;
 }
 
 // ... (existing code)
@@ -237,6 +238,7 @@ export default function CesiumGlobe({
   activeItemId,
   hoveredItemId,
   onItemHover,
+  onZoomChange,
 }: CesiumGlobeProps) {
   const viewerRef = useRef<CesiumViewer | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -244,6 +246,14 @@ export default function CesiumGlobe({
   const [hoveredHost, setHoveredHost] = useState<HostMarkerData | null>(null);
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
   const handlerRef = useRef<ScreenSpaceEventHandler | null>(null);
+  const zoomHeightRef = useRef<number | null>(null);
+  const initialFlightRef = useRef(false);
+  const skipNextSelectionFlyRef = useRef(false);
+
+  const cityMarkersKey = useMemo(
+    () => cityMarkers.map((marker) => `${marker.id}:${marker.lat}:${marker.lng}`).join('|'),
+    [cityMarkers]
+  );
 
   // Find the selected destination to get its day number
   const selectedDest = destinations.find(d => d.id === selectedDestination);
@@ -269,6 +279,10 @@ export default function CesiumGlobe({
     });
   }, [routeMarkers, selectedDayNumber, destinations]);
 
+  useEffect(() => {
+    initialFlightRef.current = false;
+    skipNextSelectionFlyRef.current = false;
+  }, [cityMarkersKey]);
 
   // Pre-load circular avatars for hosts
   useEffect(() => {
@@ -350,6 +364,33 @@ export default function CesiumGlobe({
     };
   }, [isReady, hostMarkers, onItemHover, onMapBackgroundClick]);
 
+  useEffect(() => {
+    if (!viewerRef.current || !isReady || !onZoomChange) return;
+
+    const camera = viewerRef.current.camera;
+    const ellipsoid = viewerRef.current.scene.globe.ellipsoid;
+
+    const emitZoomHeight = () => {
+      const height =
+        camera.positionCartographic?.height ??
+        ellipsoid.cartesianToCartographic(camera.position).height;
+
+      if (!Number.isFinite(height)) return;
+
+      const rounded = Math.round(height);
+      if (zoomHeightRef.current === rounded) return;
+      zoomHeightRef.current = rounded;
+      onZoomChange(rounded);
+    };
+
+    emitZoomHeight();
+    camera.moveEnd.addEventListener(emitZoomHeight);
+
+    return () => {
+      camera.moveEnd.removeEventListener(emitZoomHeight);
+    };
+  }, [isReady, onZoomChange]);
+
   // Handle explicit visual target (e.g. from chat command)
   useEffect(() => {
     if (visualTarget && viewerRef.current && isReady) {
@@ -364,9 +405,46 @@ export default function CesiumGlobe({
     }
   }, [visualTarget, isReady]);
 
+  // Initial camera framing: show all city markers for multi-city drafts
+  useEffect(() => {
+    if (!viewerRef.current || !isReady || visualTarget) return;
+    if (initialFlightRef.current) return;
+
+    if (cityMarkers.length >= 2) {
+      const rect = getBoundingRectangle(
+        cityMarkers.map((marker) => ({ lat: marker.lat, lng: marker.lng }))
+      );
+      if (rect) {
+        initialFlightRef.current = true;
+        skipNextSelectionFlyRef.current = true;
+        viewerRef.current.camera.flyTo({
+          destination: rect,
+          duration: 2,
+        });
+        return;
+      }
+    }
+
+    if (destinations.length > 0) {
+      const firstDest = destinations[0];
+      initialFlightRef.current = true;
+      const timer = window.setTimeout(() => {
+        viewerRef.current?.camera.flyTo({
+          destination: Cartesian3.fromDegrees(firstDest.lng, firstDest.lat, 50000), // 50km - see the city
+          duration: 3,
+        });
+      }, 500);
+      return () => window.clearTimeout(timer);
+    }
+  }, [cityMarkers, destinations, isReady, visualTarget]);
+
   // Fly to destination when selected (only if no explicit visual target overriding it)
   useEffect(() => {
     if (selectedDestination && viewerRef.current && isReady && !visualTarget) {
+      if (skipNextSelectionFlyRef.current) {
+        skipNextSelectionFlyRef.current = false;
+        return;
+      }
       const dest = destinations.find(d => d.id === selectedDestination);
       if (dest) {
         // Check for multi-location anchor
@@ -389,19 +467,6 @@ export default function CesiumGlobe({
       }
     }
   }, [selectedDestination, destinations, isReady, visualTarget]);
-
-  // Fly to first destination on initial load
-  useEffect(() => {
-    if (destinations.length > 0 && viewerRef.current && isReady && !selectedDestination && !visualTarget) {
-      const firstDest = destinations[0];
-      setTimeout(() => {
-        viewerRef.current?.camera.flyTo({
-          destination: Cartesian3.fromDegrees(firstDest.lng, firstDest.lat, 50000), // 50km - see the city
-          duration: 3,
-        });
-      }, 500);
-    }
-  }, [destinations.length, isReady]);
 
   return (
     <>

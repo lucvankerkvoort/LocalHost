@@ -1,12 +1,18 @@
 'use client';
 
 import { ItineraryItem as ItineraryItemType } from '@/types/itinerary';
-import { Calendar, MapPin, Clock, Plus } from 'lucide-react';
+import { Clock, Plus } from 'lucide-react';
+import {
+  isHostedExperienceItem,
+  resolveItineraryDayCaption,
+  resolveItineraryDayHeadline,
+} from './itinerary-utils';
 
 interface ItineraryDayProps {
   dayId: string;
   dayNumber: number;
   title?: string;
+  city?: string;
   date?: string;
   activities: ItineraryItemType[];
   isSpaceOptimized?: boolean;
@@ -21,21 +27,11 @@ interface ItineraryDayProps {
   onBookItem?: (item: ItineraryItemType) => void;
 }
 
-function formatDate(dateString?: string): string {
-  if (!dateString) return 'Unscheduled';
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return 'Unscheduled';
-    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  } catch (e) {
-    return 'Unscheduled';
-  }
-}
-
 export function ItineraryDayColumn({
   dayId,
   dayNumber,
   title,
+  city,
   date,
   activities = [],
   isSpaceOptimized = false,
@@ -48,6 +44,8 @@ export function ItineraryDayColumn({
   onDeleteItem,
   onBookItem,
 }: ItineraryDayProps) {
+  const headline = resolveItineraryDayHeadline(date, title, dayNumber);
+  const caption = resolveItineraryDayCaption(date, title, city, dayNumber);
   
   return (
     <div 
@@ -72,10 +70,10 @@ export function ItineraryDayColumn({
         
         <div className="flex flex-col">
             <span className="text-sm font-bold text-[var(--foreground)] group-hover:text-[var(--princeton-orange)] transition-colors">
-                {formatDate(date)}
+                {headline}
             </span>
             <span className="text-xs text-[var(--muted-foreground)]">
-                {activities.length} Stops • {title || `Day ${dayNumber}`}
+                {activities.length} Stops • {caption}
             </span>
         </div>
       </div>
@@ -83,7 +81,9 @@ export function ItineraryDayColumn({
       {/* Activities List */}
       <div className="space-y-3">
         {activities.map((item) => {
-            const isAnchor = item.type === 'EXPERIENCE' || item.type === 'MEAL';
+            const isHostedExperience = isHostedExperienceItem(item);
+            const isAnchor = item.type === 'MEAL' || isHostedExperience;
+            const showCategory = Boolean(item.category) && (item.type !== 'EXPERIENCE' || isHostedExperience);
             
             return (
             <div 
@@ -104,12 +104,12 @@ export function ItineraryDayColumn({
                 <div className="flex justify-between items-start gap-3">
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                            {isAnchor && item.hostId && (
+                            {isHostedExperience && (
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--princeton-orange)] bg-[var(--princeton-orange)]/10 px-1.5 py-0.5 rounded-sm">
                                     Hosted
                                 </span>
                             )}
-                            {item.category && (
+                            {showCategory && (
                                 <span className="text-[10px] uppercase tracking-wider text-[var(--muted-foreground)]">
                                     {item.category.replace('_', ' ')}
                                 </span>
@@ -118,6 +118,11 @@ export function ItineraryDayColumn({
                         <h4 className={`font-medium text-[var(--foreground)] truncate pr-6 ${isAnchor ? 'text-sm' : 'text-xs'}`}>
                             {item.title}
                         </h4>
+                        {item.description?.trim() && (
+                            <p className="mt-1 text-xs text-[var(--muted-foreground)] line-clamp-2">
+                                {item.description}
+                            </p>
+                        )}
                         <div className="flex items-center gap-2 mt-1 text-xs text-[var(--muted-foreground)]">
                        {item.duration && (
                                <span className="flex items-center gap-1">
@@ -131,7 +136,7 @@ export function ItineraryDayColumn({
                 
                  {/* Actions (hover only) */}
                 <div className="absolute top-2 right-2 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center gap-1">
-                     {onBookItem && isAnchor && item.hostId && (
+                     {onBookItem && isHostedExperience && (
                          <button 
                             onClick={(e) => {
                                 e.stopPropagation();

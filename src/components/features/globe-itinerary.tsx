@@ -12,7 +12,7 @@ import {
   TravelRoute,
 } from '@/types/globe';
 import { ItineraryItem } from '@/types/itinerary';
-import type { HostExperience } from '@/lib/data/hosts';
+import type { PlannerExperience } from '@/types/planner-experiences';
 
 import { BookingDialog } from './booking-dialog';
 import { PaymentModal } from './payment/payment-modal';
@@ -33,13 +33,16 @@ import {
   clearSelectedHostId,
   setSelectedExperienceId,
   setSelectedHostId,
+  clearPlannerHosts,
+  clearHostMarkers,
+  setCameraHeight,
 } from '@/store/globe-slice';
 import { 
   fetchActiveTrip, 
   addExperienceToTrip, 
   removeExperienceFromTrip,
+  fetchPlannerExperiencesByCity,
 } from '@/store/globe-thunks';
-import { selectAllHosts, filterHostsByProximity } from '@/store/hosts-slice';
 import type { HostMarkerData } from '@/types/globe';
 import {
   setItineraryCollapsed,
@@ -61,6 +64,7 @@ const ITINERARY_STATE_PREFIX = 'globe-itinerary-state:';
 const ITINERARY_PENDING_KEY = 'globe-itinerary-pending';
 const ITINERARY_RESTORE_PARAM = 'restoreKey';
 const CITY_CLUSTER_DISTANCE_METERS = 60000;
+const CITY_LEVEL_MAX_HEIGHT_METERS = 200000;
 
 function calculateDistanceMeters(
   lat1: number,
@@ -103,7 +107,7 @@ type PlanningExperienceSelection = {
   hostLat?: number;
   hostLng?: number;
   hostCity?: string;
-  experience: HostExperience;
+  experience: PlannerExperience;
 };
 
 type BookingCandidate = {
@@ -142,9 +146,10 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   const selectedDestination = useAppSelector((state) => state.globe.selectedDestination);
   const visualTarget = useAppSelector((state) => state.globe.visualTarget);
   const hostMarkers = useAppSelector((state) => state.globe.hostMarkers);
+  const cameraHeight = useAppSelector((state) => state.globe.cameraHeight);
+  const plannerHosts = useAppSelector((state) => state.globe.plannerHosts);
   const placeMarkers = useAppSelector((state) => state.globe.placeMarkers);
   const tripIdState = useAppSelector((state) => state.globe.tripId);
-  const allHosts = useAppSelector(selectAllHosts);
   const activeItemId = useAppSelector((state) => state.globe.activeItemId);
   const hoveredItemId = useAppSelector((state) => state.globe.hoveredItemId);
   const selectedHostId = useAppSelector((state) => state.globe.selectedHostId);
@@ -170,6 +175,21 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     return destinations.find((d) => d.id === selectedDestination) || null;
   }, [selectedDestination, destinations]);
 
+  const isCityZoom = useMemo(() => {
+    if (cameraHeight === null) return false;
+    return cameraHeight <= CITY_LEVEL_MAX_HEIGHT_METERS;
+  }, [cameraHeight]);
+
+  const shouldShowHostMarkers = isCityZoom && itineraryPanelTab === 'EXPERIENCES';
+  const visibleHostMarkers = shouldShowHostMarkers ? hostMarkers : [];
+  const visibleRouteMarkers = isCityZoom ? routeMarkers : [];
+
+  const selectedCity = useMemo(() => {
+    if (!selectedDestData) return '';
+    const city = selectedDestData.city ?? selectedDestData.name ?? '';
+    return city.trim();
+  }, [selectedDestData]);
+
   const addedExperienceIds = useMemo(() => {
     return buildAddedExperienceIds(selectedDestData?.activities);
   }, [selectedDestData]);
@@ -181,6 +201,15 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   const router = useRouter();
   const searchParams = useSearchParams();
   const hasRestoredRef = useRef(false);
+
+  useEffect(() => {
+    if (!selectedCity) {
+      dispatch(clearPlannerHosts());
+      dispatch(clearHostMarkers());
+      return;
+    }
+    dispatch(fetchPlannerExperiencesByCity(selectedCity));
+  }, [dispatch, selectedCity]);
 
   /* Persistence Logic - Chat state removed */
   const persistItineraryState = useCallback(() => {
@@ -619,9 +648,6 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     if (destinations.length === 0) return [];
 
     type CityCluster = CityMarkerData & {
-      count: number;
-      latSum: number;
-      lngSum: number;
       minDay: number;
     };
 
@@ -646,9 +672,6 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
         dayIds: [dest.id],
         dayNumbers: [dest.day],
         color: dest.color,
-        count: 1,
-        latSum: dest.lat,
-        lngSum: dest.lng,
         minDay: dest.day,
       };
       clusters.push(cluster);
@@ -658,11 +681,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     const addToCluster = (cluster: CityCluster, dest: GlobeDestination) => {
       cluster.dayIds.push(dest.id);
       cluster.dayNumbers.push(dest.day);
-      cluster.count += 1;
-      cluster.latSum += dest.lat;
-      cluster.lngSum += dest.lng;
-      cluster.lat = cluster.latSum / cluster.count;
-      cluster.lng = cluster.lngSum / cluster.count;
+      // Keep first day's position as canonical — don't average/drift
       if (dest.day < cluster.minDay) {
         cluster.minDay = dest.day;
         cluster.color = dest.color;
@@ -733,42 +752,14 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     dispatch(clearSelectedHostId());
   }, [destinations, dispatch, selectedDestination]);
 
-  // Get hosts near the selected destination using proximity filtering
-  const nearbyHosts: HostMarkerData[] = useMemo(() => {
-    if (!selectedDestData) return [];
-    
-    // Filter hosts within 100km of the selected destination
-    const hostsNearby = filterHostsByProximity(
-      allHosts,
-      selectedDestData.lat,
-      selectedDestData.lng,
-      100 // 100km radius
-    );
-    
-    // Convert HostWithLocation to HostMarkerData format
-    return hostsNearby.map((host): HostMarkerData => ({
-      id: host.id,
-      hostId: host.id,
-      name: host.name,
-      lat: host.lat,
-      lng: host.lng,
-      photo: host.photo,
-      headline: host.quote,
-      rating: host.experiences[0]?.rating,
-      experienceCount: host.experiences.length,
-    }));
-  }, [selectedDestData, allHosts]);
-
   const orderedDestinations = useMemo(
     () => [...destinations].sort((a, b) => a.day - b.day),
     [destinations]
   );
 
   const findHostMarker = useCallback((hostId: string): HostMarkerData | null => {
-    const nearby = nearbyHosts.find((host) => host.id === hostId || host.hostId === hostId);
-    if (nearby) return nearby;
     return hostMarkers.find((host) => host.id === hostId || host.hostId === hostId) ?? null;
-  }, [hostMarkers, nearbyHosts]);
+  }, [hostMarkers]);
 
   const handleHostSelection = useCallback((host: HostMarkerData) => {
     dispatch(setSelectedHostId(host.hostId || host.id));
@@ -853,8 +844,8 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
           <CesiumGlobe
             destinations={destinations}
             cityMarkers={cityMarkers}
-            routeMarkers={routeMarkers}
-            hostMarkers={hostMarkers}
+            routeMarkers={visibleRouteMarkers}
+            hostMarkers={visibleHostMarkers}
             placeMarkers={placeMarkers}
             selectedDestination={selectedDestination}
             onCityMarkerClick={handleCityMarkerClick}
@@ -864,6 +855,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
             activeItemId={activeItemId}
             hoveredItemId={hoveredItemId}
             onItemHover={handleItemHover}
+            onZoomChange={(height) => dispatch(setCameraHeight(height))}
           />
           {/* Itinerary Panel / Mobile Drawer */}
           <div
@@ -915,6 +907,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                       Itinerary
                     </button>
                     <button
+                      data-testid="open-experiences-tab"
                       onClick={() => dispatch(setItineraryPanelTab('EXPERIENCES'))}
                       className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                         itineraryPanelTab === 'EXPERIENCES'
@@ -946,6 +939,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                       dayId={day.id}
                       dayNumber={day.day}
                       title={day.name}
+                      city={day.city}
                       date={day.date}
                       activities={day.activities}
                       isActive={day.id === selectedDestination}
@@ -1003,7 +997,8 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                 <div className="flex-1 min-h-0">
                   <HostPanel
                     variant="panel"
-                    hosts={nearbyHosts.length > 0 ? nearbyHosts : hostMarkers}
+                    hosts={plannerHosts}
+                    hostMarkers={hostMarkers}
                     selectedHostId={selectedHostId}
                     selectedDayNumber={selectedDestData?.day}
                     addedExperienceIds={addedExperienceIds}

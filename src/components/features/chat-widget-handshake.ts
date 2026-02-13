@@ -41,8 +41,15 @@ export function getChatIntent(pathname: string | null, intentOverride?: ChatWidg
   return pathname?.startsWith('/become-host') ? 'become_host' : 'general';
 }
 
-export function getChatId(intent: ChatWidgetIntent, pathname: string | null): string {
-  if (intent !== 'become_host') return `chat-${intent}`;
+export function getChatId(
+  intent: ChatWidgetIntent,
+  pathname: string | null,
+  tripId?: string | null
+): string {
+  if (intent !== 'become_host') {
+    const trimmedTripId = tripId?.trim();
+    return trimmedTripId ? `chat-${intent}-${trimmedTripId}` : `chat-${intent}`;
+  }
   const draftId = getHostDraftIdFromPath(pathname);
   return draftId ? `chat-${intent}-${draftId}` : `chat-${intent}`;
 }

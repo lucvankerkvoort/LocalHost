@@ -19,8 +19,14 @@ test('getChatIntent only enables become_host on /become-host routes', () => {
 
 test('getChatId uses draft-scoped chat ids for become_host sessions', () => {
   assert.equal(getChatId('become_host', '/become-host/draft-1'), 'chat-become_host-draft-1');
-  assert.equal(getChatId('become_host', '/become-host'), 'chat-become_host');
+  assert.equal(getChatId('become_host', '/become-host', 'trip-1'), 'chat-become_host');
   assert.equal(getChatId('general', '/become-host/draft-1'), 'chat-general');
+});
+
+test('getChatId scopes general chat ids by tripId when provided', () => {
+  assert.equal(getChatId('general', '/trips/trip-1', 'trip-1'), 'chat-general-trip-1');
+  assert.equal(getChatId('general', '/trips/trip-2', '  trip-2  '), 'chat-general-trip-2');
+  assert.equal(getChatId('general', '/trips/trip-3', null), 'chat-general');
 });
 
 test('shouldStartHostOnboardingHandshake gates handshake correctly', () => {

@@ -16,6 +16,7 @@ import {
   type SearchIntent 
 } from '@/lib/semantic-search';
 import { Agent, AgentContext } from './agent';
+import { OPENAI_PLANNING_MODEL } from '@/lib/ai/model-config';
 
 // Schema for intent extraction
 const searchIntentSchema = z.object({
@@ -27,7 +28,7 @@ const searchIntentSchema = z.object({
 });
 
 // System prompt that handles semantic search and itinerary planning
-const SYSTEM_PROMPT = `You are a friendly matchmaker for Localhost, a platform that connects travelers with locals and authentic experiences.
+const SYSTEM_PROMPT = `You are a friendly, helpful travel planner for Localhost, a platform that connects travelers with locals and authentic experiences.
 
 CRITICAL TOOL RULES - ALWAYS FOLLOW THESE:
 
@@ -61,8 +62,16 @@ Your role depends on the MODE indicated in the user's message:
 
 Guidelines:
 - ALWAYS call tools BEFORE responding with text about locations
-- Keep text responses warm and brief AFTER tool execution
-- Never pretend to fly somewhere without calling flyToLocation`;
+- Keep text responses blunt and brief AFTER tool execution
+- Never pretend to fly somewhere without calling flyToLocation
+
+STYLE RULES (STRICT):
+- Be warm, calm, and professional. Keep responses concise and practical.
+- Do NOT provide multiple options unless the user explicitly asks.
+- Ask at most one question, only if required to proceed.
+- No emojis, no exclamation points, no filler.
+- For trip planning, do NOT narrate the itinerary in chat. The UI will show details.
+- Trip days should be city-based with real sights/POIs (not travel-day activities).`;
 
 type HydrationTotals = {
   geocodes: number;
@@ -161,8 +170,7 @@ export class PlanningAgent implements Agent {
       : 'auto' as const;
   
     return streamText({
-      // Using gpt-4o for reliable tool calling
-      model: openai('gpt-4o'),
+      model: openai(OPENAI_PLANNING_MODEL),
       system: SYSTEM_PROMPT,
       messages,
       toolChoice,

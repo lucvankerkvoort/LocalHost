@@ -8,6 +8,7 @@ import reducer, {
   addHostMarkers,
   addPlaceMarker,
   clearItinerary,
+  clearPlannerHosts,
   clearVisualTarget,
   hydrateGlobeState,
   setDestinations,
@@ -19,7 +20,10 @@ import reducer, {
   setActiveItemId,
   setFocusedItemId,
   setItineraryData,
+  setPlannerHosts,
+  setPlannerHostsStatus,
   setTripId,
+  setCameraHeight,
   setVisualTarget,
   updateDayIds,
 } from './globe-slice';
@@ -59,6 +63,11 @@ test('setVisualTarget sets target and clearVisualTarget resets it', () => {
   assert.equal(cleared.visualTarget, null);
 });
 
+test('setCameraHeight sets camera height value', () => {
+  const state = reducer(getInitialState(), setCameraHeight(150000));
+  assert.equal(state.cameraHeight, 150000);
+});
+
 test('addHostMarkers appends new markers and skips duplicate ids', () => {
   const start = reducer(
     getInitialState(),
@@ -81,6 +90,73 @@ test('addHostMarkers appends new markers and skips duplicate ids', () => {
     next.hostMarkers.map((host) => host.id),
     ['h-1', 'h-2', 'h-3']
   );
+});
+
+test('setPlannerHosts and setPlannerHostsStatus update planner host state', () => {
+  const hosts = [
+    {
+      id: 'host-1',
+      name: 'Planner Host',
+      photo: null,
+      bio: null,
+      quote: null,
+      responseTime: null,
+      languages: [],
+      interests: [],
+      city: 'Rome',
+      country: 'Italy',
+      marker: { lat: 41.9, lng: 12.5 },
+      experiences: [
+        {
+          id: 'exp-1',
+          title: 'Experience',
+          description: 'Desc',
+          category: 'ARTS_CULTURE',
+          duration: 120,
+          price: 5000,
+          rating: 4.8,
+          reviewCount: 10,
+          photos: [],
+          city: 'Rome',
+          country: 'Italy',
+        },
+      ],
+    },
+  ];
+
+  let state = reducer(getInitialState(), setPlannerHostsStatus('loading'));
+  state = reducer(state, setPlannerHosts(hosts));
+  state = reducer(state, setPlannerHostsStatus('ready'));
+
+  assert.equal(state.plannerHostsStatus, 'ready');
+  assert.equal(state.plannerHosts.length, 1);
+  assert.equal(state.plannerHosts[0].id, 'host-1');
+});
+
+test('clearPlannerHosts resets planner host state', () => {
+  const hosts = [
+    {
+      id: 'host-1',
+      name: 'Planner Host',
+      photo: null,
+      bio: null,
+      quote: null,
+      responseTime: null,
+      languages: [],
+      interests: [],
+      city: 'Rome',
+      country: 'Italy',
+      marker: { lat: 41.9, lng: 12.5 },
+      experiences: [],
+    },
+  ];
+
+  let state = reducer(getInitialState(), setPlannerHosts(hosts));
+  state = reducer(state, setPlannerHostsStatus('ready'));
+  state = reducer(state, clearPlannerHosts());
+
+  assert.equal(state.plannerHosts.length, 0);
+  assert.equal(state.plannerHostsStatus, 'idle');
 });
 
 test('addPlaceMarker replaces marker with same id', () => {
@@ -147,7 +223,10 @@ test('clearItinerary clears destinations, routes, markers and selected destinati
   assert.deepEqual(cleared.routeMarkers, []);
   assert.equal(cleared.selectedDestination, null);
   assert.equal(cleared.visualTarget, null);
+  assert.equal(cleared.cameraHeight, null);
   assert.deepEqual(cleared.hostMarkers, []);
+  assert.deepEqual(cleared.plannerHosts, []);
+  assert.equal(cleared.plannerHostsStatus, 'idle');
   assert.deepEqual(cleared.placeMarkers, []);
   assert.equal(cleared.selectedHostId, null);
   assert.equal(cleared.selectedExperienceId, null);

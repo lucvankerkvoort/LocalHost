@@ -9,6 +9,7 @@ export type HostOnboardingStage =
 export interface AgentContext {
   userId?: string; 
   sessionId?: string;
+  tripId?: string;
   onboardingStage?: HostOnboardingStage;
 }
 

@@ -189,6 +189,46 @@ function formatPlaceResult(result: NominatimResult, fallbackName: string): Resol
   };
 }
 
+function normalizeCityKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z]/g, '');
+}
+
+function extractContextCity(context?: string): string | null {
+  if (!context) return null;
+  const parts = context.split(',').map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 2) return null;
+  return parts[0] || null;
+}
+
+function isCityMatch(expectedCity: string, candidate?: string): boolean {
+  if (!candidate) return false;
+  const expectedKey = normalizeCityKey(expectedCity);
+  const candidateKey = normalizeCityKey(candidate);
+  if (!expectedKey || !candidateKey) return false;
+  if (expectedKey === candidateKey) return true;
+  if (expectedKey.length >= 4 && candidateKey.includes(expectedKey)) return true;
+  if (candidateKey.length >= 4 && expectedKey.includes(candidateKey)) return true;
+  return expectedKey.slice(0, 3) === candidateKey.slice(0, 3);
+}
+
+function filterResultsByCity(
+  results: ResolvePlaceResult[],
+  expectedCity: string | null
+): ResolvePlaceResult[] {
+  if (!expectedCity) return results;
+  const expectedKey = normalizeCityKey(expectedCity);
+  if (!expectedKey) return results;
+  const matches = results.filter((result) => {
+    if (isCityMatch(expectedCity, result.city)) return true;
+    if (result.formattedAddress) {
+      const addressKey = normalizeCityKey(result.formattedAddress);
+      if (addressKey.includes(expectedKey)) return true;
+    }
+    return false;
+  });
+  return matches.length > 0 ? matches : results;
+}
+
 // ============================================================================
 // Tool Implementation
 // ============================================================================
@@ -202,15 +242,17 @@ export const resolvePlaceTool = createTool({
     try {
       const queryVariants = buildQueryVariants(params.name, params.context);
       const primaryEndpoint = 'https://nominatim.openstreetmap.org/search';
+      const expectedCity = extractContextCity(params.context);
       
       // Check cache first
       const cacheKey = `${params.name}|${params.context || ''}`;
       if (GEOCODE_CACHE.has(cacheKey)) {
         const cachedResults = GEOCODE_CACHE.get(cacheKey)!;
         if (cachedResults.length > 0) {
+          const candidateResults = filterResultsByCity(cachedResults, expectedCity);
           // Re-sort cached results if anchor point changed (unlikely but possible)
           if (params.anchorPoint) {
-            const best = cachedResults.reduce((prev, curr) => {
+            const best = candidateResults.reduce((prev, curr) => {
               const prevDist = calculateDistance(
                 prev.location.lat,
                 prev.location.lng,
@@ -228,7 +270,7 @@ export const resolvePlaceTool = createTool({
             console.log(`[resolve_place] Cache hit for "${params.name}"`);
             return { success: true, data: attachDistanceToAnchor(best, params.anchorPoint) };
           }
-          return { success: true, data: cachedResults[0] };
+          return { success: true, data: candidateResults[0] };
         }
       }
 
@@ -240,17 +282,18 @@ export const resolvePlaceTool = createTool({
           if (results.length > 0) {
             // 2. Format all candidates
             const formattedResults = results.map(r => formatPlaceResult(r, params.name));
+            const candidateResults = filterResultsByCity(formattedResults, expectedCity);
             
             // 3. Cache them
             GEOCODE_CACHE.set(cacheKey, formattedResults);
             
             // 4. Triangulate: Find closest to anchor
-            let bestResult = formattedResults[0];
+            let bestResult = candidateResults[0];
             
             if (params.anchorPoint) {
               let minDistance = Number.MAX_VALUE;
               
-              for (const res of formattedResults) {
+              for (const res of candidateResults) {
                 const dist = calculateDistance(
                   res.location.lat, res.location.lng,
                   params.anchorPoint.lat, params.anchorPoint.lng

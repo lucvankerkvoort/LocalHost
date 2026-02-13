@@ -138,13 +138,13 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
     };
     destinations.push(destination);
 
-    // Add markers for ALL activities using the item ID
+    // Add markers for ALL activities — use place.id as canonical ID for hover sync
     dayItems.forEach((item) => {
       if (item.place && item.place.location) {
         const { lat, lng } = item.place.location;
         if (isValidCoordinate(lat, lng)) {
             routeMarkers.push({
-              id: item.id, // Direct match with item ID
+              id: item.place.id || item.id, // Prefer resolve_place OSM ID
               routeId: `full-day-${day.dayNumber}`,
               kind: 'end',
               lat,
@@ -176,8 +176,8 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
             mode: nav.type === 'transit' ? 'train' : nav.type,
             dayNumber: day.dayNumber,
           });
-          addRouteMarker(routeId, 'start', fromActivity.place, day.dayNumber);
-          addRouteMarker(routeId, 'end', toActivity.place, day.dayNumber);
+          // NOTE: No addRouteMarker calls here — activity markers (above) already
+          // cover these locations. Navigation events only need polylines.
         }
       }
     }
@@ -269,7 +269,7 @@ export function generateMarkersFromDestinations(destinations: GlobeDestination[]
         const { lat, lng } = act.place.location;
         if (isValidCoordinate(lat, lng)) {
           routeMarkers.push({
-            id: `marker-${act.id}`,
+            id: act.place.id || act.id, // Same ID scheme as convertPlanToGlobeData for hover sync
             routeId: `route-${dest.id}`, // grouping by day/destination
             kind: 'end',
             lat,

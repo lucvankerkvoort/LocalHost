@@ -98,6 +98,72 @@ test.describe('Itinerary Editing and Persistence', () => {
   });
 
   test('host panel locks booked items and keeps draft items removable', async ({ page }) => {
+    await page.route('**/api/planner/experiences**', async (route) => {
+      const url = new URL(route.request().url());
+      const city = url.searchParams.get('city') ?? '';
+      const normalized = city.trim().toLowerCase();
+
+      if (normalized !== 'rome') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ city, hosts: [] }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          city: 'Rome',
+          hosts: [
+            {
+              id: 'maria-rome',
+              name: 'Maria Rossi',
+              photo: 'https://example.com/host.jpg',
+              bio: 'Test host bio',
+              quote: 'Test quote',
+              responseTime: 'within an hour',
+              languages: ['Italian', 'English'],
+              interests: ['food'],
+              city: 'Rome',
+              country: 'Italy',
+              marker: { lat: 41.9028, lng: 12.4964 },
+              experiences: [
+                {
+                  id: '1',
+                  title: 'Sunset Cooking Class with Nonna Maria',
+                  description: 'Learn authentic Roman pasta recipes.',
+                  category: 'FOOD_DRINK',
+                  duration: 180,
+                  price: 7500,
+                  rating: 4.9,
+                  reviewCount: 127,
+                  photos: ['https://example.com/exp1.jpg'],
+                  city: 'Rome',
+                  country: 'Italy',
+                },
+                {
+                  id: '1b',
+                  title: 'Morning Market Tour & Brunch',
+                  description: 'Explore the market and cook brunch together.',
+                  category: 'FOOD_DRINK',
+                  duration: 150,
+                  price: 6000,
+                  rating: 4.8,
+                  reviewCount: 43,
+                  photos: ['https://example.com/exp1b.jpg'],
+                  city: 'Rome',
+                  country: 'Italy',
+                },
+              ],
+            },
+          ],
+        }),
+      });
+    });
+
     await page.route('**/api/trips', async (route) => {
       await route.fulfill({
         status: 200,
