@@ -6,6 +6,7 @@ import { BookingStatus, ExperienceCategory, Prisma, PrismaClient, SyntheticRespo
 import bcrypt from 'bcryptjs';
 
 import { HOSTS } from '../src/lib/data/hosts';
+import { getCityCoordinates } from '../src/lib/data/city-coordinates';
 import { summarizeSeedDistribution, validateSeedDistribution } from '../src/lib/synthetic-bots/seed-distribution';
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -177,7 +178,20 @@ async function clearSyntheticDataset() {
     },
   });
   await prisma.message.deleteMany({ where: { id: { startsWith: 'syn-msg-' } } });
-  await prisma.booking.deleteMany({ where: { id: { startsWith: 'syn-booking-' } } });
+  await prisma.review.deleteMany({ where: { experienceId: { startsWith: 'syn-exp-' } } });
+  await prisma.booking.deleteMany({
+    where: {
+      OR: [
+        { id: { startsWith: 'syn-booking-' } },
+        { experienceId: { startsWith: 'syn-exp-' } },
+        { hostId: { startsWith: 'syn-host-' } },
+        { guestId: { startsWith: 'syn-traveler-' } },
+      ],
+    },
+  });
+  await prisma.itineraryItem.deleteMany({
+    where: { experienceId: { startsWith: 'syn-exp-' } },
+  });
   await prisma.experienceAvailability.deleteMany({ where: { id: { startsWith: 'syn-avail-' } } });
   await prisma.trip.deleteMany({ where: { id: { startsWith: 'syn-trip-' } } });
   await prisma.experience.deleteMany({ where: { id: { startsWith: 'syn-exp-' } } });
@@ -216,30 +230,53 @@ async function main() {
 
   // Ensure Demo User
   const demoUserId = 'demo-user';
-  await prisma.user.upsert({
-    where: { id: demoUserId },
-    create: {
-      id: demoUserId,
-      email: 'demo@localhost.com',
-      password,
-      name: 'Demo Traveler',
-      city: 'San Francisco',
-      country: 'USA',
-      languages: ['English'],
-      interests: ['travel', 'food'],
-      bio: 'Demo user for testing.',
-      isHost: false,
-      isVerified: true,
-      verificationTier: 'BASIC',
-      trustScore: 100,
-    },
-    update: {
-      password, // Update password to ensure it matches
-    },
+  const demoEmail = 'demo@localhost.com';
+  const existingDemoByEmail = await prisma.user.findUnique({
+    where: { email: demoEmail },
+    select: { id: true },
   });
+
+  if (existingDemoByEmail) {
+    await prisma.user.update({
+      where: { id: existingDemoByEmail.id },
+      data: { password },
+    });
+  } else {
+    const existingDemoById = await prisma.user.findUnique({
+      where: { id: demoUserId },
+      select: { id: true },
+    });
+
+    if (existingDemoById) {
+      await prisma.user.update({
+        where: { id: demoUserId },
+        data: { email: demoEmail, password },
+      });
+    } else {
+      await prisma.user.create({
+        data: {
+          id: demoUserId,
+          email: demoEmail,
+          password,
+          name: 'Demo Traveler',
+          city: 'San Francisco',
+          country: 'USA',
+          languages: ['English'],
+          interests: ['travel', 'food'],
+          bio: 'Demo user for testing.',
+          isHost: false,
+          isVerified: true,
+          verificationTier: 'BASIC',
+          trustScore: 100,
+        },
+      });
+    }
+  }
 
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
+
+  const stripeEnabled = profile === 'dev-lite';
 
   const hostRecords = Array.from({ length: config.syntheticHosts }, (_, i) => {
     const baseHost = HOSTS[i % HOSTS.length];
@@ -247,6 +284,9 @@ async function main() {
     const responseStyle = RESPONSE_STYLES[i % RESPONSE_STYLES.length];
     const latencyMin = 5 + (hashInt(`${hostId}:latency-min`) % 11);
     const latencyMax = latencyMin + 8 + (hashInt(`${hostId}:latency-max`) % 16);
+    const stripeAccountId = stripeEnabled
+      ? `acct_${createHash('sha256').update(hostId).digest('hex').slice(0, 16)}`
+      : null;
 
     return {
       id: hostId,
@@ -264,6 +304,10 @@ async function main() {
       latencyMin,
       latencyMax,
       personaKey: `${baseHost.id}:${responseStyle.toLowerCase()}`,
+      stripeAccountId,
+      stripeOnboardingStatus: stripeEnabled ? 'COMPLETE' : 'NOT_STARTED',
+      payoutsEnabled: stripeEnabled,
+      chargesEnabled: stripeEnabled,
     };
   });
 
@@ -293,10 +337,10 @@ async function main() {
         syntheticResponseStyle: host.responseStyle,
         syntheticResponseLatencyMinSec: host.latencyMin,
         syntheticResponseLatencyMaxSec: host.latencyMax,
-        stripeConnectedAccountId: null,
-        stripeOnboardingStatus: 'NOT_STARTED',
-        payoutsEnabled: false,
-        chargesEnabled: false,
+        stripeConnectedAccountId: host.stripeAccountId,
+        stripeOnboardingStatus: host.stripeOnboardingStatus,
+        payoutsEnabled: host.payoutsEnabled,
+        chargesEnabled: host.chargesEnabled,
       },
       update: {
         email: host.email,
@@ -319,10 +363,10 @@ async function main() {
         syntheticResponseStyle: host.responseStyle,
         syntheticResponseLatencyMinSec: host.latencyMin,
         syntheticResponseLatencyMaxSec: host.latencyMax,
-        stripeConnectedAccountId: null,
-        stripeOnboardingStatus: 'NOT_STARTED',
-        payoutsEnabled: false,
-        chargesEnabled: false,
+        stripeConnectedAccountId: host.stripeAccountId,
+        stripeOnboardingStatus: host.stripeOnboardingStatus,
+        payoutsEnabled: host.payoutsEnabled,
+        chargesEnabled: host.chargesEnabled,
       },
     });
   }
@@ -380,6 +424,7 @@ async function main() {
     const category = ALL_CATEGORIES[i % ALL_CATEGORIES.length];
     const id = stableId('syn-exp', `${profile}:experience:${i}:${host.id}:${category}`);
     const price = choosePrice(id);
+    const coords = getCityCoordinates(host.city);
 
     return {
       id,
@@ -396,6 +441,8 @@ async function main() {
       photos: [`https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&h=500&fit=crop&sig=${i + 1}`],
       includedItems: ['Host guidance', 'Local recommendations'],
       excludedItems: ['Transportation', 'Personal shopping'],
+      latitude: coords?.lat ?? null,
+      longitude: coords?.lng ?? null,
     };
   });
 
@@ -421,6 +468,8 @@ async function main() {
         photos: experience.photos,
         rating: experience.rating,
         reviewCount: experience.reviewCount,
+        latitude: experience.latitude ?? null,
+        longitude: experience.longitude ?? null,
         isActive: true,
       },
       update: {
@@ -441,6 +490,8 @@ async function main() {
         photos: experience.photos,
         rating: experience.rating,
         reviewCount: experience.reviewCount,
+        latitude: experience.latitude ?? null,
+        longitude: experience.longitude ?? null,
         isActive: true,
       },
     });

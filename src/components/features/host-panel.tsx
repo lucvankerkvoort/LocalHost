@@ -1,27 +1,29 @@
 'use client';
 
-import { HOSTS, type Host, type HostExperience } from '@/lib/data/hosts';
 import type { HostMarkerData } from '@/types/globe';
+import type { PlannerExperience, PlannerExperienceHost } from '@/types/planner-experiences';
 import { getHostExperienceCtaState } from './host-panel-state';
 
 import { Home } from 'lucide-react';
 
 interface HostPanelProps {
   variant?: 'sidebar' | 'panel';
-  hosts: HostMarkerData[];
+  hosts: PlannerExperienceHost[];
+  hostMarkers: HostMarkerData[];
   selectedHostId?: string | null;
   selectedDayNumber?: number;
   addedExperienceIds?: Set<string>;
   bookedExperienceIds?: Set<string>;
   onHostClick: (host: HostMarkerData) => void;
   onViewProfile: (host: HostMarkerData) => void;
-  onAddExperience: (host: Host, experience: HostExperience, marker: HostMarkerData) => void;
-  onFocusExperience?: (host: Host, experience: HostExperience, marker: HostMarkerData) => void;
+  onAddExperience: (host: PlannerExperienceHost, experience: PlannerExperience, marker: HostMarkerData) => void;
+  onFocusExperience?: (host: PlannerExperienceHost, experience: PlannerExperience, marker: HostMarkerData) => void;
 }
 
 export function HostPanel({
   variant = 'sidebar',
   hosts,
+  hostMarkers,
   selectedHostId,
   selectedDayNumber,
   addedExperienceIds,
@@ -31,11 +33,21 @@ export function HostPanel({
   onAddExperience,
   onFocusExperience,
 }: HostPanelProps) {
-  // Get full host data to access experiences
-  const hostsWithExperiences = hosts.map(marker => {
-    const fullHost = HOSTS.find(h => h.id === marker.id);
-    return { marker, fullHost };
-  }).filter(({ fullHost }) => fullHost !== undefined);
+  const hostsWithMarkers = hosts.map((host) => {
+    const marker =
+      hostMarkers.find((item) => item.hostId === host.id || item.id === host.id) ??
+      ({
+        id: host.id,
+        hostId: host.id,
+        name: host.name,
+        lat: host.marker.lat,
+        lng: host.marker.lng,
+        photo: host.photo ?? undefined,
+        headline: host.quote ?? undefined,
+        experienceCount: host.experiences.length,
+      } satisfies HostMarkerData);
+    return { host, marker };
+  });
 
   const containerClasses = variant === 'panel'
     ? 'w-full border-transparent'
@@ -47,7 +59,7 @@ export function HostPanel({
 
   if (hosts.length === 0) {
     return (
-      <div className={`${emptyContainerClasses} flex-shrink-0 bg-[var(--background)]/60 backdrop-blur-xl flex flex-col`}>
+      <div className={`${emptyContainerClasses} flex-1 min-h-0 bg-[var(--background)]/60 backdrop-blur-xl flex flex-col`}>
         <div className="p-4 border-b border-[var(--border)]/50">
           <h2 className="font-semibold text-[var(--foreground)] flex items-center gap-2">
             <Home className="w-5 h-5 text-[var(--princeton-orange)]" />
@@ -69,7 +81,7 @@ export function HostPanel({
   }
 
   return (
-    <div className={`${containerClasses} flex-shrink-0 bg-[var(--background)]/60 backdrop-blur-xl flex flex-col`}>
+    <div className={`${containerClasses} flex-1 min-h-0 bg-[var(--background)]/60 backdrop-blur-xl flex flex-col`}>
       {/* Header */}
       <div className="p-4 border-b border-[var(--border)]/50">
         <h2 className="font-semibold text-[var(--foreground)] flex items-center gap-2">
@@ -83,19 +95,19 @@ export function HostPanel({
 
       {/* Scrollable host list */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {hostsWithExperiences.map(({ marker, fullHost }) => (
+        {hostsWithMarkers.map(({ marker, host }) => (
           <HostCardWithExperiences
             key={marker.id}
             marker={marker}
-            host={fullHost!}
-            isSelected={marker.id === selectedHostId}
+            host={host}
+            isSelected={marker.id === selectedHostId || marker.hostId === selectedHostId}
             selectedDayNumber={selectedDayNumber}
             addedExperienceIds={addedExperienceIds}
             bookedExperienceIds={bookedExperienceIds}
             onClick={() => onHostClick(marker)}
             onViewProfile={() => onViewProfile(marker)}
-            onAddExperience={(exp) => onAddExperience(fullHost!, exp, marker)}
-            onFocusExperience={(exp) => onFocusExperience?.(fullHost!, exp, marker)}
+            onAddExperience={(exp) => onAddExperience(host, exp, marker)}
+            onFocusExperience={(exp) => onFocusExperience?.(host, exp, marker)}
           />
         ))}
       </div>
@@ -105,15 +117,15 @@ export function HostPanel({
 
 interface HostCardWithExperiencesProps {
   marker: HostMarkerData;
-  host: Host;
+  host: PlannerExperienceHost;
   isSelected: boolean;
   selectedDayNumber?: number;
   addedExperienceIds?: Set<string>;
   bookedExperienceIds?: Set<string>;
   onClick: () => void;
   onViewProfile: () => void;
-  onAddExperience: (experience: HostExperience) => void;
-  onFocusExperience?: (experience: HostExperience) => void;
+  onAddExperience: (experience: PlannerExperience) => void;
+  onFocusExperience?: (experience: PlannerExperience) => void;
 }
 
 function HostCardWithExperiences({
@@ -146,7 +158,7 @@ function HostCardWithExperiences({
       >
         <div className="flex items-start gap-3">
           <img
-            src={host.photo}
+            src={host.photo ?? ''}
             alt={host.name}
             className="w-12 h-12 rounded-full object-cover flex-shrink-0 ring-2 ring-[var(--border)]"
           />
@@ -192,7 +204,7 @@ function HostCardWithExperiences({
               >
                 <div className="flex gap-3">
                   <img
-                    src={exp.photos?.[0] || host.photo}
+                    src={exp.photos?.[0] || host.photo || ''}
                     alt={exp.title}
                     className="w-16 h-12 rounded-lg object-cover flex-shrink-0"
                   />

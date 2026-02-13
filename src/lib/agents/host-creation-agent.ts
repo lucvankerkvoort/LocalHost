@@ -2,6 +2,7 @@ import { openai } from '@ai-sdk/openai';
 import { streamText, stepCountIs, tool, type ModelMessage } from 'ai';
 import { z } from 'zod';
 import type { Agent, AgentContext, HostOnboardingStage } from './agent';
+import { OPENAI_HOST_CREATION_MODEL } from '@/lib/ai/model-config';
 
 export const HOST_ONBOARDING_START_TOKEN = 'ACTION:START_HOST_ONBOARDING';
 export const HOST_CREATION_MAX_STEPS = 5;
@@ -281,7 +282,7 @@ export class HostCreationAgent implements Agent {
     });
 
     return streamText({
-      model: openai('gpt-4o'),
+      model: openai(OPENAI_HOST_CREATION_MODEL),
       system,
       messages: prepared.messages as ModelMessage[],
       tools: {

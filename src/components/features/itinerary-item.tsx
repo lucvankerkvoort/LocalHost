@@ -1,6 +1,7 @@
 'use client';
 
 import { ItineraryItem as ItineraryItemData, ItineraryItemType, ITEM_TYPE_CONFIG } from '@/types/itinerary';
+import { isHostedExperienceItem } from './itinerary-utils';
 import { 
   MapPin, 
   Clock, 
@@ -64,8 +65,7 @@ export function ItineraryItem({
   const configKey = getTypeKey(item.type);
   const config = ITEM_TYPE_CONFIG[configKey] || ITEM_TYPE_CONFIG.SIGHT;
 
-  // Check if it's a localhost experience (either explicitly or mapped)
-  const isLocalhost = item.type === 'EXPERIENCE';
+  const isHostedExperience = isHostedExperienceItem(item);
   const status = item.status || 'DRAFT';
   
   return (
@@ -124,7 +124,7 @@ export function ItineraryItem({
       )}
 
       {/* Booking Action */}
-      {isLocalhost && status === 'DRAFT' && (
+      {isHostedExperience && status === 'DRAFT' && (
         <button
           onClick={(e) => {
             e.stopPropagation();

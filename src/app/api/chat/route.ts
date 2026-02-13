@@ -23,7 +23,7 @@ function parseOnboardingStage(value: unknown): HostOnboardingStage | undefined {
 
 export async function POST(req: Request) {
   const body = await req.json();
-  const { messages, id } = body;
+  const { messages, id, tripId } = body;
   
   // Validate messages
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
   }
 
   const onboardingStage = parseOnboardingStage(body.onboardingStage);
-  const runAgent = () => agent.process(modelMessages, { sessionId: id, onboardingStage });
+  const runAgent = () => agent.process(modelMessages, { sessionId: id, onboardingStage, tripId });
   const result = execution ? await withExecution(execution, runAgent) : await runAgent();
 
   if (execution || strictConstraints) {

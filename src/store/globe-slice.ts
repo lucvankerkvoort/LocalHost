@@ -1,6 +1,7 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import type { GlobeDestination, RouteMarkerData, TravelRoute, HostMarkerData, PlaceMarkerData } from '@/types/globe';
+import type { PlannerExperienceHost } from '@/types/planner-experiences';
 import type { ItineraryPlan } from '@/lib/ai/types';
 import { convertPlanToGlobeData } from '@/lib/ai/plan-converter';
 import { toolCallReceived, type ToolCallEvent } from './tool-calls-slice';
@@ -10,11 +11,14 @@ const MAX_PLACE_DISTANCE_METERS = 300000;
 interface GlobeState {
   tripId: string | null;
   visualTarget: { lat: number; lng: number; height?: number } | null;
+  cameraHeight: number | null;
   destinations: GlobeDestination[];
   routes: TravelRoute[];
   routeMarkers: RouteMarkerData[];
   selectedDestination: string | null;
   hostMarkers: HostMarkerData[];
+  plannerHosts: PlannerExperienceHost[];
+  plannerHostsStatus: 'idle' | 'loading' | 'ready' | 'error';
   placeMarkers: PlaceMarkerData[];
   // Sync state for list <-> map interaction
   hoveredItemId: string | null;
@@ -38,11 +42,14 @@ function deduplicate<T extends { id: string }>(items: T[]): T[] {
 const initialState: GlobeState = {
   tripId: null,
   visualTarget: null,
+  cameraHeight: null,
   destinations: [],
   routes: [],
   routeMarkers: [],
   selectedDestination: null,
   hostMarkers: [],
+  plannerHosts: [],
+  plannerHostsStatus: 'idle',
   placeMarkers: [],
   hoveredItemId: null,
   activeItemId: null,
@@ -76,6 +83,9 @@ const globeSlice = createSlice({
     },
     setVisualTarget(state, action: PayloadAction<GlobeState['visualTarget']>) {
       state.visualTarget = action.payload;
+    },
+    setCameraHeight(state, action: PayloadAction<number | null>) {
+      state.cameraHeight = action.payload;
     },
     clearVisualTarget(state) {
       state.visualTarget = null;
@@ -115,6 +125,16 @@ const globeSlice = createSlice({
     setHostMarkers(state, action: PayloadAction<HostMarkerData[]>) {
       state.hostMarkers = action.payload;
     },
+    setPlannerHosts(state, action: PayloadAction<PlannerExperienceHost[]>) {
+      state.plannerHosts = action.payload;
+    },
+    setPlannerHostsStatus(state, action: PayloadAction<GlobeState['plannerHostsStatus']>) {
+      state.plannerHostsStatus = action.payload;
+    },
+    clearPlannerHosts(state) {
+      state.plannerHosts = [];
+      state.plannerHostsStatus = 'idle';
+    },
     addHostMarkers(state, action: PayloadAction<HostMarkerData[]>) {
       const existingIds = new Set(state.hostMarkers.map((host) => host.id));
       const next = action.payload.filter((host) => !existingIds.has(host.id));
@@ -148,7 +168,10 @@ const globeSlice = createSlice({
       state.routeMarkers = [];
       state.selectedDestination = null;
       state.visualTarget = null;
+      state.cameraHeight = null;
       state.hostMarkers = [];
+      state.plannerHosts = [];
+      state.plannerHostsStatus = 'idle';
       state.placeMarkers = [];
       state.hoveredItemId = null;
       state.activeItemId = null;
@@ -202,8 +225,17 @@ const globeSlice = createSlice({
       if (Object.prototype.hasOwnProperty.call(action.payload, 'visualTarget')) {
         state.visualTarget = action.payload.visualTarget ?? null;
       }
+      if (Object.prototype.hasOwnProperty.call(action.payload, 'cameraHeight')) {
+        state.cameraHeight = action.payload.cameraHeight ?? null;
+      }
       if (action.payload.hostMarkers) {
         state.hostMarkers = deduplicate(action.payload.hostMarkers);
+      }
+      if (action.payload.plannerHosts) {
+        state.plannerHosts = action.payload.plannerHosts;
+      }
+      if (Object.prototype.hasOwnProperty.call(action.payload, 'plannerHostsStatus')) {
+        state.plannerHostsStatus = action.payload.plannerHostsStatus ?? 'idle';
       }
       if (action.payload.placeMarkers) {
         state.placeMarkers = deduplicate(action.payload.placeMarkers);
@@ -362,6 +394,7 @@ const globeSlice = createSlice({
 export const {
   setTripId,
   setVisualTarget,
+  setCameraHeight,
   clearVisualTarget,
   setDestinations,
   setRoutes,
@@ -372,6 +405,9 @@ export const {
   setSelectedExperienceId,
   clearSelectedExperienceId,
   setHostMarkers,
+  setPlannerHosts,
+  setPlannerHostsStatus,
+  clearPlannerHosts,
   addHostMarkers,
   clearHostMarkers,
   setPlaceMarkers,

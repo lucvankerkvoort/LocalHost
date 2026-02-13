@@ -6,13 +6,17 @@ import {
   clearItinerary, 
   setDestinations, 
   setTripId,
-  updateDayIds
+  updateDayIds,
+  setPlannerHosts,
+  setPlannerHostsStatus,
+  clearPlannerHosts,
 } from './globe-slice';
 import { convertTripToGlobeDestinations, ApiTrip } from '@/lib/api/trip-converter';
 import { convertPlanToGlobeData, generateMarkersFromDestinations } from '@/lib/ai/plan-converter';
 import type { ItineraryPlan } from '@/lib/ai/types';
-import { RootState } from './store'; // Need to be careful with circular imports if store imports this. 
 // Ideally slice doesn't import thunks, components import thunks.
+import type { PlannerExperiencesResponse } from '@/types/planner-experiences';
+import { buildHostMarkersFromPlannerHosts } from '@/lib/planner/experiences';
 
 // Fetch the user's active trip (or create one)
 export const fetchActiveTrip = createAsyncThunk(
@@ -103,6 +107,49 @@ export const fetchActiveTrip = createAsyncThunk(
 
     } catch (error) {
       console.error('Error fetching active trip:', error);
+      throw error;
+    }
+  }
+);
+
+export const fetchPlannerExperiencesByCity = createAsyncThunk(
+  'globe/fetchPlannerExperiencesByCity',
+  async (city: string, { dispatch }) => {
+    const trimmedCity = city.trim();
+    if (!trimmedCity) {
+      dispatch(clearPlannerHosts());
+      dispatch(clearHostMarkers());
+      return { city: '', hosts: [] } as PlannerExperiencesResponse;
+    }
+
+    dispatch(setPlannerHostsStatus('loading'));
+
+    try {
+      const res = await fetch(`/api/planner/experiences?city=${encodeURIComponent(trimmedCity)}`);
+      if (res.status === 401 || res.status === 403) {
+        dispatch(setPlannerHosts([]));
+        dispatch(setPlannerHostsStatus('error'));
+        dispatch(clearHostMarkers());
+        return { city: trimmedCity, hosts: [] } as PlannerExperiencesResponse;
+      }
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Failed to fetch planner experiences: ${res.status} ${errorText}`);
+      }
+
+      const data = (await res.json()) as PlannerExperiencesResponse;
+      const hosts = Array.isArray(data.hosts) ? data.hosts : [];
+
+      dispatch(setPlannerHosts(hosts));
+      dispatch(setPlannerHostsStatus('ready'));
+      dispatch(setHostMarkers(buildHostMarkersFromPlannerHosts(hosts)));
+
+      return data;
+    } catch (error) {
+      console.error('[fetchPlannerExperiencesByCity] Failed', error);
+      dispatch(setPlannerHosts([]));
+      dispatch(setPlannerHostsStatus('error'));
+      dispatch(clearHostMarkers());
       throw error;
     }
   }

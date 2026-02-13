@@ -58,7 +58,7 @@ async function runTest() {
   console.log('Running Consolidation Verification...');
   
   // existingRoutes can be empty for this test
-  const result = await convertPlanToGlobeData(mockPlan, []);
+  const result = convertPlanToGlobeData(mockPlan);
   
   const destinations = result.destinations;
   

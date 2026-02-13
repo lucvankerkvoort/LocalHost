@@ -117,8 +117,13 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
   const uiConfig = INTENT_UI_CONFIG[intent];
   const hostCreationState = useAppSelector(selectHostCreation);
   const activeTripId = useAppSelector((state) => state.globe.tripId);
+  const tripIdFromPath =
+    pathname?.startsWith('/trips/') && pathname.length > '/trips/'.length
+      ? pathname.split('/').filter(Boolean)[1] ?? null
+      : null;
+  const scopedTripId = activeTripId || tripIdFromPath;
   // Stable chat ID per intent/session (draft-specific for host onboarding)
-  const chatId = getChatId(intent, pathname);
+  const chatId = getChatId(intent, pathname, scopedTripId);
 
   const [isOpen, setIsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -159,14 +164,14 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
 
   const chatRequestBody = useCallback(() => {
     if (intent !== 'become_host') {
-      return { intent };
+      return scopedTripId ? { intent, tripId: scopedTripId } : { intent };
     }
 
     return {
       intent,
       onboardingStage,
     };
-  }, [intent, onboardingStage]);
+  }, [intent, onboardingStage, scopedTripId]);
 
   // Proactive onboarding trigger (silent handshake) for become-host context.
   useEffect(() => {
