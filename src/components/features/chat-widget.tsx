@@ -11,14 +11,15 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { usePathname } from 'next/navigation';
 import { ChatMessage } from './chat-message';
-import { OrchestratorJobStatus } from './orchestrator-job-status';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { ingestToolInvocations, ingestToolParts } from '@/lib/ai/tool-events';
 import { selectHostCreation } from '@/store/host-creation-slice';
 import {
   HOST_ONBOARDING_START_TOKEN,
+  PLANNER_ONBOARDING_START_TOKEN,
   HANDSHAKE_STORAGE_PREFIX,
   buildHostOnboardingTrigger,
+  buildPlannerOnboardingTrigger,
   type ChatWidgetIntent,
   getChatId,
   getHostDraftIdFromPath,
@@ -26,6 +27,7 @@ import {
   getChatIntent,
   resolveHostOnboardingStage,
   shouldStartHostOnboardingHandshake,
+  shouldStartPlannerHandshake,
 } from './chat-widget-handshake';
 import {
   UserSearch,
@@ -132,6 +134,14 @@ const INTENT_UI_CONFIG = {
     emptyStateGreeting: 'Ready to become a host? Let\'s start with your city!',
     emptyStateHint: 'Tell me which city you\'re in, e.g. "I\'m in Barcelona"',
     inputPlaceholder: 'Which city are you in?',
+  },
+  profile_setup: {
+    Icon: UserSearch,
+    title: 'Profile Agent',
+    subtitle: 'Building your profile',
+    emptyStateGreeting: 'Let\'s build your traveler profile together.',
+    emptyStateHint: 'Tell me about yourself — where you\'re from, what you love.',
+    inputPlaceholder: 'Tell me about yourself…',
   },
 } as const;
 
@@ -244,6 +254,36 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
     pathname,
     sendMessage,
   ]);
+
+  // Proactive planner trigger (silent handshake) for trip planner context.
+  useEffect(() => {
+    if (!sendMessage) return;
+
+    const storageKey = `${HANDSHAKE_STORAGE_PREFIX}${chatId}:planner`;
+    const alreadyTriggered =
+      handshakeTriggeredRef.current.has(storageKey) ||
+      (typeof window !== 'undefined' && sessionStorage.getItem(storageKey) === '1');
+
+    if (
+      !shouldStartPlannerHandshake({
+        intent,
+        isActive,
+        pathname,
+        messageCount: messages.length,
+        alreadyTriggered,
+      })
+    ) {
+      return;
+    }
+
+    handshakeTriggeredRef.current.add(storageKey);
+    sessionStorage.setItem(storageKey, '1');
+
+    const trigger = buildPlannerOnboardingTrigger();
+    void Promise.resolve(sendMessage({ text: trigger }, { body: chatRequestBody() })).catch(() => {
+      // Keep one-shot behavior to avoid duplicate handshake sends in Strict Mode.
+    });
+  }, [chatId, chatRequestBody, intent, isActive, messages.length, pathname, sendMessage]);
 
   // Auto-open/close on specific routes
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -526,7 +566,6 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                   onScroll={handleScroll}
                   className="h-[400px] overflow-y-auto p-4 space-y-3 scroll-smooth"
                 >
-                <OrchestratorJobStatus />
                 {messages.length === 0 && (
                   <div className="text-center py-8 text-[var(--muted-foreground)]">
                     <p className="text-sm">{uiConfig.emptyStateGreeting}</p>
@@ -569,9 +608,11 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                     textContent = message.content;
                   }
 
+                  const trimmedContent = textContent.trim();
                   const isHiddenHandshakeMessage =
                     message.role === 'user' &&
-                    textContent.trim().startsWith(HOST_ONBOARDING_START_TOKEN);
+                    (trimmedContent.startsWith(HOST_ONBOARDING_START_TOKEN) ||
+                      trimmedContent.startsWith(PLANNER_ONBOARDING_START_TOKEN));
                   if (isHiddenHandshakeMessage) {
                     return null;
                   }
@@ -669,18 +710,6 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                     </div>
                   );
                 })}
-
-                {isLoading && (
-                  <div className="flex justify-start">
-                    <div className="bg-[var(--card-background)] border border-[var(--border)] px-4 py-3 rounded-2xl rounded-bl-md">
-                      <div className="flex gap-1.5">
-                        <span className="w-2 h-2 bg-[var(--muted-foreground)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-2 h-2 bg-[var(--muted-foreground)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-2 h-2 bg-[var(--muted-foreground)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {error && (
                   <div className="text-center py-2 text-red-500 text-sm">

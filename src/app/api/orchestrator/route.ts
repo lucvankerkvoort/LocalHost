@@ -143,10 +143,12 @@ export async function GET(request: NextRequest) {
       job: {
         id: job.id,
         status: job.status,
+        generationId: job.generationId,
+        generationMode: job.generationMode,
         progress: job.progress,
         updatedAt: job.updatedAt,
-        plan: job.status === 'complete' ? job.plan : undefined,
-        hostMarkers: job.status === 'complete' ? job.hostMarkers : undefined,
+        plan: job.plan,
+        hostMarkers: job.hostMarkers,
         error: job.status === 'error' ? job.error : undefined,
       },
     });

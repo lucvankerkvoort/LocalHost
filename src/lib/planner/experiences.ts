@@ -1,6 +1,6 @@
 import { getCityCoordinates } from '@/lib/data/city-coordinates';
 import type { HostMarkerData } from '@/types/globe';
-import type { PlannerExperience, PlannerExperienceHost } from '@/types/planner-experiences';
+import type { PlannerExperience, PlannerExperienceHost, PlannerExperienceStop } from '@/types/planner-experiences';
 
 export type PlannerExperienceSource = {
   id: string;
@@ -16,6 +16,7 @@ export type PlannerExperienceSource = {
   country: string;
   latitude?: number | null;
   longitude?: number | null;
+  stops?: PlannerExperienceStop[];
   host: {
     id: string;
     name: string | null;
@@ -49,6 +50,18 @@ function resolveExperienceCoordinates(experience: PlannerExperienceSource): { la
   if (!Number.isFinite(fallback.lat) || !Number.isFinite(fallback.lng)) return null;
   if (fallback.lat === 0 && fallback.lng === 0) return null;
   return fallback;
+}
+
+function sanitizeExperienceStops(stops?: PlannerExperienceStop[]): PlannerExperienceStop[] {
+  if (!Array.isArray(stops)) return [];
+  return stops
+    .filter((stop) => typeof stop.lat === 'number' && typeof stop.lng === 'number')
+    .map((stop) => ({
+      ...stop,
+      lat: stop.lat ?? undefined,
+      lng: stop.lng ?? undefined,
+    }))
+    .sort((a, b) => a.order - b.order);
 }
 
 export function derivePlannerHosts(
@@ -87,6 +100,7 @@ export function derivePlannerHosts(
       photos: Array.isArray(experience.photos) ? experience.photos : [],
       city: experience.city,
       country: experience.country,
+      stops: sanitizeExperienceStops(experience.stops),
     };
 
     const existing = hostMap.get(hostId);

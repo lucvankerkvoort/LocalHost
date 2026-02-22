@@ -42,7 +42,7 @@ export function AuthButton({
     <Button 
       variant={variant} 
       size={size}
-      onClick={() => signIn(undefined, { callbackUrl: '/' })}
+      onClick={() => window.location.href = '/auth/signup'}
     >
       Sign up
     </Button>

@@ -3,6 +3,7 @@ import type { HostMarker } from './trip-session';
 
 export type OrchestratorJobStatus = 'draft' | 'running' | 'complete' | 'error';
 export type OrchestratorJobStage = 'draft' | 'geocoding' | 'routing' | 'hosts' | 'final' | 'complete' | 'error';
+export type OrchestratorGenerationMode = 'draft' | 'refine';
 
 export type OrchestratorJobProgress = {
   stage: OrchestratorJobStage;
@@ -18,6 +19,8 @@ export type OrchestratorJob = {
   progress: OrchestratorJobProgress;
   createdAt: number;
   updatedAt: number;
+  generationId?: string;
+  generationMode?: OrchestratorGenerationMode;
   plan?: ItineraryPlan;
   hostMarkers?: HostMarker[];
   error?: string;
@@ -43,7 +46,11 @@ function scheduleCleanup(id: string) {
 
 export function createOrchestratorJob(
   prompt: string,
-  progress: OrchestratorJobProgress
+  progress: OrchestratorJobProgress,
+  metadata?: {
+    generationId?: string;
+    generationMode?: OrchestratorGenerationMode;
+  }
 ): OrchestratorJob {
   const now = Date.now();
   const job: OrchestratorJob = {
@@ -53,6 +60,8 @@ export function createOrchestratorJob(
     progress,
     createdAt: now,
     updatedAt: now,
+    generationId: metadata?.generationId,
+    generationMode: metadata?.generationMode,
   };
   jobs.set(job.id, job);
   scheduleCleanup(job.id);
@@ -61,7 +70,7 @@ export function createOrchestratorJob(
 
 export function updateOrchestratorJob(
   id: string,
-  updates: Partial<Omit<OrchestratorJob, 'id' | 'prompt' | 'createdAt'>> & {
+  updates: Partial<Omit<OrchestratorJob, 'id' | 'createdAt'>> & {
     progress?: Partial<OrchestratorJobProgress>;
   }
 ): OrchestratorJob | null {
@@ -82,6 +91,21 @@ export function updateOrchestratorJob(
 
   if (updates.plan) {
     job.plan = updates.plan;
+  }
+
+  if (typeof updates.prompt === 'string') {
+    job.prompt = updates.prompt;
+  }
+
+  if (typeof updates.generationId === 'string') {
+    job.generationId = updates.generationId;
+  }
+
+  if (
+    updates.generationMode === 'draft' ||
+    updates.generationMode === 'refine'
+  ) {
+    job.generationMode = updates.generationMode;
   }
 
   if (Object.prototype.hasOwnProperty.call(updates, 'hostMarkers')) {
@@ -107,6 +131,32 @@ export function completeOrchestratorJob(
       message: 'Plan ready',
     },
   });
+}
+
+export function resetOrchestratorJob(
+  id: string,
+  input: {
+    prompt: string;
+    progress: OrchestratorJobProgress;
+    generationId: string;
+    generationMode: OrchestratorGenerationMode;
+  }
+): OrchestratorJob | null {
+  const job = jobs.get(id);
+  if (!job) return null;
+
+  job.prompt = input.prompt;
+  job.status = 'draft';
+  job.progress = input.progress;
+  job.generationId = input.generationId;
+  job.generationMode = input.generationMode;
+  job.plan = undefined;
+  job.hostMarkers = undefined;
+  job.error = undefined;
+  job.updatedAt = Date.now();
+
+  jobs.set(id, job);
+  return job;
 }
 
 export function failOrchestratorJob(id: string, error: string): OrchestratorJob | null {

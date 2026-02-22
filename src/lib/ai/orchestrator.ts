@@ -37,6 +37,10 @@ const DraftItinerarySchema = z.object({
     city: z.string().nullable().describe('City for this specific day, if different from main trip city; otherwise null'),
     country: z.string().nullable().describe('Country for this specific day, if different from main trip country; otherwise null'),
     anchorArea: z.string().describe('Neighborhood or area name, e.g. "Jordaan"'),
+    interCityTransportToNext: z
+      .enum(['flight', 'train', 'drive', 'boat'])
+      .nullable()
+      .describe('Transport mode to the next day city; null if last day or no inter-city travel'),
     activities: z.array(z.object({
       name: z.string().describe('Name of the place/activity'),
       timeSlot: z.enum(['morning', 'afternoon', 'evening']),
@@ -104,13 +108,13 @@ export interface OrchestratorCallbacks {
  * Supports session context for stateful conversations.
  */
 /**
- * Simple Rate Limiter to respect Nominatim's 1 req/sec policy
+ * Simple throttler for geocoding/tool burst control.
  */
 class RateLimiter {
   private queue: Array<() => void> = [];
   private processing = false;
   private lastRequestTime = 0;
-  private minInterval = 1100; // 1.1s safety buffer
+  private minInterval = 150;
 
   async schedule<T>(fn: () => Promise<T>): Promise<T> {
     return new Promise((resolve, reject) => {
@@ -154,6 +158,7 @@ const rateLimiter = new RateLimiter();
 const MAX_ANCHOR_DISTANCE_METERS = 300000;
 const DRAFT_DAY_JITTER_DEGREES = 0.01;
 const DRAFT_ACTIVITY_JITTER_DEGREES = 0.004;
+const TOOL_EXECUTION_TIMEOUT_MS = 12000;
 
 function calculateDistanceMeters(
   lat1: number,
@@ -812,6 +817,7 @@ export class ItineraryOrchestrator {
       return {
         dayNumber: day.dayNumber,
         title: day.title,
+        interCityTransportToNext: day.interCityTransportToNext ?? null,
         anchorLocation: {
           id: `draft-anchor-${crypto.randomUUID()}`,
           name: day.anchorArea || anchorResult?.name || dayCity,
@@ -857,13 +863,35 @@ export class ItineraryOrchestrator {
    */
   private async executeTool<T>(toolName: string, params: unknown): Promise<T | null> {
     this.callbacks.onToolCall?.(toolName, params);
-    
-    const result = await this.registry.execute<T>(toolName, params);
-    
+
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    const timeoutResult = new Promise<{
+      success: boolean;
+      error: string;
+      code: string;
+    }>((resolve) => {
+      timeoutHandle = setTimeout(() => {
+        resolve({
+          success: false,
+          error: `Tool ${toolName} timed out after ${TOOL_EXECUTION_TIMEOUT_MS}ms`,
+          code: 'TOOL_TIMEOUT',
+        });
+      }, TOOL_EXECUTION_TIMEOUT_MS);
+    });
+
+    const result = await Promise.race([
+      this.registry.execute<T>(toolName, params),
+      timeoutResult,
+    ]);
+
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+
     this.callbacks.onToolResult?.(toolName, result);
     
     if (result.success) {
-      return result.data;
+      return (result as { data: T }).data;
     } else {
       console.warn(`[Orchestrator] Tool ${toolName} failed: ${result.error}`);
       return null;
@@ -889,6 +917,7 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
       Rules:
       - IMPORTANT: Include the country and main city for this trip.
       - Each day must represent a CITY day (not a travel day). If multi-city, set the day city explicitly.
+      - For each day except the last, set interCityTransportToNext to the best option to reach the next day's city (flight, train, drive, boat). Use null for the last day or if there is no inter-city travel.
       - Anchor area must be a real neighborhood or district within the day city.
       - Ensure 1-3 main stops per day.
       - Stops must be real, physical locations (museums, parks, restaurants, landmarks).
@@ -1166,6 +1195,7 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
       country: dayCountry,
       anchorLocation: anchorPlace,
       activities: validActivities,
+      interCityTransportToNext: draftDay.interCityTransportToNext ?? null,
       navigationEvents,
       suggestedHosts,
     };

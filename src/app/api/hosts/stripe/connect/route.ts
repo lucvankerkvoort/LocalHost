@@ -3,6 +3,33 @@ import { createConnectAccount, createAccountLink } from '@/lib/stripe/connect';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
+function normalizeStripeError(error: unknown): { message: string; status: number } {
+  if (typeof error === 'object' && error !== null) {
+    const statusCode = (error as { statusCode?: unknown }).statusCode;
+    const raw = (error as { raw?: { message?: unknown } }).raw;
+    const directMessage = (error as { message?: unknown }).message;
+
+    if (raw && typeof raw.message === 'string' && raw.message.trim().length > 0) {
+      return {
+        message: raw.message,
+        status: typeof statusCode === 'number' ? statusCode : 400,
+      };
+    }
+
+    if (typeof directMessage === 'string' && directMessage.trim().length > 0) {
+      return {
+        message: directMessage,
+        status: typeof statusCode === 'number' ? statusCode : 500,
+      };
+    }
+  }
+
+  return {
+    message: 'Failed to initiate onboarding',
+    status: 500,
+  };
+}
+
 export async function POST(req: Request) {
   try {
     const session = await auth();
@@ -35,7 +62,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ url: accountLink });
   } catch (error) {
+    const normalized = normalizeStripeError(error);
     console.error('Stripe Connect error:', error);
-    return NextResponse.json({ error: 'Failed to initiate onboarding' }, { status: 500 });
+    return NextResponse.json({ error: normalized.message }, { status: normalized.status });
   }
 }

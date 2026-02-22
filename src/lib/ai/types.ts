@@ -60,6 +60,11 @@ export const DayPlanSchema = z.object({
   country: z.string().optional().describe('Explicit country context for this day'),
   anchorLocation: PlaceSchema.optional().describe('Central geographic point used to find nearby hosts (null if geocoding failed)'),
   activities: z.array(ActivitySchema),
+  interCityTransportToNext: z
+    .enum(['flight', 'train', 'drive', 'boat'])
+    .nullable()
+    .optional()
+    .describe('Inter-city transport mode to the next day (null if last day or no travel)'),
   navigationEvents: z.array(NavigationActionSchema).optional(),
   suggestedHosts: z.array(HostCardSchema).describe('List of >= 6 hosts near the anchor'),
 });

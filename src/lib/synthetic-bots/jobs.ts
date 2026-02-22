@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { getSyntheticBotsConfig } from '@/lib/synthetic-bots/config';
 import { generateSyntheticHostReply } from '@/lib/synthetic-bots/responder';
 
-const CHAT_ELIGIBLE_STATUSES = new Set<BookingStatus>(['CONFIRMED', 'COMPLETED']);
+const CHAT_ELIGIBLE_STATUSES = new Set<BookingStatus>(['TENTATIVE', 'PENDING', 'CONFIRMED', 'COMPLETED']);
 
 export function computeDeterministicLatencySec(
   stableKey: string,

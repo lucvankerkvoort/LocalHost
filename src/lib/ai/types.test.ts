@@ -60,6 +60,7 @@ test('ItineraryPlanSchema validates complete plan and rejects malformed data', (
             timeSlot: 'morning',
           },
         ],
+        interCityTransportToNext: null,
         navigationEvents: [
           {
             type: 'walk',
@@ -134,6 +135,26 @@ test('ItineraryPlanSchema rejects invalid navigation event type', () => {
             toPlaceId: 'b',
           },
         ],
+        suggestedHosts: [],
+      },
+    ],
+  });
+
+  assert.equal(parsed.success, false);
+});
+
+test('ItineraryPlanSchema rejects invalid inter-city transport mode', () => {
+  const parsed = ItineraryPlanSchema.safeParse({
+    id: 'plan-4',
+    title: 'Invalid inter-city',
+    request: 'test',
+    summary: 'test',
+    days: [
+      {
+        dayNumber: 1,
+        title: 'Day 1',
+        activities: [],
+        interCityTransportToNext: 'teleport',
         suggestedHosts: [],
       },
     ],

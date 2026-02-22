@@ -1,4 +1,5 @@
 import { convertToModelMessages } from 'ai';
+import { auth } from '@/auth';
 import { agentRouter } from '@/lib/conversation/router';
 import { conversationController } from '@/lib/conversation/controller';
 import { validateAgentOutput, withExecution } from '@/lib/agent-constraints';
@@ -22,6 +23,7 @@ function parseOnboardingStage(value: unknown): HostOnboardingStage | undefined {
 }
 
 export async function POST(req: Request) {
+  const session = await auth();
   const body = await req.json();
   const { messages, id, tripId } = body;
   
@@ -70,7 +72,13 @@ export async function POST(req: Request) {
   }
 
   const onboardingStage = parseOnboardingStage(body.onboardingStage);
-  const runAgent = () => agent.process(modelMessages, { sessionId: id, onboardingStage, tripId });
+  const runAgent = () =>
+    agent.process(modelMessages, {
+      userId: session?.user?.id,
+      sessionId: id,
+      onboardingStage,
+      tripId,
+    });
   const result = execution ? await withExecution(execution, runAgent) : await runAgent();
 
   if (execution || strictConstraints) {

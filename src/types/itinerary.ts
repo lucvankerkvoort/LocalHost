@@ -46,6 +46,7 @@ export interface ItineraryItem {
     description?: string;
     confidence?: number;
     geoValidation?: 'EXACT' | 'APPROXIMATE' | 'CITY_FALLBACK' | 'FAILED';
+    imageUrl?: string;
   };
   duration?: number; // duration in minutes
   category?: string; // specific category if different from type

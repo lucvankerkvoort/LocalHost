@@ -5,6 +5,7 @@ import {
   clearHostMarkers, 
   clearItinerary, 
   setDestinations, 
+  setRoutes,
   setTripId,
   updateDayIds,
   setPlannerHosts,
@@ -12,8 +13,15 @@ import {
   clearPlannerHosts,
 } from './globe-slice';
 import { convertTripToGlobeDestinations, ApiTrip } from '@/lib/api/trip-converter';
-import { convertPlanToGlobeData, generateMarkersFromDestinations } from '@/lib/ai/plan-converter';
+import {
+  convertPlanToGlobeData,
+  extractTransportPreference,
+  generateMarkersFromDestinations,
+  mapTransportPreferenceToMode,
+} from '@/lib/ai/plan-converter';
 import type { ItineraryPlan } from '@/lib/ai/types';
+import type { GlobeDestination, TravelRoute } from '@/types/globe';
+import { generateId } from '@/types/globe';
 // Ideally slice doesn't import thunks, components import thunks.
 import type { PlannerExperiencesResponse } from '@/types/planner-experiences';
 import { buildHostMarkersFromPlannerHosts } from '@/lib/planner/experiences';
@@ -91,6 +99,12 @@ export const fetchActiveTrip = createAsyncThunk(
           if (activeTrip.stops && activeTrip.stops.length > 0) {
               const globeDestinations = convertTripToGlobeDestinations(activeTrip);
               dispatch(setDestinations(globeDestinations));
+
+              const routes = buildRoutesFromDestinations(
+                globeDestinations,
+                activeTrip.preferences
+              );
+              dispatch(setRoutes(routes));
               
               // Regenerate markers from the loaded content
               const { routeMarkers, hostMarkers } = generateMarkersFromDestinations(globeDestinations);
@@ -111,6 +125,93 @@ export const fetchActiveTrip = createAsyncThunk(
     }
   }
 );
+
+function resolveTransportPreference(preferences: unknown): TravelRoute['mode'] | null {
+  if (!preferences || typeof preferences !== 'object') return null;
+  const pref =
+    typeof (preferences as { transportPreference?: unknown }).transportPreference === 'string'
+      ? ((preferences as { transportPreference: string }).transportPreference)
+      : null;
+  return mapTransportPreferenceToMode(pref);
+}
+
+function buildRoutesFromDestinations(
+  destinations: GlobeDestination[],
+  preferences?: unknown
+): TravelRoute[] {
+  if (!Array.isArray(destinations) || destinations.length < 2) return [];
+  const sorted = [...destinations].sort((a, b) => a.day - b.day);
+  const routes: TravelRoute[] = [];
+  const defaultMode = resolveTransportPreference(preferences) ?? 'flight';
+  const MIN_INTERCITY_ROUTE_DISTANCE_METERS = 30000;
+
+  const isValidCoordinate = (lat: number, lng: number) =>
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180 &&
+    !(lat === 0 && lng === 0);
+
+  const normalizeCityKey = (value?: string): string =>
+    (value ?? '').trim().toLowerCase().replace(/[^a-z]/g, '');
+
+  const calculateDistanceMeters = (
+    fromLat: number,
+    fromLng: number,
+    toLat: number,
+    toLng: number
+  ): number => {
+    const R = 6371e3;
+    const phi1 = (fromLat * Math.PI) / 180;
+    const phi2 = (toLat * Math.PI) / 180;
+    const deltaPhi = ((toLat - fromLat) * Math.PI) / 180;
+    const deltaLambda = ((toLng - fromLng) * Math.PI) / 180;
+
+    const a =
+      Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+      Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  for (let i = 0; i < sorted.length - 1; i += 1) {
+    const from = sorted[i];
+    const to = sorted[i + 1];
+    if (!isValidCoordinate(from.lat, from.lng) || !isValidCoordinate(to.lat, to.lng)) {
+      continue;
+    }
+
+    const fromCityKey = normalizeCityKey(from.city || from.name);
+    const toCityKey = normalizeCityKey(to.city || to.name);
+    const distance = calculateDistanceMeters(from.lat, from.lng, to.lat, to.lng);
+    const isSameCityHop =
+      fromCityKey.length > 0 &&
+      toCityKey.length > 0 &&
+      fromCityKey === toCityKey;
+    const isShortHop = distance < MIN_INTERCITY_ROUTE_DISTANCE_METERS;
+
+    // Rebuilt routes should stay inter-city; short hops create noisy "star" lines in one city.
+    if (isSameCityHop || isShortHop) {
+      continue;
+    }
+
+    routes.push({
+      id: generateId(),
+      fromId: from.id,
+      toId: to.id,
+      fromLat: from.lat,
+      fromLng: from.lng,
+      toLat: to.lat,
+      toLng: to.lng,
+      mode: defaultMode,
+      dayNumber: from.day,
+    });
+  }
+
+  return routes;
+}
 
 export const fetchPlannerExperiencesByCity = createAsyncThunk(
   'globe/fetchPlannerExperiencesByCity',
@@ -285,6 +386,7 @@ export const removeExperienceFromTrip = createAsyncThunk(
 );
 
 import { convertGlobeDestinationsToApiPayload } from '@/lib/api/trip-converter';
+import { generateTripTitleFromPlan } from '@/lib/trips/title';
 
 export const saveTripPlan = createAsyncThunk(
     'globe/saveTripPlan',
@@ -335,11 +437,20 @@ export const saveTripPlanForTrip = createAsyncThunk(
         try {
             const { destinations } = convertPlanToGlobeData(plan);
             const payload = convertGlobeDestinationsToApiPayload(destinations);
+            const title = generateTripTitleFromPlan(plan);
+            const transportPreference = mapTransportPreferenceToMode(
+              extractTransportPreference(plan.request)
+            );
+            const preferences = transportPreference ? { transportPreference } : undefined;
             
             const res = await fetch(`/api/trips/${tripId}/plan`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                  ...payload,
+                  title,
+                  ...(preferences ? { preferences } : {}),
+                }),
             });
 
             if (!res.ok) {

@@ -6,6 +6,33 @@ import Link from 'next/link';
 import { register } from '@/app/actions/auth';
 import { signIn } from 'next-auth/react';
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function verifyAuthenticatedSession() {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const res = await fetch('/api/auth/session', {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store',
+    });
+
+    if (res.ok) {
+      const session = (await res.json()) as { user?: { id?: string | null } | null } | null;
+      if (session?.user?.id) {
+        return true;
+      }
+    }
+
+    if (attempt < 2) {
+      await sleep(200);
+    }
+  }
+
+  return false;
+}
+
 export default function SignUpPage() {
   const router = useRouter();
   const [name, setName] = useState('');
@@ -32,13 +59,30 @@ export default function SignUpPage() {
       if (result.error) {
         setError(result.error);
       } else {
-        setSuccess(result.success || 'Account created!');
-        // Optional: Auto sign in or redirect to sign in
-        setTimeout(() => {
-          router.push('/auth/signin');
-        }, 2000);
+        setSuccess(result.success || 'Account created! Signing you in…');
+
+        // Sign in on the client so the browser definitely receives the auth cookies.
+        const signInResult = await signIn('credentials', {
+          email,
+          password,
+          redirect: false,
+        });
+
+        if (signInResult?.error) {
+          setError('Account created, but automatic sign-in failed. Please sign in manually.');
+          return;
+        }
+
+        const hasSession = await verifyAuthenticatedSession();
+        if (!hasSession) {
+          setError('Account created, but your session was not established yet. Please sign in manually.');
+          return;
+        }
+
+        router.push('/profile/setup');
+        router.refresh();
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred. Please try again.');
     } finally {
       setIsLoading(false);

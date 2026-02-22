@@ -1,18 +1,18 @@
 import { z } from 'zod';
-import { createTool, ToolResult } from './tool-registry';
-import { validateCoordinate, isObviouslyInvalid } from '../validation/geo-validator';
 
-// ============================================================================
-// Schema
-// ============================================================================
+import { isObviouslyInvalid, validateCoordinate } from '../validation/geo-validator';
+import { createTool, ToolResult } from './tool-registry';
 
 const ResolvePlaceParams = z.object({
   name: z.string().describe('Name of the place to geocode'),
   context: z.string().optional().describe('City, country, or area hint for disambiguation'),
-  anchorPoint: z.object({
-    lat: z.number(),
-    lng: z.number(),
-  }).optional().describe('Reference point (e.g. city center) to prefer closer results'),
+  anchorPoint: z
+    .object({
+      lat: z.number(),
+      lng: z.number(),
+    })
+    .optional()
+    .describe('Reference point (e.g. city center) to prefer closer results'),
 });
 
 type ResolvePlaceResult = {
@@ -27,59 +27,46 @@ type ResolvePlaceResult = {
   confidence: number;
   distanceToAnchor?: number;
   city?: string;
-  /** Geocoding validation confidence level */
   geoValidation?: 'HIGH' | 'MEDIUM' | 'LOW' | 'FAILED';
 };
 
-// ============================================================================
-// Nominatim Response Types
-// ============================================================================
+type GooglePlacesTextSearchResponse = {
+  places?: GooglePlaceResult[];
+};
 
-interface NominatimResult {
-  place_id: number;
-  licence: string;
-  osm_type: string;
-  osm_id: number;
-  lat: string;
-  lon: string;
-  class: string;
-  type: string;
-  place_rank: number;
-  importance: number;
-  addresstype: string;
-  name: string;
-  display_name: string;
-  address?: {
-    city?: string;
-    town?: string;
-    village?: string;
-    municipality?: string;
-    county?: string;
-    state?: string;
-    country?: string;
-  };
-}
-
-// ============================================================================
-// Cache
-// ============================================================================
+type GooglePlaceResult = {
+  id?: string;
+  displayName?: { text?: string };
+  formattedAddress?: string;
+  location?: { latitude?: number; longitude?: number };
+  types?: string[];
+  addressComponents?: Array<{
+    longText?: string;
+    shortText?: string;
+    types?: string[];
+  }>;
+};
 
 const GEOCODE_CACHE = new Map<string, ResolvePlaceResult[]>();
+const GOOGLE_PLACES_TIMEOUT_MS = 8000;
 
-// ============================================================================
-// Helpers
-// ============================================================================
+function resolveGoogleApiKey(): string | null {
+  const key =
+    process.env.GOOGLE_PLACES_API_KEY ||
+    process.env.GOOGLE_MAPS_API_KEY;
+  return key && key.trim().length > 0 ? key.trim() : null;
+}
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371e3; // metres
-  const φ1 = lat1 * Math.PI / 180;
-  const φ2 = lat2 * Math.PI / 180;
-  const Δφ = (lat2 - lat1) * Math.PI / 180;
-  const Δλ = (lon2 - lon1) * Math.PI / 180;
+  const R = 6371e3;
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
 
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-            Math.cos(φ1) * Math.cos(φ2) *
-            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const a =
+    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+    Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return R * c;
@@ -87,106 +74,19 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 
 function buildQueryVariants(name: string, context?: string): string[] {
   const variants: string[] = [];
-  
-  // Prioritize "Name, City" as it's the sweet spot for speed/accuracy with triangulation
+  const trimmedName = name.trim();
+  if (!trimmedName) return [];
+
   if (context) {
-    const parts = context.split(',').map(p => p.trim()).filter(Boolean);
-    // 1. Name, City (Fastest, usually correct with triangulation)
-    variants.push(`${name}, ${parts[0]}`);
-    // 2. Name, City, Country (More specific if first fails)
-    variants.push(`${name}, ${context}`);
-  } else {
-    variants.push(name);
+    const parts = context.split(',').map((part) => part.trim()).filter(Boolean);
+    if (parts.length > 0) {
+      variants.push(`${trimmedName}, ${parts[0]}`);
+    }
+    variants.push(`${trimmedName}, ${context.trim()}`);
   }
-  
+
+  variants.push(trimmedName);
   return Array.from(new Set(variants));
-}
-
-async function fetchNominatimResults(
-  baseUrl: string,
-  searchQuery: string,
-): Promise<NominatimResult[]> {
-  const url = new URL(baseUrl);
-  url.searchParams.set('q', searchQuery);
-  url.searchParams.set('format', 'json');
-  url.searchParams.set('limit', '5'); // Fetch 5 candidates for triangulation
-  url.searchParams.set('addressdetails', '1');
-
-  const response = await fetch(url.toString(), {
-    headers: {
-      'User-Agent': 'LocalhostTravelApp/1.0 (https://localhost.dev; contact@localhost.dev)',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Geocoding API error: ${response.status}`);
-  }
-
-  return await response.json();
-}
-
-function mapNominatimCategory(osmClass: string, osmType: string): ResolvePlaceResult['category'] {
-  if (osmClass === 'tourism') {
-    if (['museum', 'gallery'].includes(osmType)) return 'museum';
-    if (['attraction', 'viewpoint', 'monument'].includes(osmType)) return 'landmark';
-    return 'landmark';
-  }
-  if (osmClass === 'leisure' && ['park', 'garden', 'nature_reserve'].includes(osmType)) return 'park';
-  if (osmClass === 'amenity' && ['restaurant', 'cafe', 'bar', 'fast_food'].includes(osmType)) return 'restaurant';
-  if (osmClass === 'place') {
-    if (['city', 'town', 'village'].includes(osmType)) return 'city';
-    if (osmType === 'country') return 'country';
-    if (['neighbourhood', 'suburb', 'quarter'].includes(osmType)) return 'neighborhood';
-  }
-  if (osmClass === 'boundary' && osmType === 'administrative') return 'city';
-  return 'other';
-}
-
-function extractCityFromAddress(address?: NominatimResult['address']): string | undefined {
-  if (!address) return undefined;
-  return (
-    address.city ||
-    address.town ||
-    address.village ||
-    address.municipality ||
-    address.county ||
-    address.state
-  );
-}
-
-function attachDistanceToAnchor(
-  result: ResolvePlaceResult,
-  anchorPoint?: { lat: number; lng: number }
-): ResolvePlaceResult {
-  if (!anchorPoint) return result;
-  return {
-    ...result,
-    distanceToAnchor: calculateDistance(
-      result.location.lat,
-      result.location.lng,
-      anchorPoint.lat,
-      anchorPoint.lng
-    ),
-  };
-}
-
-function formatPlaceResult(result: NominatimResult, fallbackName: string): ResolvePlaceResult {
-  const category = mapNominatimCategory(result.class, result.type);
-  const confidence = Math.min(result.importance + 0.3, 1);
-  const city = extractCityFromAddress(result.address);
-
-  return {
-    id: `osm-${result.osm_type}-${result.osm_id}`,
-    name: result.name || fallbackName,
-    formattedAddress: result.display_name,
-    city,
-    location: {
-      lat: parseFloat(result.lat),
-      lng: parseFloat(result.lon),
-    },
-    category,
-    confidence,
-  };
 }
 
 function normalizeCityKey(value: string): string {
@@ -196,7 +96,6 @@ function normalizeCityKey(value: string): string {
 function extractContextCity(context?: string): string | null {
   if (!context) return null;
   const parts = context.split(',').map((part) => part.trim()).filter(Boolean);
-  if (parts.length < 2) return null;
   return parts[0] || null;
 }
 
@@ -218,6 +117,7 @@ function filterResultsByCity(
   if (!expectedCity) return results;
   const expectedKey = normalizeCityKey(expectedCity);
   if (!expectedKey) return results;
+
   const matches = results.filter((result) => {
     if (isCityMatch(expectedCity, result.city)) return true;
     if (result.formattedAddress) {
@@ -226,132 +126,243 @@ function filterResultsByCity(
     }
     return false;
   });
+
   return matches.length > 0 ? matches : results;
 }
 
-// ============================================================================
-// Tool Implementation
-// ============================================================================
+function mapGoogleCategory(types?: string[]): ResolvePlaceResult['category'] {
+  if (!types || types.length === 0) return 'other';
+  const set = new Set(types);
+  if (set.has('museum') || set.has('art_gallery')) return 'museum';
+  if (set.has('tourist_attraction') || set.has('point_of_interest') || set.has('landmark')) {
+    return 'landmark';
+  }
+  if (set.has('park') || set.has('campground') || set.has('national_park')) return 'park';
+  if (set.has('restaurant') || set.has('cafe') || set.has('bar') || set.has('food')) {
+    return 'restaurant';
+  }
+  if (set.has('neighborhood') || set.has('sublocality') || set.has('sublocality_level_1')) {
+    return 'neighborhood';
+  }
+  if (set.has('locality') || set.has('administrative_area_level_2')) return 'city';
+  if (set.has('country')) return 'country';
+  return 'other';
+}
+
+function extractGoogleCity(components?: GooglePlaceResult['addressComponents']): string | undefined {
+  if (!components) return undefined;
+
+  const pick = (type: string) =>
+    components.find((component) => component.types?.includes(type))?.longText ||
+    components.find((component) => component.types?.includes(type))?.shortText;
+
+  return (
+    pick('locality') ||
+    pick('postal_town') ||
+    pick('administrative_area_level_2') ||
+    pick('administrative_area_level_1') ||
+    undefined
+  );
+}
+
+function formatGoogleResult(result: GooglePlaceResult, fallbackName: string): ResolvePlaceResult | null {
+  if (
+    !result.location ||
+    typeof result.location.latitude !== 'number' ||
+    typeof result.location.longitude !== 'number'
+  ) {
+    return null;
+  }
+
+  const name = result.displayName?.text || fallbackName;
+  return {
+    id: result.id ? `gplaces-${result.id}` : `gplaces-${name}`,
+    name,
+    formattedAddress: result.formattedAddress || name,
+    location: {
+      lat: result.location.latitude,
+      lng: result.location.longitude,
+    },
+    category: mapGoogleCategory(result.types),
+    confidence: 0.9,
+    city: extractGoogleCity(result.addressComponents),
+  };
+}
+
+function attachDistanceToAnchor(
+  result: ResolvePlaceResult,
+  anchorPoint?: { lat: number; lng: number }
+): ResolvePlaceResult {
+  if (!anchorPoint) return result;
+  return {
+    ...result,
+    distanceToAnchor: calculateDistance(
+      result.location.lat,
+      result.location.lng,
+      anchorPoint.lat,
+      anchorPoint.lng
+    ),
+  };
+}
+
+function pickBestCandidate(
+  candidates: ResolvePlaceResult[],
+  anchorPoint?: { lat: number; lng: number }
+): ResolvePlaceResult | null {
+  if (candidates.length === 0) return null;
+
+  const scored = candidates.map((candidate) => {
+    const validation = validateCoordinate(candidate.location.lat, candidate.location.lng);
+    const distance = anchorPoint
+      ? calculateDistance(
+          candidate.location.lat,
+          candidate.location.lng,
+          anchorPoint.lat,
+          anchorPoint.lng
+        )
+      : null;
+    return { candidate, validation, distance };
+  });
+
+  const valid = scored.filter(
+    (item) =>
+      item.validation.valid &&
+      !isObviouslyInvalid(item.candidate.location.lat, item.candidate.location.lng)
+  );
+  const bucket = valid.length > 0 ? valid : scored;
+
+  bucket.sort((a, b) => {
+    const confidenceOrder = { HIGH: 0, MEDIUM: 1, LOW: 2, FAILED: 3 } as const;
+    const confidenceA = confidenceOrder[a.validation.confidence];
+    const confidenceB = confidenceOrder[b.validation.confidence];
+    if (confidenceA !== confidenceB) return confidenceA - confidenceB;
+    if (a.distance !== null && b.distance !== null) return a.distance - b.distance;
+    return b.candidate.confidence - a.candidate.confidence;
+  });
+
+  const best = bucket[0];
+  return {
+    ...best.candidate,
+    geoValidation: best.validation.confidence,
+  };
+}
+
+async function fetchGooglePlacesResults(
+  query: string,
+  apiKey: string,
+  anchorPoint?: { lat: number; lng: number }
+): Promise<ResolvePlaceResult[]> {
+  const languageCode = process.env.GOOGLE_PLACES_LANGUAGE;
+  const regionCode = process.env.GOOGLE_PLACES_REGION;
+
+  const body: Record<string, unknown> = {
+    textQuery: query,
+    pageSize: 5,
+  };
+
+  if (languageCode) body.languageCode = languageCode;
+  if (regionCode) body.regionCode = regionCode;
+  if (anchorPoint) {
+    body.locationBias = {
+      circle: {
+        center: { latitude: anchorPoint.lat, longitude: anchorPoint.lng },
+        radius: 50000,
+      },
+    };
+  }
+
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => {
+    controller.abort();
+  }, GOOGLE_PLACES_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask':
+          'places.id,places.displayName,places.formattedAddress,places.location,places.types,places.addressComponents',
+      },
+      cache: 'no-store',
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.warn(
+        `[resolve_place] Google Places request timed out after ${GOOGLE_PLACES_TIMEOUT_MS}ms for query: ${query}`
+      );
+      return [];
+    }
+    console.warn('[resolve_place] Google Places request failed', error);
+    return [];
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+
+  if (!response.ok) {
+    console.warn('[resolve_place] Google Places searchText failed', response.status, response.statusText);
+    return [];
+  }
+
+  const payload = (await response.json()) as GooglePlacesTextSearchResponse;
+  return (payload.places ?? [])
+    .map((place) => formatGoogleResult(place, query))
+    .filter((place): place is ResolvePlaceResult => Boolean(place));
+}
 
 export const resolvePlaceTool = createTool({
   name: 'resolve_place',
-  description: 'Convert a place name to geographic coordinates using OpenStreetMap geocoding with triangulation.',
+  description: 'Convert a place name to geographic coordinates using Google Places.',
   parameters: ResolvePlaceParams,
 
   async handler(params): Promise<ToolResult<ResolvePlaceResult>> {
     try {
+      const apiKey = resolveGoogleApiKey();
+      if (!apiKey) {
+        return {
+          success: false,
+          error: 'GOOGLE_PLACES_API_KEY is not configured',
+          code: 'CONFIG_ERROR',
+        };
+      }
+
       const queryVariants = buildQueryVariants(params.name, params.context);
-      const primaryEndpoint = 'https://nominatim.openstreetmap.org/search';
       const expectedCity = extractContextCity(params.context);
-      
-      // Check cache first
       const cacheKey = `${params.name}|${params.context || ''}`;
+
       if (GEOCODE_CACHE.has(cacheKey)) {
-        const cachedResults = GEOCODE_CACHE.get(cacheKey)!;
+        const cachedResults = GEOCODE_CACHE.get(cacheKey) ?? [];
         if (cachedResults.length > 0) {
           const candidateResults = filterResultsByCity(cachedResults, expectedCity);
-          // Re-sort cached results if anchor point changed (unlikely but possible)
-          if (params.anchorPoint) {
-            const best = candidateResults.reduce((prev, curr) => {
-              const prevDist = calculateDistance(
-                prev.location.lat,
-                prev.location.lng,
-                params.anchorPoint!.lat,
-                params.anchorPoint!.lng
-              );
-              const currDist = calculateDistance(
-                curr.location.lat,
-                curr.location.lng,
-                params.anchorPoint!.lat,
-                params.anchorPoint!.lng
-              );
-              return prevDist < currDist ? prev : curr;
-            });
-            console.log(`[resolve_place] Cache hit for "${params.name}"`);
+          const best = pickBestCandidate(candidateResults, params.anchorPoint);
+          if (best) {
             return { success: true, data: attachDistanceToAnchor(best, params.anchorPoint) };
           }
-          return { success: true, data: candidateResults[0] };
         }
       }
 
-      for (const searchQuery of queryVariants) {
-        try {
-          // 1. Fetch candidates (limit=5)
-          const results = await fetchNominatimResults(primaryEndpoint, searchQuery);
-          
-          if (results.length > 0) {
-            // 2. Format all candidates
-            const formattedResults = results.map(r => formatPlaceResult(r, params.name));
-            const candidateResults = filterResultsByCity(formattedResults, expectedCity);
-            
-            // 3. Cache them
-            GEOCODE_CACHE.set(cacheKey, formattedResults);
-            
-            // 4. Triangulate: Find closest to anchor
-            let bestResult = candidateResults[0];
-            
-            if (params.anchorPoint) {
-              let minDistance = Number.MAX_VALUE;
-              
-              for (const res of candidateResults) {
-                const dist = calculateDistance(
-                  res.location.lat, res.location.lng,
-                  params.anchorPoint.lat, params.anchorPoint.lng
-                );
-                
-                // If within reasonable range (e.g. < 50km from city center) prefer it
-                if (dist < minDistance) {
-                  minDistance = dist;
-                  bestResult = { ...res, distanceToAnchor: dist };
-                }
-              }
-              console.log(`[resolve_place] Triangulated best match for "${params.name}": ${bestResult.name} (${Math.round(minDistance)}m away)`);
-            } else {
-               console.log(`[resolve_place] Found "${params.name}" (no anchor provided)`);
-            }
+      for (const query of queryVariants) {
+        const results = await fetchGooglePlacesResults(query, apiKey, params.anchorPoint);
+        if (results.length === 0) continue;
 
-            // Validate the best result's coordinates against trust boundaries
-            const { lat, lng } = bestResult.location;
-            const validation = validateCoordinate(lat, lng);
-            
-            if (!validation.valid) {
-              // Log violations for debugging/monitoring
-              console.warn(`[resolve_place] Coordinate validation failed for "${params.name}":`, 
-                validation.violations.map(v => `${v.code}: ${v.message}`));
-              
-              // Reduce confidence to 0 if validation fails
-              bestResult = {
-                ...bestResult,
-                confidence: 0,
-                geoValidation: 'FAILED',
-              };
-            } else {
-              bestResult = {
-                ...bestResult,
-                geoValidation: validation.confidence,
-              };
-            }
-
-            return { success: true, data: attachDistanceToAnchor(bestResult, params.anchorPoint) };
-          }
-        } catch (error) {
-          console.warn(`[resolve_place] Error for "${searchQuery}":`, error);
+        GEOCODE_CACHE.set(cacheKey, results);
+        const candidateResults = filterResultsByCity(results, expectedCity);
+        const best = pickBestCandidate(candidateResults, params.anchorPoint);
+        if (best) {
+          return { success: true, data: attachDistanceToAnchor(best, params.anchorPoint) };
         }
-
-        // Small delay between variants to respect rate limits (1 req/sec)
-        // If the first query failed to find results, we must wait > 1s before trying the next
-        await new Promise(resolve => setTimeout(resolve, 1200));
       }
 
-      console.warn(`[resolve_place] No results for: ${params.name}`);
       return {
         success: false,
         error: `No location found for: ${params.name}`,
         code: 'NO_RESULTS',
       };
-      
     } catch (error) {
-      console.error(`[resolve_place] Error:`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Geocoding failed',

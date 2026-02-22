@@ -1,4 +1,4 @@
-export type AgentIntent = 'general' | 'plan_trip' | 'become_host';
+export type AgentIntent = 'general' | 'plan_trip' | 'become_host' | 'profile_setup';
 
 export interface ConversationSession {
   id: string;

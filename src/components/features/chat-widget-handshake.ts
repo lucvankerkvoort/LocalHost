@@ -1,7 +1,9 @@
 export const HOST_ONBOARDING_START_TOKEN = 'ACTION:START_HOST_ONBOARDING';
+export const PLANNER_ONBOARDING_START_TOKEN = 'ACTION:START_PLANNER';
+export const PROFILE_SETUP_START_TOKEN = 'ACTION:START_PROFILE_SETUP';
 export const HANDSHAKE_STORAGE_PREFIX = 'chat-handshake:';
 
-export type ChatWidgetIntent = 'general' | 'become_host';
+export type ChatWidgetIntent = 'general' | 'become_host' | 'profile_setup';
 export type HostOnboardingStage =
   | 'CITY_MISSING'
   | 'STOPS_MISSING'
@@ -36,9 +38,29 @@ export function shouldStartHostOnboardingHandshake(input: HandshakeCheckInput): 
   return true;
 }
 
+export function shouldStartPlannerHandshake(input: HandshakeCheckInput): boolean {
+  if (!input.isActive) return false;
+  if (input.intent !== 'general') return false;
+  if (!input.pathname?.startsWith('/trips/')) return false;
+  if (input.messageCount > 0) return false;
+  if (input.alreadyTriggered) return false;
+  return true;
+}
+
+export function shouldStartProfileHandshake(input: HandshakeCheckInput): boolean {
+  if (!input.isActive) return false;
+  if (input.intent !== 'profile_setup') return false;
+  if (!input.pathname?.startsWith('/profile/setup')) return false;
+  if (input.messageCount > 0) return false;
+  if (input.alreadyTriggered) return false;
+  return true;
+}
+
 export function getChatIntent(pathname: string | null, intentOverride?: ChatWidgetIntent): ChatWidgetIntent {
   if (intentOverride) return intentOverride;
-  return pathname?.startsWith('/become-host') ? 'become_host' : 'general';
+  if (pathname?.startsWith('/become-host')) return 'become_host';
+  if (pathname?.startsWith('/profile/setup')) return 'profile_setup';
+  return 'general';
 }
 
 export function getChatId(
@@ -61,6 +83,14 @@ export function getHostDraftIdFromPath(pathname: string | null): string | null {
 
 export function buildHostOnboardingTrigger(stage: HostOnboardingStage): string {
   return `${HOST_ONBOARDING_START_TOKEN}:${stage}`;
+}
+
+export function buildPlannerOnboardingTrigger(): string {
+  return PLANNER_ONBOARDING_START_TOKEN;
+}
+
+export function buildProfileSetupTrigger(): string {
+  return PROFILE_SETUP_START_TOKEN;
 }
 
 const HOST_TOOL_ONLY_FOLLOW_UP_BY_STAGE: Record<HostOnboardingStage, string> = {

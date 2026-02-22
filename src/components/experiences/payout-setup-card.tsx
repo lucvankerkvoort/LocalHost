@@ -18,7 +18,11 @@ export function PayoutSetupCard({ status, payoutsEnabled }: PayoutSetupCardProps
     try {
       const res = await fetch('/api/hosts/stripe/connect', { method: 'POST' });
       const data = await res.json();
-      if (data.url) {
+      if (!res.ok) {
+        alert(data.error || 'Failed to start onboarding');
+        return;
+      }
+      if (typeof data.url === 'string' && data.url.length > 0) {
         window.location.href = data.url;
       } else {
         alert('Failed to start onboarding');

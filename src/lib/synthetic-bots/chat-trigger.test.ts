@@ -58,9 +58,9 @@ test('maybeEnqueueSyntheticReplyForMessage skips when sender is host', async () 
   assert.equal(result.reason, 'SENDER_IS_HOST');
 });
 
-test('maybeEnqueueSyntheticReplyForMessage skips for non-chat-eligible booking', async () => {
+test('maybeEnqueueSyntheticReplyForMessage skips for cancelled booking', async () => {
   const result = await maybeEnqueueSyntheticReplyForMessage({
-    booking: makeBooking({ status: 'TENTATIVE' }),
+    booking: makeBooking({ status: 'CANCELLED' }),
     senderId: 'guest-1',
     triggerMessageId: 'msg-1',
   });

@@ -25,6 +25,7 @@ import {
   Cartesian3, 
   Color, 
   HeightReference,
+  SceneTransforms,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
   UrlTemplateImageryProvider,
@@ -52,6 +53,7 @@ const PLACE_MARKER_COLORS: Record<string, string> = {
   park: '#2a9d8f',
   neighborhood: '#8ecae6',
   city: '#023047',
+  experience: '#fb8500',
 };
 const LUCIDE_STROKE_WIDTH = 2.25;
 const CITY_MARKER_FALLBACK_COLOR = '#fb8500';
@@ -61,6 +63,13 @@ const ROUTE_MARKER_ICON_SIZE = 16;
 const ROUTE_MARKER_ICON_HOVER_SIZE = 20;
 const ROUTE_MARKER_ICON_ACTIVE_SIZE = 24;
 const PLACE_MARKER_ICON_SIZE = 14;
+const ROUTE_MODE_STYLES: Record<TravelRoute['mode'], { color: string; width: number; arcType: ArcType }> = {
+  flight: { color: '#2EC5FF', width: 3, arcType: ArcType.GEODESIC },
+  train: { color: '#7B61FF', width: 4, arcType: ArcType.RHUMB },
+  drive: { color: '#FF8C42', width: 4, arcType: ArcType.RHUMB },
+  boat: { color: '#1F7A8C', width: 3, arcType: ArcType.GEODESIC },
+  walk: { color: '#94a3b8', width: 2, arcType: ArcType.RHUMB },
+};
 const PLACE_MARKER_ICON_MAP: Record<string, { icon: LucideIcon; name: string }> = {
   landmark: { icon: Landmark, name: 'Landmark' },
   museum: { icon: Building2, name: 'Building2' },
@@ -68,11 +77,16 @@ const PLACE_MARKER_ICON_MAP: Record<string, { icon: LucideIcon; name: string }> 
   park: { icon: Trees, name: 'Trees' },
   neighborhood: { icon: MapIcon, name: 'Map' },
   city: { icon: MapPin, name: 'MapPin' },
+  experience: { icon: MapPin, name: 'MapPin' },
 };
 const LUCIDE_ICON_CACHE = new Map<string, string>();
 
 function getRouteMarkerColor(_marker: RouteMarkerData): string {
   return ROUTE_MARKER_COLOR;
+}
+
+function getRouteStyle(mode: TravelRoute['mode']) {
+  return ROUTE_MODE_STYLES[mode] ?? ROUTE_MODE_STYLES.flight;
 }
 
 function encodeSvgData(svg: string): string {
@@ -224,7 +238,151 @@ interface CesiumGlobeProps {
   activeItemId?: string | null;
   hoveredItemId?: string | null;
   onItemHover?: (itemId: string | null) => void;
+  onItemClick?: (itemId: string) => void;
   onZoomChange?: (height: number) => void;
+  itemPreview?: {
+    itemId: string;
+    title: string;
+    description?: string;
+    lat: number;
+    lng: number;
+    images: Array<{
+      url: string;
+      attribution?: {
+        displayName?: string;
+        uri?: string;
+      };
+    }>;
+    isLoading: boolean;
+  } | null;
+  autoCycleDurationMs?: number | null;
+}
+
+type RoutePathPayload = {
+  points?: Array<{ lat: number; lng: number }>;
+  distanceMeters?: number | null;
+  durationSeconds?: number | null;
+  source?: 'google' | 'fallback';
+};
+
+type ItemPreviewPopperProps = {
+  itemPreview: NonNullable<CesiumGlobeProps['itemPreview']>;
+  previewPosition: { x: number; y: number };
+  autoCycleDurationMs?: number | null;
+};
+
+function ItemPreviewPopper({
+  itemPreview,
+  previewPosition,
+  autoCycleDurationMs,
+}: ItemPreviewPopperProps) {
+  const [previewIndex, setPreviewIndex] = useState(0);
+
+  useEffect(() => {
+    if (!autoCycleDurationMs || itemPreview.isLoading || itemPreview.images.length < 2) {
+      return;
+    }
+
+    const intervalMs = Math.max(
+      120,
+      Math.floor(autoCycleDurationMs / itemPreview.images.length)
+    );
+    const timer = window.setInterval(() => {
+      setPreviewIndex((prev) =>
+        prev === itemPreview.images.length - 1 ? 0 : prev + 1
+      );
+    }, intervalMs);
+
+    return () => window.clearInterval(timer);
+  }, [
+    autoCycleDurationMs,
+    itemPreview.images.length,
+    itemPreview.isLoading,
+    itemPreview.itemId,
+  ]);
+
+  return (
+    <div
+      className="absolute z-50"
+      style={{
+        left: previewPosition.x,
+        top: previewPosition.y - 12,
+        transform: 'translate(-50%, -100%)',
+        maxWidth: '320px',
+      }}
+    >
+      <div className="pointer-events-auto bg-white rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden w-72">
+        <div className="relative bg-[var(--muted)]/20">
+          {itemPreview.isLoading ? (
+            <div className="w-full h-40 animate-pulse bg-[var(--muted)]/40" />
+          ) : itemPreview.images.length > 0 ? (
+            <img
+              src={itemPreview.images[previewIndex].url}
+              alt={itemPreview.title}
+              className="w-full h-40 object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-40 flex items-center justify-center text-xs text-[var(--muted-foreground)]">
+              No image available
+            </div>
+          )}
+
+          {itemPreview.images.length > 1 && (
+            <>
+              <button
+                onClick={() =>
+                  setPreviewIndex((prev) =>
+                    prev === 0 ? itemPreview.images.length - 1 : prev - 1
+                  )
+                }
+                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded-full"
+              >
+                ◀
+              </button>
+              <button
+                onClick={() =>
+                  setPreviewIndex((prev) =>
+                    prev === itemPreview.images.length - 1 ? 0 : prev + 1
+                  )
+                }
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded-full"
+              >
+                ▶
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="p-3">
+          <h4 className="text-sm font-semibold text-[var(--foreground)] line-clamp-1">
+            {itemPreview.title}
+          </h4>
+          {itemPreview.description && (
+            <p className="mt-1 text-xs text-[var(--muted-foreground)] line-clamp-3">
+              {itemPreview.description}
+            </p>
+          )}
+          {itemPreview.images[previewIndex]?.attribution?.displayName && (
+            <p className="mt-2 text-[10px] text-[var(--muted-foreground)]/80">
+              {itemPreview.images[previewIndex].attribution?.uri ? (
+                <a
+                  href={itemPreview.images[previewIndex].attribution?.uri}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  Photo: {itemPreview.images[previewIndex].attribution?.displayName}
+                </a>
+              ) : (
+                <>Photo: {itemPreview.images[previewIndex].attribution?.displayName}</>
+              )}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ... (existing code)
@@ -244,17 +402,22 @@ export default function CesiumGlobe({
   activeItemId,
   hoveredItemId,
   onItemHover,
+  onItemClick,
   onZoomChange,
+  itemPreview,
+  autoCycleDurationMs,
 }: CesiumGlobeProps) {
   const viewerRef = useRef<CesiumViewer | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [hostAvatars, setHostAvatars] = useState<Record<string, string>>({});
   const [hoveredHost, setHoveredHost] = useState<HostMarkerData | null>(null);
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
+  const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null);
   const handlerRef = useRef<ScreenSpaceEventHandler | null>(null);
   const zoomHeightRef = useRef<number | null>(null);
   const initialFlightRef = useRef(false);
   const skipNextSelectionFlyRef = useRef(false);
+  const [routePathsById, setRoutePathsById] = useState<Record<string, RoutePathPayload>>({});
 
   const cityMarkersKey = useMemo(
     () => cityMarkers.map((marker) => `${marker.id}:${marker.lat}:${marker.lng}`).join('|'),
@@ -289,6 +452,123 @@ export default function CesiumGlobe({
     initialFlightRef.current = false;
     skipNextSelectionFlyRef.current = false;
   }, [cityMarkersKey]);
+
+  useEffect(() => {
+    const unresolvedRoutes = routes.filter((route) => {
+      if (Array.isArray(route.path) && route.path.length >= 2) return false;
+      return !routePathsById[route.id];
+    });
+
+    if (unresolvedRoutes.length === 0) return;
+
+    let cancelled = false;
+
+    const resolveRoutePaths = async () => {
+      const settled = await Promise.all(
+        unresolvedRoutes.map(async (route) => {
+          try {
+            const response = await fetch('/api/routes/compute', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fromLat: route.fromLat,
+                fromLng: route.fromLng,
+                toLat: route.toLat,
+                toLng: route.toLng,
+                mode: route.mode,
+              }),
+            });
+
+            if (!response.ok) {
+              return {
+                routeId: route.id,
+                payload: {
+                  points: [
+                    { lat: route.fromLat, lng: route.fromLng },
+                    { lat: route.toLat, lng: route.toLng },
+                  ],
+                  source: 'fallback',
+                } satisfies RoutePathPayload,
+              };
+            }
+
+            const payload = (await response.json()) as RoutePathPayload;
+            const points =
+              Array.isArray(payload.points) && payload.points.length >= 2
+                ? payload.points
+                : [
+                    { lat: route.fromLat, lng: route.fromLng },
+                    { lat: route.toLat, lng: route.toLng },
+                  ];
+
+            return {
+              routeId: route.id,
+              payload: {
+                points,
+                distanceMeters:
+                  typeof payload.distanceMeters === 'number' ? payload.distanceMeters : null,
+                durationSeconds:
+                  typeof payload.durationSeconds === 'number' ? payload.durationSeconds : null,
+                source: payload.source === 'google' ? 'google' : 'fallback',
+              } satisfies RoutePathPayload,
+            };
+          } catch {
+            return {
+              routeId: route.id,
+              payload: {
+                points: [
+                  { lat: route.fromLat, lng: route.fromLng },
+                  { lat: route.toLat, lng: route.toLng },
+                ],
+                source: 'fallback',
+              } satisfies RoutePathPayload,
+            };
+          }
+        })
+      );
+
+      if (cancelled) return;
+
+      setRoutePathsById((previous) => {
+        const next = { ...previous };
+        settled.forEach(({ routeId, payload }) => {
+          next[routeId] = payload;
+        });
+        return next;
+      });
+    };
+
+    void resolveRoutePaths();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [routePathsById, routes]);
+
+  useEffect(() => {
+    if (!itemPreview || !viewerRef.current) {
+      return;
+    }
+
+    const viewer = viewerRef.current;
+    const updatePosition = () => {
+      const cartesian = Cartesian3.fromDegrees(itemPreview.lng, itemPreview.lat, 0);
+      const windowPosition = SceneTransforms.worldToWindowCoordinates(
+        viewer.scene,
+        cartesian
+      );
+      if (windowPosition && Number.isFinite(windowPosition.x) && Number.isFinite(windowPosition.y)) {
+        setPreviewPosition({ x: windowPosition.x, y: windowPosition.y });
+      } else {
+        setPreviewPosition(null);
+      }
+    };
+
+    viewer.scene.postRender.addEventListener(updatePosition);
+    return () => {
+      viewer.scene.postRender.removeEventListener(updatePosition);
+    };
+  }, [itemPreview?.lat, itemPreview?.lng, itemPreview?.itemId]);
 
   // Pre-load circular avatars for hosts
   useEffect(() => {
@@ -357,9 +637,26 @@ export default function CesiumGlobe({
 
     handler.setInputAction((movement: { position: Cartesian2 }) => {
       const pickedObject = viewer.scene.pick(movement.position);
-      if (!defined(pickedObject) || !pickedObject.id) {
-        onMapBackgroundClick?.();
+      if (defined(pickedObject) && pickedObject.id) {
+        const entity = pickedObject.id as CesiumEntity;
+        const entityId = entity.id;
+
+        if (entityId?.startsWith('route-marker-')) {
+          const markerId = entityId.replace('route-marker-', '');
+          onItemClick?.(markerId);
+          return;
+        }
+
+        if (entityId?.startsWith('place-')) {
+          const markerId = entityId.replace('place-', '');
+          onItemClick?.(markerId);
+          return;
+        }
+
+        return;
       }
+
+      onMapBackgroundClick?.();
     }, ScreenSpaceEventType.LEFT_CLICK);
 
     return () => {
@@ -368,7 +665,7 @@ export default function CesiumGlobe({
         handlerRef.current = null;
       }
     };
-  }, [isReady, hostMarkers, onItemHover, onMapBackgroundClick]);
+  }, [isReady, hostMarkers, onItemHover, onItemClick, onMapBackgroundClick]);
 
   useEffect(() => {
     if (!viewerRef.current || !isReady || !onZoomChange) return;
@@ -578,21 +875,30 @@ export default function CesiumGlobe({
            // (Optional: usually we want to see the whole trip context, or just the current leg)
            // For now, show all routes to give the "Grand Tour" feel
            
-           const isFlight = route.mode === 'flight';
-           const color = isFlight ? Color.fromCssColorString('#8ecae6') : Color.fromCssColorString('#fb8500');
+           const style = getRouteStyle(route.mode);
+           const color = Color.fromCssColorString(style.color);
+           const routePath =
+             (Array.isArray(route.path) && route.path.length >= 2
+               ? route.path
+               : routePathsById[route.id]?.points) ?? [
+               { lat: route.fromLat, lng: route.fromLng },
+               { lat: route.toLat, lng: route.toLng },
+             ];
+           const hasDetailedPath = routePath.length > 2;
+           const positions = routePath.map((point) =>
+             Cartesian3.fromDegrees(point.lng, point.lat)
+           );
            
            return (
              <Entity
                key={`route-${route.id}`}
                polyline={{
-                 positions: [
-                   Cartesian3.fromDegrees(route.fromLng, route.fromLat),
-                   Cartesian3.fromDegrees(route.toLng, route.toLat)
-                 ],
-                 width: isFlight ? 3 : 4,
+                 positions,
+                 width: style.width,
                  material: color.withAlpha(0.7),
-                 arcType: isFlight ? ArcType.GEODESIC : ArcType.RHUMB,
-                 clampToGround: false, // Arcs need to fly
+                 // Ground polylines only support GEODESIC or RHUMB arc types.
+                 arcType: style.arcType,
+                 clampToGround: hasDetailedPath && route.mode !== 'flight',
                }}
              />
            );
@@ -770,6 +1076,16 @@ export default function CesiumGlobe({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Item Preview Popper */}
+      {itemPreview && previewPosition && (
+        <ItemPreviewPopper
+          key={itemPreview.itemId}
+          itemPreview={itemPreview}
+          previewPosition={previewPosition}
+          autoCycleDurationMs={autoCycleDurationMs}
+        />
       )}
     </>
   );

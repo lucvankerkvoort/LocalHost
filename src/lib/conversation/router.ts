@@ -2,6 +2,7 @@ import { Agent } from '../agents/agent';
 import { AgentIntent } from './types';
 import { PlanningAgent } from '../agents/planning-agent';
 import { HostCreationAgent } from '../agents/host-creation-agent';
+import { ProfileAgent } from '../agents/profile-agent';
 
 export class AgentRouter {
   private agents: Map<string, Agent> = new Map();
@@ -9,10 +10,12 @@ export class AgentRouter {
   constructor() {
     const planningAgent = new PlanningAgent();
     const hostCreationAgent = new HostCreationAgent();
+    const profileAgent = new ProfileAgent();
 
     // Register agents
     this.registerAgent('plan_trip', planningAgent);
     this.registerAgent('become_host', hostCreationAgent);
+    this.registerAgent('profile_setup', profileAgent);
     
     // Reuse planning agent as general/default for now
     this.registerAgent('general', planningAgent); 

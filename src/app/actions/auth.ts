@@ -47,7 +47,7 @@ export async function register(formData: FormData) {
       },
     });
 
-    return { success: "Account created successfully!" };
+    return { success: "Account created successfully!", email: validatedEmail };
   } catch (error) {
     console.error("Registration error:", error);
     return { error: "Something went wrong. Please try again." };

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { createTool, ToolResult } from './tool-registry';
+import { computeGoogleRoutePath, type RouteMode } from '@/lib/maps/google-routes';
 
 // ============================================================================
 // Schema
@@ -24,6 +25,7 @@ type RouteSegment = {
   distanceMeters: number;
   durationMinutes: number;
   instructions: string;
+  polyline?: Array<{ lat: number; lng: number }>;
 };
 
 type GenerateRouteResult = {
@@ -82,6 +84,12 @@ function generateInstructions(from: string, to: string, distanceMeters: number, 
   }
 }
 
+function mapGenerateModeToRouteMode(mode: 'walk' | 'transit' | 'drive'): RouteMode {
+  if (mode === 'drive') return 'drive';
+  if (mode === 'transit') return 'train';
+  return 'walk';
+}
+
 // ============================================================================
 // Tool Implementation
 // ============================================================================
@@ -135,20 +143,29 @@ export const generateRouteTool = createTool({
         if (mode === 'walk' && distance > 2000) {
           mode = 'transit';
         }
-        
-        const duration = estimateDuration(distance, mode);
+        const routePath = await computeGoogleRoutePath(
+          { lat: from.lat, lng: from.lng },
+          { lat: to.lat, lng: to.lng },
+          mapGenerateModeToRouteMode(mode)
+        );
+        const resolvedDistance = routePath.distanceMeters ?? Math.round(distance);
+        const resolvedDurationMinutes =
+          typeof routePath.durationSeconds === 'number'
+            ? Math.max(1, Math.round(routePath.durationSeconds / 60))
+            : estimateDuration(distance, mode);
         
         segments.push({
           from: { name: from.name, lat: from.lat, lng: from.lng },
           to: { name: to.name, lat: to.lat, lng: to.lng },
           mode,
-          distanceMeters: Math.round(distance),
-          durationMinutes: duration,
-          instructions: generateInstructions(from.name, to.name, distance, mode),
+          distanceMeters: resolvedDistance,
+          durationMinutes: resolvedDurationMinutes,
+          instructions: generateInstructions(from.name, to.name, resolvedDistance, mode),
+          polyline: routePath.points.length > 1 ? routePath.points : undefined,
         });
         
-        totalDistance += distance;
-        totalDuration += duration;
+        totalDistance += resolvedDistance;
+        totalDuration += resolvedDurationMinutes;
       }
 
       return {
