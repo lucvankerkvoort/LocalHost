@@ -39,9 +39,9 @@ export async function GET(
             return new NextResponse('Forbidden', { status: 403 });
         }
 
-        // Chat access gate: only allow access if booking is CONFIRMED or COMPLETED
-        if (booking.status !== 'CONFIRMED' && booking.status !== 'COMPLETED') {
-            return new NextResponse('Chat is locked until booking is confirmed', { status: 403 });
+        // Keep chat open for pre-booking coordination; only block cancelled bookings.
+        if (booking.status === 'CANCELLED') {
+            return new NextResponse('Chat is unavailable for cancelled bookings', { status: 403 });
         }
 
         // Opportunistic processor trigger to drain due jobs on normal chat traffic.
@@ -111,9 +111,9 @@ export async function POST(
              return new NextResponse('Forbidden', { status: 403 });
         }
 
-        // Chat access gate: only allow access if booking is CONFIRMED or COMPLETED
-        if (booking.status !== 'CONFIRMED' && booking.status !== 'COMPLETED') {
-            return new NextResponse('Chat is locked until booking is confirmed', { status: 403 });
+        // Keep chat open for pre-booking coordination; only block cancelled bookings.
+        if (booking.status === 'CANCELLED') {
+            return new NextResponse('Chat is unavailable for cancelled bookings', { status: 403 });
         }
 
         const message = await prisma.message.create({

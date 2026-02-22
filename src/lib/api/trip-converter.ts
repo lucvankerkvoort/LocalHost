@@ -53,6 +53,7 @@ export interface ApiTrip {
   userId: string;
   title: string;
   stops: ApiTripAnchor[];
+  preferences?: Record<string, unknown> | null;
 }
 
 const ITINERARY_ITEM_TYPES: ItineraryItem['type'][] = [

@@ -10,6 +10,17 @@ export type PlannerExperience = {
   photos: string[];
   city: string;
   country: string;
+  stops?: PlannerExperienceStop[];
+};
+
+export type PlannerExperienceStop = {
+  id: string;
+  name: string;
+  description?: string | null;
+  address?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  order: number;
 };
 
 export type PlannerExperienceHost = {

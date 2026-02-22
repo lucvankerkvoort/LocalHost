@@ -17,6 +17,7 @@ interface HostPanelProps {
   onHostClick: (host: HostMarkerData) => void;
   onViewProfile: (host: HostMarkerData) => void;
   onAddExperience: (host: PlannerExperienceHost, experience: PlannerExperience, marker: HostMarkerData) => void;
+  onChatExperience: (host: PlannerExperienceHost, experience: PlannerExperience, marker: HostMarkerData) => void;
   onFocusExperience?: (host: PlannerExperienceHost, experience: PlannerExperience, marker: HostMarkerData) => void;
 }
 
@@ -31,6 +32,7 @@ export function HostPanel({
   onHostClick,
   onViewProfile,
   onAddExperience,
+  onChatExperience,
   onFocusExperience,
 }: HostPanelProps) {
   const hostsWithMarkers = hosts.map((host) => {
@@ -50,16 +52,16 @@ export function HostPanel({
   });
 
   const containerClasses = variant === 'panel'
-    ? 'w-full border-transparent'
+    ? 'w-full h-full border-transparent'
     : 'w-96 border-l border-[var(--border)]/50';
   const emptyContainerClasses = variant === 'panel'
-    ? 'w-full border-transparent'
+    ? 'w-full h-full border-transparent'
     : 'w-80 border-l border-[var(--border)]/50';
   const headerLabel = variant === 'panel' ? 'Experiences' : 'Local Hosts';
 
   if (hosts.length === 0) {
     return (
-      <div className={`${emptyContainerClasses} flex-1 min-h-0 bg-[var(--background)]/60 backdrop-blur-xl flex flex-col`}>
+      <div className={`${emptyContainerClasses} min-h-0 bg-[var(--background)]/60 backdrop-blur-xl flex flex-col`}>
         <div className="p-4 border-b border-[var(--border)]/50">
           <h2 className="font-semibold text-[var(--foreground)] flex items-center gap-2">
             <Home className="w-5 h-5 text-[var(--princeton-orange)]" />
@@ -81,7 +83,7 @@ export function HostPanel({
   }
 
   return (
-    <div className={`${containerClasses} flex-1 min-h-0 bg-[var(--background)]/60 backdrop-blur-xl flex flex-col`}>
+    <div className={`${containerClasses} min-h-0 bg-[var(--background)]/60 backdrop-blur-xl flex flex-col`}>
       {/* Header */}
       <div className="p-4 border-b border-[var(--border)]/50">
         <h2 className="font-semibold text-[var(--foreground)] flex items-center gap-2">
@@ -94,11 +96,10 @@ export function HostPanel({
       </div>
 
       {/* Scrollable host list */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
         {hostsWithMarkers.map(({ marker, host }) => (
           <HostCardWithExperiences
             key={marker.id}
-            marker={marker}
             host={host}
             isSelected={marker.id === selectedHostId || marker.hostId === selectedHostId}
             selectedDayNumber={selectedDayNumber}
@@ -107,6 +108,7 @@ export function HostPanel({
             onClick={() => onHostClick(marker)}
             onViewProfile={() => onViewProfile(marker)}
             onAddExperience={(exp) => onAddExperience(host, exp, marker)}
+            onChatExperience={(exp) => onChatExperience(host, exp, marker)}
             onFocusExperience={(exp) => onFocusExperience?.(host, exp, marker)}
           />
         ))}
@@ -116,7 +118,6 @@ export function HostPanel({
 }
 
 interface HostCardWithExperiencesProps {
-  marker: HostMarkerData;
   host: PlannerExperienceHost;
   isSelected: boolean;
   selectedDayNumber?: number;
@@ -125,11 +126,11 @@ interface HostCardWithExperiencesProps {
   onClick: () => void;
   onViewProfile: () => void;
   onAddExperience: (experience: PlannerExperience) => void;
+  onChatExperience: (experience: PlannerExperience) => void;
   onFocusExperience?: (experience: PlannerExperience) => void;
 }
 
 function HostCardWithExperiences({
-  marker,
   host,
   isSelected,
   selectedDayNumber,
@@ -138,6 +139,7 @@ function HostCardWithExperiences({
   onClick,
   onViewProfile,
   onAddExperience,
+  onChatExperience,
   onFocusExperience,
 }: HostCardWithExperiencesProps) {
   return (
@@ -221,28 +223,38 @@ function HostCardWithExperiences({
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    if (ctaState === 'BOOKED') return;
-                    onAddExperience(exp);
-                  }}
-                  disabled={ctaState === 'BOOKED'}
-                  className={`w-full mt-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    ctaState === 'BOOKED'
-                      ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-200 cursor-not-allowed'
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onChatExperience(exp);
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-white/5 text-[var(--foreground)] border border-[var(--border)]/60 hover:bg-white/10"
+                  >
+                    Chat
+                  </button>
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (ctaState === 'BOOKED') return;
+                      onAddExperience(exp);
+                    }}
+                    disabled={ctaState === 'BOOKED'}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      ctaState === 'BOOKED'
+                        ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-200 cursor-not-allowed'
+                        : ctaState === 'REMOVE'
+                        ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20 border border-red-200'
+                        : 'bg-[var(--princeton-orange)] text-white hover:bg-[var(--princeton-dark)]'
+                    }`}
+                  >
+                    {ctaState === 'BOOKED'
+                      ? 'Booked'
                       : ctaState === 'REMOVE'
-                      ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20 border border-red-200'
-                      : 'bg-[var(--princeton-orange)] text-white hover:bg-[var(--princeton-dark)]'
-                  }`}
-                >
-                  {ctaState === 'BOOKED'
-                    ? 'Booked'
-                    : ctaState === 'REMOVE'
-                    ? 'Remove from Day' 
-                    : selectedDayNumber ? `Add to Day ${selectedDayNumber}` : 'Add to Trip'
-                  }
-                </button>
+                      ? 'Remove'
+                      : selectedDayNumber ? `Add Day ${selectedDayNumber}` : 'Add'}
+                  </button>
+                </div>
               </div>
             );
           })}

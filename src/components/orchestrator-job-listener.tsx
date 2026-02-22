@@ -16,15 +16,38 @@ export function OrchestratorJobListener() {
     (state) => state.toolCalls.lastResultsByTool.generateItinerary
   );
   const activeTripId = useAppSelector((state) => state.globe.tripId);
-  const pollRef = useRef<{ jobId?: string; timer?: number; inFlight?: boolean }>({});
+  const pollRef = useRef<{
+    jobId?: string;
+    generationId?: string;
+    timer?: number;
+    inFlight?: boolean;
+  }>({});
+  const draftAppliedRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
-    const result = latestGenerate?.result as { jobId?: string; message?: string; tripId?: string } | undefined;
+    const result = latestGenerate?.result as {
+      jobId?: string;
+      message?: string;
+      tripId?: string;
+      generationId?: string;
+    } | undefined;
     const jobId = result?.jobId;
+    const toolGenerationId =
+      typeof result?.generationId === 'string' ? result.generationId : undefined;
     const jobTripId = result?.tripId ?? activeTripId ?? undefined;
-    if (!jobId || pollRef.current.jobId === jobId) return;
+    if (!jobId) return;
+    const pollState = pollRef.current;
+    const sameJob = pollState.jobId === jobId;
+    const sameGeneration = toolGenerationId
+      ? pollState.generationId === toolGenerationId
+      : true;
+    const hasActivePoll = typeof pollState.timer === 'number';
+    if (sameJob && sameGeneration && hasActivePoll) return;
 
-    pollRef.current.jobId = jobId;
+    pollState.jobId = jobId;
+    if (toolGenerationId) {
+      pollState.generationId = toolGenerationId;
+    }
 
     dispatch(
       jobStarted({
@@ -35,8 +58,8 @@ export function OrchestratorJobListener() {
     );
 
     const poll = async () => {
-      if (pollRef.current.inFlight) return;
-      pollRef.current.inFlight = true;
+      if (pollState.inFlight) return;
+      pollState.inFlight = true;
 
       try {
         const response = await fetch(`/api/orchestrator?jobId=${encodeURIComponent(jobId)}`);
@@ -47,11 +70,45 @@ export function OrchestratorJobListener() {
 
         const job = data.job as {
           status: 'draft' | 'running' | 'complete' | 'error';
+          generationId?: string;
+          generationMode?: 'draft' | 'refine';
           progress?: { stage?: string; message?: string; current?: number; total?: number };
           plan?: unknown;
           hostMarkers?: unknown;
           error?: string;
         };
+        const jobGenerationId =
+          typeof job.generationId === 'string' ? job.generationId : 'unknown';
+
+        if (pollState.generationId !== jobGenerationId) {
+          pollState.generationId = jobGenerationId;
+          dispatch(
+            jobStarted({
+              id: jobId,
+              stage: 'draft',
+              message: job.progress?.message ?? 'Drafting itinerary',
+            })
+          );
+        }
+
+        if (
+          job.plan &&
+          job.status !== 'complete' &&
+          draftAppliedRef.current[jobId] !== jobGenerationId
+        ) {
+          draftAppliedRef.current[jobId] = jobGenerationId;
+          recordToolResult(dispatch, {
+            toolName: 'generateItinerary',
+            result: {
+              success: true,
+              plan: job.plan,
+              hostMarkers: job.hostMarkers ?? [],
+              tripId: jobTripId,
+              generationId: jobGenerationId,
+            },
+            source: 'orchestrator',
+          });
+        }
 
         if (job.status === 'complete' && job.plan) {
           dispatch(jobCompleted({ id: jobId }));
@@ -62,6 +119,7 @@ export function OrchestratorJobListener() {
               plan: job.plan,
               hostMarkers: job.hostMarkers ?? [],
               tripId: jobTripId,
+              generationId: jobGenerationId,
             },
             source: 'orchestrator',
           });
@@ -69,12 +127,14 @@ export function OrchestratorJobListener() {
             dispatch(saveTripPlanForTrip({ tripId: jobTripId, plan: job.plan as ItineraryPlan }));
           }
           window.clearInterval(intervalId);
+          pollState.timer = undefined;
           return;
         }
 
         if (job.status === 'error') {
           dispatch(jobFailed({ id: jobId, error: job.error || 'Failed to build itinerary.' }));
           window.clearInterval(intervalId);
+          pollState.timer = undefined;
           return;
         }
 
@@ -101,16 +161,19 @@ export function OrchestratorJobListener() {
           );
         }
       } finally {
-        pollRef.current.inFlight = false;
+        pollState.inFlight = false;
       }
     };
 
     const intervalId = window.setInterval(poll, POLL_INTERVAL_MS);
-    pollRef.current.timer = intervalId;
+    pollState.timer = intervalId;
     poll();
 
     return () => {
       window.clearInterval(intervalId);
+      if (pollState.timer === intervalId) {
+        pollState.timer = undefined;
+      }
     };
   }, [activeTripId, dispatch, latestGenerate]);
 

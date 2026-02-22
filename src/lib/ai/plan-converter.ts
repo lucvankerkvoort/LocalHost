@@ -8,6 +8,32 @@ import { GlobeDestination, RouteMarkerData, TravelRoute, generateId, getColorFor
 import { createItem, ItineraryItem, ItineraryItemType } from '@/types/itinerary';
 import type { ItineraryPlan as OrchestratorPlan } from '@/lib/ai/types';
 import { isObviouslyInvalid } from '@/lib/ai/validation/geo-validator';
+import { buildPlaceImageUrl } from '@/lib/images/places';
+
+const TRANSPORT_OVERRIDE_PATTERN = /transport between cities:\s*([^.\n]+)/i;
+const MIN_INTERCITY_ROUTE_DISTANCE_METERS = 30000;
+
+export function extractTransportPreference(request: string | undefined): string | null {
+  if (!request) return null;
+  const match = request.match(TRANSPORT_OVERRIDE_PATTERN);
+  if (!match) return null;
+  const raw = match[1]?.trim();
+  return raw ? raw : null;
+}
+
+export function mapTransportPreferenceToMode(input: string | null): TravelRoute['mode'] | null {
+  if (!input) return null;
+  const normalized = input.toLowerCase().trim();
+  if (!normalized || normalized === 'no preference' || normalized === 'none' || normalized === 'any') {
+    return null;
+  }
+  if (/train|rail|railway|transit/.test(normalized)) return 'train';
+  if (/flight|fly|air|plane/.test(normalized)) return 'flight';
+  if (/drive|car|road|road trip|roadtrip/.test(normalized)) return 'drive';
+  if (/boat|ferry|ship|cruise/.test(normalized)) return 'boat';
+  if (/walk|on foot/.test(normalized)) return 'walk';
+  return null;
+}
 
 /**
  * Convert an orchestrator ItineraryPlan to globe visualization data.
@@ -44,6 +70,28 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
     });
   };
 
+  const normalizeCityKey = (value?: string): string =>
+    (value ?? '').trim().toLowerCase().replace(/[^a-z]/g, '');
+
+  const calculateDistanceMeters = (
+    fromLat: number,
+    fromLng: number,
+    toLat: number,
+    toLng: number
+  ): number => {
+    const R = 6371e3;
+    const phi1 = (fromLat * Math.PI) / 180;
+    const phi2 = (toLat * Math.PI) / 180;
+    const deltaPhi = ((toLat - fromLat) * Math.PI) / 180;
+    const deltaLambda = ((toLng - fromLng) * Math.PI) / 180;
+
+    const a =
+      Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+      Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
   const extractCityName = (place: {
     name: string;
     description?: string;
@@ -77,8 +125,6 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
     // Prefer explicit city from AI, fallback to extraction
     const currentCity = day.city || extractCityName(anchorLocation);
 
-    console.log(`[PlanConverter] Day ${day.dayNumber}: currentCity="${currentCity}" (explicit: ${day.city})`);
-
     // Create items first to preserve IDs
     const dayItems = day.activities.map((act, idx): ItineraryItem => {
       // ... (existing mapping logic) ...
@@ -100,13 +146,21 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
             hostId = day.suggestedHosts[hostIndex].id;
         }
 
+        const placeImageUrl = act.place.imageUrl
+          ?? buildPlaceImageUrl({
+            name: act.place.name,
+            city: currentCity ?? act.place.city,
+            category: cat ?? type,
+          });
+
         return createItem(type, act.place.name, idx, {
           description: act.notes,
           location: act.place.description || act.place.address || `${act.timeSlot}`,
           place: {
             id: act.place.id || `place-${idx}`,
             name: act.place.name,
-            location: act.place.location
+            location: act.place.location,
+            imageUrl: placeImageUrl,
           },
           category: act.place.category, // Use place category
           hostId, // Assign the host
@@ -156,34 +210,14 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
       }
     });
 
-    // Extract navigation routes within this day
-    if (day.navigationEvents && day.navigationEvents.length > 0) {
-      for (const nav of day.navigationEvents) {
-        // Find the from/to places in activities
-        const fromActivity = day.activities.find(a => a.place.id === nav.fromPlaceId);
-        const toActivity = day.activities.find(a => a.place.id === nav.toPlaceId);
-
-        if (fromActivity && toActivity) {
-          const routeId = generateId();
-          routes.push({
-            id: routeId,
-            fromId: nav.fromPlaceId,
-            toId: nav.toPlaceId,
-            fromLat: fromActivity.place.location.lat,
-            fromLng: fromActivity.place.location.lng,
-            toLat: toActivity.place.location.lat,
-            toLng: toActivity.place.location.lng,
-            mode: nav.type === 'transit' ? 'train' : nav.type,
-            dayNumber: day.dayNumber,
-          });
-          // NOTE: No addRouteMarker calls here — activity markers (above) already
-          // cover these locations. Navigation events only need polylines.
-        }
-      }
-    }
+    // Intra-day route lines are intentionally disabled.
+    // We keep activity markers, but do not render navigation polylines between stops.
   }
 
   // Add routes between days (connecting last activity of day N to first activity of day N+1)
+  const transportOverride = mapTransportPreferenceToMode(
+    extractTransportPreference(plan.request)
+  );
   for (let i = 0; i < plan.days.length - 1; i++) {
     const currentDay = plan.days[i];
     const nextDay = plan.days[i + 1];
@@ -195,9 +229,31 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
     
     const currentAnchor = currentDay.anchorLocation;
     const nextAnchor = nextDay.anchorLocation;
+    const currentCityKey = normalizeCityKey(currentDay.city);
+    const nextCityKey = normalizeCityKey(nextDay.city);
+    const anchorDistance = calculateDistanceMeters(
+      currentAnchor.location.lat,
+      currentAnchor.location.lng,
+      nextAnchor.location.lat,
+      nextAnchor.location.lng
+    );
+
+    const isSameCityHop =
+      currentCityKey.length > 0 &&
+      nextCityKey.length > 0 &&
+      currentCityKey === nextCityKey;
+    const isShortHop = anchorDistance < MIN_INTERCITY_ROUTE_DISTANCE_METERS;
+
+    // Inter-day routes are only meant for true inter-city travel.
+    // If anchors are in the same city (or very close together), skip drawing a route.
+    if (isSameCityHop || isShortHop) {
+      continue;
+    }
 
     // Use anchor locations for inter-day routes
     const routeId = generateId();
+    const interCityMode =
+      transportOverride ?? currentDay.interCityTransportToNext ?? 'flight';
     routes.push({
       id: routeId,
       fromId: `day-${currentDay.dayNumber}-anchor`,
@@ -206,7 +262,7 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
       fromLng: currentAnchor.location.lng,
       toLat: nextAnchor.location.lat,
       toLng: nextAnchor.location.lng,
-      mode: 'flight', // Default to flight for inter-day travel
+      mode: interCityMode,
     });
     addRouteMarker(routeId, 'start', currentAnchor, currentDay.dayNumber);
     addRouteMarker(routeId, 'end', nextAnchor, nextDay.dayNumber);

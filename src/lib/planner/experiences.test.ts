@@ -113,3 +113,19 @@ test('buildHostMarkersFromPlannerHosts averages rating and counts experiences', 
   assert.equal(markers[0].experienceCount, 2);
   assert.equal(markers[0].rating, 4.6);
 });
+
+test('derivePlannerHosts passes through stops with coordinates', () => {
+  const hosts = derivePlannerHosts('Amsterdam', [
+    makeExperience({
+      id: 'exp-1',
+      stops: [
+        { id: 'stop-1', name: 'Stop One', lat: 52.37, lng: 4.89, order: 1 },
+        { id: 'stop-2', name: 'No Coords', lat: null, lng: null, order: 2 },
+      ],
+    }),
+  ]);
+
+  const stops = hosts[0]?.experiences[0]?.stops ?? [];
+  assert.equal(stops.length, 1);
+  assert.equal(stops[0]?.id, 'stop-1');
+});

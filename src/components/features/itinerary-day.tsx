@@ -1,6 +1,7 @@
 'use client';
 
 import { ItineraryItem as ItineraryItemType } from '@/types/itinerary';
+import { buildPlaceImageUrl } from '@/lib/images/places';
 import { Clock, Plus, MapPin, CheckCircle2 } from 'lucide-react';
 import {
   isHostedExperienceItem,
@@ -84,6 +85,13 @@ export function ItineraryDayColumn({
             const isHostedExperience = isHostedExperienceItem(item);
             const isAnchor = item.type === 'MEAL' || isHostedExperience;
             const showCategory = Boolean(item.category) && (item.type !== 'EXPERIENCE' || isHostedExperience);
+            const imageUrl = isHostedExperience
+              ? undefined
+              : (item.place?.imageUrl ?? buildPlaceImageUrl({
+                  name: item.place?.name ?? item.title,
+                  city: item.place?.city,
+                  category: item.category ?? item.type,
+                }));
             
             return (
             <div 
@@ -102,6 +110,16 @@ export function ItineraryDayColumn({
                 onMouseLeave={() => onItemHover?.(null)}
             >
                 <div className="flex justify-between items-start gap-3">
+                    {imageUrl && (
+                        <div className="w-14 h-14 rounded-md overflow-hidden bg-[var(--muted)]/20 flex-shrink-0">
+                            <img
+                              src={imageUrl}
+                              alt={item.title}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                        </div>
+                    )}
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                             {isHostedExperience && (

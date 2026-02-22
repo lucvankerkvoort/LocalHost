@@ -6,6 +6,7 @@ import orchestratorReducer from './orchestrator-slice';
 import hostsReducer from './hosts-slice';
 import hostCreationReducer from './host-creation-slice';
 import uiReducer from './ui-slice';
+import profileReducer from './profile-slice';
 
 import p2pChatReducer from './p2p-chat-slice';
 
@@ -18,6 +19,7 @@ export const store = configureStore({
     hostCreation: hostCreationReducer,
     ui: uiReducer,
     p2pChat: p2pChatReducer,
+    profile: profileReducer,
   },
 });
 

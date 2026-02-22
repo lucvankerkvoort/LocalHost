@@ -127,6 +127,7 @@ export async function POST(
                     date: day.date || new Date(), 
                     guests: 1, 
                     totalPrice: experience.price,
+                    amountSubtotal: experience.price,
                     currency: experience.currency,
                     status: 'TENTATIVE',
                     paymentStatus: 'PENDING',

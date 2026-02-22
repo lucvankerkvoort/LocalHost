@@ -17,7 +17,12 @@ export type BookingForSyntheticReplyTrigger = {
 };
 
 export function isChatEligibleStatus(status: BookingStatus): boolean {
-  return status === 'CONFIRMED' || status === 'COMPLETED';
+  return (
+    status === 'TENTATIVE' ||
+    status === 'PENDING' ||
+    status === 'CONFIRMED' ||
+    status === 'COMPLETED'
+  );
 }
 
 export function resolveBookingHostId(booking: BookingForSyntheticReplyTrigger): string {

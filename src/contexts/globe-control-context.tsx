@@ -37,7 +37,7 @@ export interface TravelRoute {
   fromLng: number;
   toLat: number;
   toLng: number;
-  mode: 'flight' | 'train' | 'drive' | 'walk';
+  mode: 'flight' | 'train' | 'drive' | 'boat' | 'walk';
 }
 
 interface GlobeControlState {

@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import type { RootState } from './store';
 import reducer, {
+  fetchChatThreads,
   fetchMessages,
   initThread,
   markThreadAsRead,
@@ -11,7 +12,7 @@ import reducer, {
   selectAllThreads,
   selectTotalUnreadCount,
   sendChatMessage,
-  setActiveBookingId,
+  setActiveThreadId,
 } from './p2p-chat-slice';
 
 function toRoot(state: ReturnType<typeof reducer>): RootState {
@@ -22,27 +23,59 @@ function getInitialState() {
   return reducer(undefined, { type: '@@INIT' });
 }
 
-test('initThread creates thread and sets activeBookingId', () => {
+test('initThread creates thread and sets activeThreadId', () => {
   const state = reducer(
     getInitialState(),
     initThread({
-      bookingId: 'b-1',
+      threadId: 't-1',
       hostId: 'h-1',
       hostName: 'Host One',
       hostPhoto: 'photo.jpg',
     })
   );
 
-  assert.equal(state.activeBookingId, 'b-1');
-  assert.equal(state.threads['b-1'].hostName, 'Host One');
-  assert.equal(state.threads['b-1'].messages.length, 0);
+  assert.equal(state.activeThreadId, 't-1');
+  assert.equal(state.threads['t-1'].hostName, 'Host One');
+  assert.equal(state.threads['t-1'].messages.length, 0);
+});
+
+test('fetchChatThreads.fulfilled seeds thread metadata with latest message preview', () => {
+  const state = reducer(
+    getInitialState(),
+    fetchChatThreads.fulfilled(
+      [
+        {
+          id: 't-1',
+          bookingId: null,
+          counterpartId: 'h-1',
+          counterpartName: 'Host One',
+          counterpartPhoto: 'photo.jpg',
+          latestMessage: {
+            id: 'm-1',
+            senderId: 'h-1',
+            content: 'hello there',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            isRead: false,
+          },
+        },
+      ],
+      'req-threads',
+      undefined
+    )
+  );
+
+  assert.equal(state.threads['t-1'].hostId, 'h-1');
+  assert.equal(state.threads['t-1'].hostName, 'Host One');
+  assert.equal(state.threads['t-1'].messages.length, 1);
+  assert.equal(state.threads['t-1'].messages[0].senderType, 'HOST');
+  assert.equal(state.threads['t-1'].messages[0].content, 'hello there');
 });
 
 test('initThread does not replace existing thread metadata', () => {
   const first = reducer(
     getInitialState(),
     initThread({
-      bookingId: 'b-1',
+      threadId: 't-1',
       hostId: 'h-1',
       hostName: 'Original Host',
       hostPhoto: 'first.jpg',
@@ -51,29 +84,29 @@ test('initThread does not replace existing thread metadata', () => {
   const second = reducer(
     first,
     initThread({
-      bookingId: 'b-1',
+      threadId: 't-1',
       hostId: 'h-2',
       hostName: 'New Host',
       hostPhoto: 'second.jpg',
     })
   );
 
-  assert.equal(second.threads['b-1'].hostId, 'h-1');
-  assert.equal(second.threads['b-1'].hostName, 'Original Host');
-  assert.equal(second.threads['b-1'].hostPhoto, 'first.jpg');
-  assert.equal(second.activeBookingId, 'b-1');
+  assert.equal(second.threads['t-1'].hostId, 'h-1');
+  assert.equal(second.threads['t-1'].hostName, 'Original Host');
+  assert.equal(second.threads['t-1'].hostPhoto, 'first.jpg');
+  assert.equal(second.activeThreadId, 't-1');
 });
 
-test('setActiveBookingId updates active booking selection', () => {
-  const state = reducer(getInitialState(), setActiveBookingId('booking-42'));
-  assert.equal(state.activeBookingId, 'booking-42');
+test('setActiveThreadId updates active thread selection', () => {
+  const state = reducer(getInitialState(), setActiveThreadId('thread-42'));
+  assert.equal(state.activeThreadId, 'thread-42');
 });
 
 test('receiveMessage appends HOST message and increments unread count', () => {
   const withThread = reducer(
     getInitialState(),
     initThread({
-      bookingId: 'b-1',
+      threadId: 't-1',
       hostId: 'h-1',
       hostName: 'Host One',
       hostPhoto: 'photo.jpg',
@@ -81,20 +114,20 @@ test('receiveMessage appends HOST message and increments unread count', () => {
   );
   const next = reducer(
     withThread,
-    receiveMessage({ bookingId: 'b-1', content: 'Welcome!' })
+    receiveMessage({ threadId: 't-1', content: 'Welcome!' })
   );
 
-  assert.equal(next.threads['b-1'].messages.length, 1);
-  assert.equal(next.threads['b-1'].messages[0].senderType, 'HOST');
-  assert.equal(next.threads['b-1'].messages[0].content, 'Welcome!');
-  assert.equal(next.threads['b-1'].messages[0].isRead, false);
-  assert.equal(next.threads['b-1'].unreadCount, 1);
+  assert.equal(next.threads['t-1'].messages.length, 1);
+  assert.equal(next.threads['t-1'].messages[0].senderType, 'HOST');
+  assert.equal(next.threads['t-1'].messages[0].content, 'Welcome!');
+  assert.equal(next.threads['t-1'].messages[0].isRead, false);
+  assert.equal(next.threads['t-1'].unreadCount, 1);
 });
 
-test('receiveMessage is a no-op when booking thread is missing', () => {
+test('receiveMessage is a no-op when thread is missing', () => {
   const state = reducer(
     getInitialState(),
-    receiveMessage({ bookingId: 'missing', content: 'hello' })
+    receiveMessage({ threadId: 'missing', content: 'hello' })
   );
   assert.deepEqual(state.threads, {});
 });
@@ -103,7 +136,7 @@ test('markThreadAsRead clears unread count and marks HOST messages as read', () 
   let state = reducer(
     getInitialState(),
     initThread({
-      bookingId: 'b-1',
+      threadId: 't-1',
       hostId: 'h-1',
       hostName: 'Host One',
       hostPhoto: 'photo.jpg',
@@ -122,7 +155,7 @@ test('markThreadAsRead clears unread count and marks HOST messages as read', () 
         },
       ],
       'req-1',
-      'b-1'
+      't-1'
     )
   );
   state = reducer(
@@ -134,18 +167,18 @@ test('markThreadAsRead clears unread count and marks HOST messages as read', () 
         createdAt: '2026-01-01T01:00:00.000Z',
       },
       'req-2',
-      { bookingId: 'b-1', content: 'user reply' }
+      { threadId: 't-1', content: 'user reply' }
     )
   );
   state = reducer(
     state,
-    receiveMessage({ bookingId: 'b-1', content: 'new host message' })
+    receiveMessage({ threadId: 't-1', content: 'new host message' })
   );
 
-  const next = reducer(state, markThreadAsRead({ bookingId: 'b-1' }));
-  const [first, second, third] = next.threads['b-1'].messages;
+  const next = reducer(state, markThreadAsRead({ threadId: 't-1' }));
+  const [first, second, third] = next.threads['t-1'].messages;
 
-  assert.equal(next.threads['b-1'].unreadCount, 0);
+  assert.equal(next.threads['t-1'].unreadCount, 0);
   assert.equal(first.senderType, 'HOST');
   assert.equal(first.isRead, true);
   assert.equal(second.senderType, 'USER');
@@ -158,7 +191,7 @@ test('fetchMessages.fulfilled maps API payload into thread messages', () => {
   const withThread = reducer(
     getInitialState(),
     initThread({
-      bookingId: 'b-1',
+      threadId: 't-1',
       hostId: 'h-1',
       hostName: 'Host One',
       hostPhoto: 'photo.jpg',
@@ -177,11 +210,11 @@ test('fetchMessages.fulfilled maps API payload into thread messages', () => {
         },
       ],
       'req-1',
-      'b-1'
+      't-1'
     )
   );
 
-  assert.deepEqual(next.threads['b-1'].messages, [
+  assert.deepEqual(next.threads['t-1'].messages, [
     {
       id: 'm-1',
       content: 'hello',
@@ -196,7 +229,7 @@ test('sendChatMessage.fulfilled appends USER message and updates lastMessageAt',
   const withThread = reducer(
     getInitialState(),
     initThread({
-      bookingId: 'b-1',
+      threadId: 't-1',
       hostId: 'h-1',
       hostName: 'Host One',
       hostPhoto: 'photo.jpg',
@@ -211,15 +244,15 @@ test('sendChatMessage.fulfilled appends USER message and updates lastMessageAt',
         createdAt: '2026-01-01T10:00:00.000Z',
       },
       'req-2',
-      { bookingId: 'b-1', content: 'sent message' }
+      { threadId: 't-1', content: 'sent message' }
     )
   );
 
-  const last = next.threads['b-1'].messages[next.threads['b-1'].messages.length - 1];
+  const last = next.threads['t-1'].messages[next.threads['t-1'].messages.length - 1];
   assert.equal(last.id, 'm-2');
   assert.equal(last.senderType, 'USER');
   assert.equal(last.isRead, true);
-  assert.equal(next.threads['b-1'].lastMessageAt, '2026-01-01T10:00:00.000Z');
+  assert.equal(next.threads['t-1'].lastMessageAt, '2026-01-01T10:00:00.000Z');
 });
 
 test('selectAllThreads sorts by latest message timestamp descending', () => {
@@ -227,7 +260,7 @@ test('selectAllThreads sorts by latest message timestamp descending', () => {
   state = reducer(
     state,
     initThread({
-      bookingId: 'old',
+      threadId: 'old',
       hostId: 'h-1',
       hostName: 'Old',
       hostPhoto: 'old.jpg',
@@ -236,7 +269,7 @@ test('selectAllThreads sorts by latest message timestamp descending', () => {
   state = reducer(
     state,
     initThread({
-      bookingId: 'new',
+      threadId: 'new',
       hostId: 'h-2',
       hostName: 'New',
       hostPhoto: 'new.jpg',
@@ -247,7 +280,7 @@ test('selectAllThreads sorts by latest message timestamp descending', () => {
     sendChatMessage.fulfilled(
       { id: 'm-old', content: 'old', createdAt: '2026-01-01T00:00:00.000Z' },
       'req-old',
-      { bookingId: 'old', content: 'old' }
+      { threadId: 'old', content: 'old' }
     )
   );
   state = reducer(
@@ -255,13 +288,13 @@ test('selectAllThreads sorts by latest message timestamp descending', () => {
     sendChatMessage.fulfilled(
       { id: 'm-new', content: 'new', createdAt: '2026-01-02T00:00:00.000Z' },
       'req-new',
-      { bookingId: 'new', content: 'new' }
+      { threadId: 'new', content: 'new' }
     )
   );
 
   const sorted = selectAllThreads(toRoot(state));
   assert.deepEqual(
-    sorted.map((thread) => thread.bookingId),
+    sorted.map((thread) => thread.threadId),
     ['new', 'old']
   );
 });
@@ -273,14 +306,14 @@ test('selectActiveThread returns active thread or null', () => {
   const withThread = reducer(
     base,
     initThread({
-      bookingId: 'b-1',
+      threadId: 't-1',
       hostId: 'h-1',
       hostName: 'Host One',
       hostPhoto: 'photo.jpg',
     })
   );
 
-  assert.equal(selectActiveThread(toRoot(withThread))?.bookingId, 'b-1');
+  assert.equal(selectActiveThread(toRoot(withThread))?.threadId, 't-1');
 });
 
 test('selectTotalUnreadCount sums unread counts across threads', () => {
@@ -288,7 +321,7 @@ test('selectTotalUnreadCount sums unread counts across threads', () => {
   state = reducer(
     state,
     initThread({
-      bookingId: 'a',
+      threadId: 'a',
       hostId: 'h-1',
       hostName: 'Host A',
       hostPhoto: 'a.jpg',
@@ -297,15 +330,15 @@ test('selectTotalUnreadCount sums unread counts across threads', () => {
   state = reducer(
     state,
     initThread({
-      bookingId: 'b',
+      threadId: 'b',
       hostId: 'h-2',
       hostName: 'Host B',
       hostPhoto: 'b.jpg',
     })
   );
-  state = reducer(state, receiveMessage({ bookingId: 'a', content: '1' }));
-  state = reducer(state, receiveMessage({ bookingId: 'a', content: '2' }));
-  state = reducer(state, receiveMessage({ bookingId: 'b', content: '3' }));
+  state = reducer(state, receiveMessage({ threadId: 'a', content: '1' }));
+  state = reducer(state, receiveMessage({ threadId: 'a', content: '2' }));
+  state = reducer(state, receiveMessage({ threadId: 'b', content: '3' }));
 
   assert.equal(selectTotalUnreadCount(toRoot(state)), 3);
 });

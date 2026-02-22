@@ -24,7 +24,7 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { stops } = body; 
+    const { stops, preferences, title } = body; 
     // Expect body to be { stops: [ { city, days: [ { items: [] } ] } ] } roughly
 
     if (!Array.isArray(stops)) {
@@ -124,9 +124,20 @@ export async function POST(
         }
         
         // Update Trip status if needed
+        const nextPreferences =
+          preferences && typeof preferences === 'object'
+            ? { ...(trip.preferences as Record<string, unknown> | null), ...preferences }
+            : trip.preferences;
+
         await tx.trip.update({
             where: { id: tripId },
-            data: { status: 'PLANNED' }
+            data: {
+              ...(typeof title === 'string' && title.trim().length > 0
+                ? { title: title.trim() }
+                : {}),
+              status: 'PLANNED',
+              preferences: nextPreferences ?? {},
+            }
         });
     });
 

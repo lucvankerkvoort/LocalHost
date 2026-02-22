@@ -89,11 +89,37 @@ export async function createExperienceDraft(): Promise<{ success: boolean; draft
 
     const userId = session.user.id;
 
-    // Create new draft directly (multi-draft supported)
+    // Look up user profile to prefill draft with their data
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { city: true, country: true },
+    });
+
+    // Geocode city if available for map placement
+    let cityLat: number | undefined;
+    let cityLng: number | undefined;
+    if (user?.city) {
+      try {
+        const { geocodeCity } = await import('@/lib/server-geocoding');
+        const coords = await geocodeCity(user.city);
+        if (coords) {
+          cityLat = coords.lat;
+          cityLng = coords.lng;
+        }
+      } catch {
+        // Non-blocking — draft still works without coords
+      }
+    }
+
+    // Create new draft prefilled with profile data
     const draft = await prisma.experienceDraft.create({
       data: {
         userId,
         title: 'New Experience',
+        city: user?.city ?? undefined,
+        country: user?.country ?? undefined,
+        cityLat,
+        cityLng,
       }
     });
 

@@ -1,6 +1,17 @@
 import { stripe, PAYMENT_CONFIG } from './stripe';
 import { prisma } from '@/lib/prisma';
 
+function resolveBookingSubtotal(
+  amountSubtotal: number | null | undefined,
+  totalPrice: number | null | undefined,
+  fallbackExperiencePrice: number | null | undefined
+): number {
+  if (typeof amountSubtotal === 'number' && amountSubtotal > 0) return amountSubtotal;
+  if (typeof totalPrice === 'number' && totalPrice > 0) return totalPrice;
+  if (typeof fallbackExperiencePrice === 'number' && fallbackExperiencePrice > 0) return fallbackExperiencePrice;
+  return 0;
+}
+
 export async function createBookingPayment(bookingId: string, userId?: string) {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -37,19 +48,25 @@ export async function createBookingPayment(bookingId: string, userId?: string) {
     throw new Error('Host Stripe account is not fully onboarded');
   }
   
-  // Validation 4: amountSubtotal must be greater than 0
-  if (!booking.amountSubtotal || booking.amountSubtotal <= 0) {
+  const amountSubtotal = resolveBookingSubtotal(
+    booking.amountSubtotal,
+    booking.totalPrice,
+    booking.experience.price
+  );
+
+  // Validation 4: resolved amount must be greater than 0
+  if (!amountSubtotal || amountSubtotal <= 0) {
     throw new Error('Invalid booking amount');
   }
-
-  const amountSubtotal = booking.amountSubtotal; // Already in cents (e.g. 15000 for $150.00)
   const platformFee = Math.round(amountSubtotal * PAYMENT_CONFIG.PLATFORM_FEE_PERCENT); // 10%
   const hostNet = amountSubtotal - platformFee;
 
-  // Update booking with calculated fees (if different from DB defaults)
+  // Normalize monetary fields for legacy bookings, then persist computed fees.
   await prisma.booking.update({
     where: { id: bookingId },
     data: {
+      amountSubtotal,
+      totalPrice: booking.totalPrice > 0 ? booking.totalPrice : amountSubtotal,
       platformFee,
       hostNetAmount: hostNet,
     },
@@ -84,5 +101,103 @@ export async function createBookingPayment(bookingId: string, userId?: string) {
     clientSecret: paymentIntent.client_secret,
     amount: amountSubtotal,
     currency: PAYMENT_CONFIG.CURRENCY,
+  };
+}
+
+export type BookingPaymentReconcileResult = {
+  state: 'CONFIRMED' | 'PENDING' | 'FAILED';
+  stripeStatus: string;
+  bookingId: string;
+};
+
+export async function reconcileBookingPayment(
+  bookingId: string,
+  userId?: string
+): Promise<BookingPaymentReconcileResult> {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+  });
+
+  if (!booking) throw new Error('Booking not found');
+
+  if (userId && booking.guestId !== userId) {
+    throw new Error('Booking does not belong to this user');
+  }
+
+  if (booking.status === 'CONFIRMED' || booking.status === 'COMPLETED') {
+    return {
+      state: 'CONFIRMED',
+      stripeStatus: 'succeeded',
+      bookingId,
+    };
+  }
+
+  if (!booking.stripePaymentId) {
+    throw new Error('Booking has no Stripe payment intent');
+  }
+
+  const paymentIntent = await stripe.paymentIntents.retrieve(booking.stripePaymentId);
+  const stripeStatus = paymentIntent.status;
+
+  if (stripeStatus === 'succeeded') {
+    const payoutEligibleAt = new Date(booking.date);
+    payoutEligibleAt.setHours(payoutEligibleAt.getHours() + PAYMENT_CONFIG.PAYOUT_DELAY_HOURS);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: {
+          status: 'CONFIRMED',
+          paymentStatus: 'PAID',
+          payoutStatus: 'ELIGIBLE',
+          payoutEligibleAt,
+        },
+      });
+
+      await tx.paymentEvent.create({
+        data: {
+          bookingId,
+          type: 'PAYMENT_RECONCILED_SUCCEEDED',
+          payload: JSON.parse(JSON.stringify(paymentIntent)),
+        },
+      });
+    });
+
+    return {
+      state: 'CONFIRMED',
+      stripeStatus,
+      bookingId,
+    };
+  }
+
+  if (stripeStatus === 'canceled' || stripeStatus === 'requires_payment_method') {
+    await prisma.$transaction(async (tx) => {
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: {
+          paymentStatus: 'FAILED',
+        },
+      });
+
+      await tx.paymentEvent.create({
+        data: {
+          bookingId,
+          type: 'PAYMENT_RECONCILED_FAILED',
+          payload: JSON.parse(JSON.stringify(paymentIntent)),
+        },
+      });
+    });
+
+    return {
+      state: 'FAILED',
+      stripeStatus,
+      bookingId,
+    };
+  }
+
+  return {
+    state: 'PENDING',
+    stripeStatus,
+    bookingId,
   };
 }

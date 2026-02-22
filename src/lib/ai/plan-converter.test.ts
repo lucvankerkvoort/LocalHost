@@ -8,6 +8,8 @@ import {
   convertPlanToGlobeData,
   generateMarkersFromDestinations,
   getCenterPoint,
+  extractTransportPreference,
+  mapTransportPreferenceToMode,
   mapTransportMode,
 } from './plan-converter';
 
@@ -49,6 +51,7 @@ test('convertPlanToGlobeData maps categories, assigns hosts, and extracts city f
           { id: 'h-1', name: 'Host 1', headline: '', photoUrl: '', rating: 4.8, reviewCount: 10, tags: [] },
           { id: 'h-2', name: 'Host 2', headline: '', photoUrl: '', rating: 4.9, reviewCount: 12, tags: [] },
         ],
+        interCityTransportToNext: null,
       },
     ],
   };
@@ -88,7 +91,7 @@ test('convertPlanToGlobeData skips day without anchor location', () => {
   assert.equal(routeMarkers.length, 0);
 });
 
-test('convertPlanToGlobeData creates intra-day and inter-day routes with expected modes', () => {
+test('convertPlanToGlobeData creates inter-day routes and ignores intra-day navigation events', () => {
   const plan: ItineraryPlan = {
     id: 'plan-2',
     title: 'Plan',
@@ -113,6 +116,7 @@ test('convertPlanToGlobeData creates intra-day and inter-day routes with expecte
             toPlaceId: 'p2',
           },
         ],
+        interCityTransportToNext: 'boat',
         suggestedHosts: [],
       },
       {
@@ -121,16 +125,107 @@ test('convertPlanToGlobeData creates intra-day and inter-day routes with expecte
         anchorLocation: makePlace('a2', 'Anchor 2', 34.05, -118.24),
         activities: [],
         suggestedHosts: [],
+        interCityTransportToNext: null,
       },
     ],
   };
 
   const { routes } = convertPlanToGlobeData(plan);
 
-  assert.equal(routes.length, 2);
-  assert.equal(routes[0].mode, 'train');
-  assert.equal(routes[0].dayNumber, 1);
-  assert.equal(routes[1].mode, 'flight');
+  assert.equal(routes.length, 1);
+  assert.equal(routes[0].mode, 'boat');
+});
+
+test('convertPlanToGlobeData skips inter-day routes for short hops without city metadata', () => {
+  const plan: ItineraryPlan = {
+    id: 'plan-short-hop',
+    title: 'Plan',
+    request: 'request',
+    summary: 'summary',
+    days: [
+      {
+        dayNumber: 1,
+        title: 'Day 1',
+        anchorLocation: makePlace('a1', 'Center', 52.370216, 4.895168),
+        activities: [],
+        suggestedHosts: [],
+        interCityTransportToNext: 'train',
+      },
+      {
+        dayNumber: 2,
+        title: 'Day 2',
+        anchorLocation: makePlace('a2', 'Museumplein', 52.357997, 4.881053),
+        activities: [],
+        suggestedHosts: [],
+        interCityTransportToNext: null,
+      },
+    ],
+  };
+
+  const { routes } = convertPlanToGlobeData(plan);
+  assert.equal(routes.length, 0);
+});
+
+test('convertPlanToGlobeData keeps inter-day route for distant anchors without city metadata', () => {
+  const plan: ItineraryPlan = {
+    id: 'plan-distant-hop',
+    title: 'Plan',
+    request: 'request',
+    summary: 'summary',
+    days: [
+      {
+        dayNumber: 1,
+        title: 'Day 1',
+        anchorLocation: makePlace('a1', 'Amsterdam', 52.370216, 4.895168),
+        activities: [],
+        suggestedHosts: [],
+        interCityTransportToNext: 'train',
+      },
+      {
+        dayNumber: 2,
+        title: 'Day 2',
+        anchorLocation: makePlace('a2', 'Rotterdam', 51.92442, 4.477733),
+        activities: [],
+        suggestedHosts: [],
+        interCityTransportToNext: null,
+      },
+    ],
+  };
+
+  const { routes } = convertPlanToGlobeData(plan);
+  assert.equal(routes.length, 1);
+});
+
+test('convertPlanToGlobeData overrides inter-day mode from transport preference', () => {
+  const plan: ItineraryPlan = {
+    id: 'plan-override',
+    title: 'Plan',
+    request: 'Plan a trip. Transport between cities: drive.',
+    summary: 'summary',
+    days: [
+      {
+        dayNumber: 1,
+        title: 'Day 1',
+        anchorLocation: makePlace('a1', 'Anchor 1', 40.7, -74.0),
+        activities: [],
+        suggestedHosts: [],
+        interCityTransportToNext: 'train',
+      },
+      {
+        dayNumber: 2,
+        title: 'Day 2',
+        anchorLocation: makePlace('a2', 'Anchor 2', 34.05, -118.24),
+        activities: [],
+        suggestedHosts: [],
+        interCityTransportToNext: null,
+      },
+    ],
+  };
+
+  const { routes } = convertPlanToGlobeData(plan);
+
+  assert.equal(routes.length, 1);
+  assert.equal(routes[0].mode, 'drive');
 });
 
 test('convertPlanToGlobeData filters invalid (0,0) activity marker coordinates', () => {
@@ -171,6 +266,12 @@ test('mapTransportMode maps walk/transit/drive to globe modes', () => {
   assert.equal(mapTransportMode('drive'), 'drive');
 });
 
+test('extractTransportPreference parses transport line from request', () => {
+  const pref = extractTransportPreference('Plan a trip. Transport between cities: drive.');
+  assert.equal(pref, 'drive');
+  assert.equal(mapTransportPreferenceToMode(pref), 'drive');
+});
+
 test('generateMarkersFromDestinations deduplicates hosts and ignores invalid coordinates', () => {
   const destinations: GlobeDestination[] = [
     {
@@ -181,8 +282,8 @@ test('generateMarkersFromDestinations deduplicates hosts and ignores invalid coo
       day: 1,
       color: '#000',
       suggestedHosts: [
-        { id: 'h-1', name: 'Host 1' },
-        { id: 'h-2', name: 'Host 2' },
+        { id: 'h-1', name: 'Host 1', lat: 10.5, lng: 10.5 },
+        { id: 'h-2', name: 'Host 2', lat: 10.6, lng: 10.6 },
       ],
       activities: [
         createItem('SIGHT', 'Valid', 0, {
@@ -201,7 +302,7 @@ test('generateMarkersFromDestinations deduplicates hosts and ignores invalid coo
       day: 2,
       color: '#000',
       suggestedHosts: [
-        { id: 'h-2', name: 'Host 2' },
+        { id: 'h-2', name: 'Host 2', lat: 20.6, lng: 20.6 },
       ],
       activities: [],
     },
@@ -277,7 +378,7 @@ test('convertPlanToGlobeData creates no inter-day route when next day lacks anch
   assert.equal(routes.length, 0);
 });
 
-test('convertPlanToGlobeData maps drive navigation events to drive routes', () => {
+test('convertPlanToGlobeData ignores intra-day navigation routes', () => {
   const plan: ItineraryPlan = {
     id: 'plan-drive',
     title: 'Plan',
@@ -308,8 +409,7 @@ test('convertPlanToGlobeData maps drive navigation events to drive routes', () =
   };
 
   const { routes } = convertPlanToGlobeData(plan);
-  assert.equal(routes.length, 1);
-  assert.equal(routes[0].mode, 'drive');
+  assert.equal(routes.length, 0);
 });
 
 test('mapTransportMode falls back to walk for unknown input', () => {

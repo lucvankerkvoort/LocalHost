@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Pause, Play, Square } from 'lucide-react';
 import { 
   CityMarkerData,
   GlobeDestination, 
@@ -13,12 +13,15 @@ import {
 } from '@/types/globe';
 import { ItineraryItem } from '@/types/itinerary';
 import type { PlannerExperience } from '@/types/planner-experiences';
+import { buildPlaceImageListUrl, PLACE_IMAGE_FALLBACK } from '@/lib/images/places';
 
 import { BookingDialog } from './booking-dialog';
 import { PaymentModal } from './payment/payment-modal';
 import { ItineraryDayColumn } from './itinerary-day';
 import { HostPanel } from './host-panel';
 import { buildAddedExperienceIds, buildBookedExperienceIds } from './host-panel-state';
+import { buildPlannerExperienceStopMarkers } from './globe-itinerary-utils';
+import { OrchestratorJobStatus } from './orchestrator-job-status';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   hydrateGlobeState,
@@ -47,8 +50,10 @@ import type { HostMarkerData } from '@/types/globe';
 import {
   setItineraryCollapsed,
   setItineraryPanelTab,
+  setP2PChatOpen,
   setShowTimeline,
 } from '@/store/ui-slice';
+import { initThread } from '@/store/p2p-chat-slice';
 
 // Dynamic import for Cesium (no SSR)
 const CesiumGlobe = dynamic(() => import('./cesium-globe'), { 
@@ -65,6 +70,8 @@ const ITINERARY_PENDING_KEY = 'globe-itinerary-pending';
 const ITINERARY_RESTORE_PARAM = 'restoreKey';
 const CITY_CLUSTER_DISTANCE_METERS = 60000;
 const CITY_LEVEL_MAX_HEIGHT_METERS = 200000;
+const TOUR_STEP_MS = 3000;
+const SHOW_TOUR_CONTROLS = false;
 
 function calculateDistanceMeters(
   lat1: number,
@@ -104,6 +111,7 @@ type GlobeItinerarySnapshot = {
 type PlanningExperienceSelection = {
   hostId: string;
   hostName: string;
+  hostPhoto?: string;
   hostLat?: number;
   hostLng?: number;
   hostCity?: string;
@@ -134,6 +142,24 @@ type BookingCandidate = {
   [key: string]: unknown;
 };
 
+type ItemPreviewImage = {
+  url: string;
+  attribution?: {
+    displayName?: string;
+    uri?: string;
+  };
+};
+
+type ItineraryItemPreview = {
+  itemId: string;
+  title: string;
+  description?: string;
+  lat: number;
+  lng: number;
+  images: ItemPreviewImage[];
+  isLoading: boolean;
+};
+
 type GlobeItineraryProps = {
   tripId?: string;
 };
@@ -157,6 +183,11 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   const showTimeline = useAppSelector((state) => state.ui.showTimeline);
   const isCollapsed = useAppSelector((state) => state.ui.isItineraryCollapsed);
   const itineraryPanelTab = useAppSelector((state) => state.ui.itineraryPanelTab);
+  const [itemPreview, setItemPreview] = useState<ItineraryItemPreview | null>(null);
+  const imageCacheRef = useRef<Map<string, ItemPreviewImage[]>>(new Map());
+  const [tourState, setTourState] = useState<'idle' | 'playing' | 'paused'>('idle');
+  const [tourIndex, setTourIndex] = useState(0);
+  const tourTimerRef = useRef<number | null>(null);
 
   // Use prop ID if available (priority), otherwise state ID
   
@@ -197,6 +228,59 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   const bookedExperienceIds = useMemo(() => {
     return buildBookedExperienceIds(selectedDestData?.activities);
   }, [selectedDestData]);
+
+  const experienceStopMarkers = useMemo<PlaceMarkerData[]>(() => {
+    return buildPlannerExperienceStopMarkers(
+      plannerHosts,
+      selectedHostId,
+      selectedExperienceId
+    );
+  }, [plannerHosts, selectedExperienceId, selectedHostId]);
+
+  const orderedActivities = useMemo(() => {
+    if (destinations.length === 0) return [];
+    const sortedDays = [...destinations].sort((a, b) => a.day - b.day);
+    const list: Array<{ item: ItineraryItem; dayId: string }> = [];
+
+    sortedDays.forEach((day) => {
+      const sortedItems = [...day.activities].sort((a, b) => a.position - b.position);
+      sortedItems.forEach((item) => {
+        const lat = item.place?.location?.lat;
+        const lng = item.place?.location?.lng;
+        if (typeof lat === 'number' && typeof lng === 'number') {
+          list.push({ item, dayId: day.id });
+        }
+      });
+    });
+
+    return list;
+  }, [destinations]);
+
+  const clearTourTimer = useCallback(() => {
+    if (tourTimerRef.current) {
+      window.clearTimeout(tourTimerRef.current);
+      tourTimerRef.current = null;
+    }
+  }, []);
+
+  const stopTour = useCallback(() => {
+    clearTourTimer();
+    setTourState('idle');
+    setTourIndex(0);
+    dispatch(setActiveItemId(null));
+    setItemPreview(null);
+  }, [clearTourTimer, dispatch]);
+
+  const pauseTour = useCallback(() => {
+    clearTourTimer();
+    setTourState('paused');
+  }, [clearTourTimer]);
+
+  const effectivePlaceMarkers = useMemo(() => {
+    if (itineraryPanelTab !== 'EXPERIENCES') return placeMarkers;
+    if (experienceStopMarkers.length === 0) return placeMarkers;
+    return [...placeMarkers, ...experienceStopMarkers];
+  }, [experienceStopMarkers, itineraryPanelTab, placeMarkers]);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -352,7 +436,10 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   const [paymentModalState, setPaymentModalState] = useState<{
     isOpen: boolean;
     bookingId: string;
-  }>({ isOpen: false, bookingId: '' });
+    hostId: string;
+    hostName: string;
+    hostPhoto: string;
+  }>({ isOpen: false, bookingId: '', hostId: '', hostName: '', hostPhoto: '' });
 
   const handleViewHostProfile = useCallback((host: HostMarkerData) => {
     const restoreKey = persistItineraryState();
@@ -364,13 +451,18 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   }, [persistItineraryState, router]);
 
   const handleMapBackgroundClick = useCallback(() => {
+    if (tourState === 'playing') {
+      pauseTour();
+    }
     dispatch(clearSelectedHostId());
     dispatch(clearSelectedExperienceId());
     dispatch(setActiveItemId(null));
-  }, [dispatch]);
+    setItemPreview(null);
+  }, [dispatch, pauseTour, tourState]);
 
   const handleAddExperience = useCallback((selection: PlanningExperienceSelection) => {
     const { experience } = selection;
+    dispatch(setSelectedHostId(selection.hostId));
     dispatch(setSelectedExperienceId(experience.id));
     dispatch(setShowTimeline(true));
     dispatch(setItineraryCollapsed(false));
@@ -437,6 +529,54 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     selectedDestination,
     tripId,
   ]);
+
+  const openChatThread = useCallback(async (participantId: string, bookingId?: string) => {
+    const res = await fetch('/api/chat/threads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        participantId,
+        bookingId,
+      }),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Failed to open host chat: ${res.status} ${errorText}`);
+    }
+
+    const data = (await res.json()) as {
+      thread?: {
+        id: string;
+        bookingId: string | null;
+        counterpartId: string;
+        counterpartName: string;
+        counterpartPhoto: string;
+      };
+    };
+    if (!data.thread) {
+      throw new Error('Thread payload was not returned while opening chat');
+    }
+
+    return data.thread;
+  }, []);
+
+  const handleChatExperience = useCallback(async (selection: PlanningExperienceSelection) => {
+    dispatch(setSelectedHostId(selection.hostId));
+    dispatch(setSelectedExperienceId(selection.experience.id));
+    const thread = await openChatThread(selection.hostId);
+
+    dispatch(
+      initThread({
+        threadId: thread.id,
+        bookingId: thread.bookingId,
+        hostId: thread.counterpartId,
+        hostName: thread.counterpartName,
+        hostPhoto: thread.counterpartPhoto || '/placeholder-host.jpg',
+      })
+    );
+    dispatch(setP2PChatOpen(true));
+  }, [dispatch, openChatThread]);
 
   // Booking Handler
   const handleBookItem = async (dayId: string, item: ItineraryItem) => {
@@ -568,8 +708,15 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     console.log('[GlobeItinerary] Confirming booking via candidate (which IS a booking):', candidateId);
     // Candidate IS the booking in TENTATIVE status - no need to call /api/bookings
     // Just open the payment modal with the candidateId (which is the bookingId)
+    const candidate = bookingDialogState.candidate;
     setBookingDialogState({ isOpen: false, candidate: null });
-    setPaymentModalState({ isOpen: true, bookingId: candidateId });
+    setPaymentModalState({
+      isOpen: true,
+      bookingId: candidateId,
+      hostId: candidate?.host?.id ?? '',
+      hostName: candidate?.host?.name ?? 'Host',
+      hostPhoto: candidate?.host?.image ?? '/placeholder-host.jpg',
+    });
   };
 
   type BookingProjection = {
@@ -608,6 +755,27 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     const maxAttempts = 6;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
+        const reconcileRes = await fetch(`/api/bookings/${bookingId}/reconcile`, { method: 'POST' });
+        if (reconcileRes.ok) {
+          const reconcileData = (await reconcileRes.json()) as { state?: string };
+          if (reconcileData.state === 'CONFIRMED') {
+            return true;
+          }
+          if (reconcileData.state === 'FAILED') {
+            return false;
+          }
+        } else {
+          const errorText = await reconcileRes.text();
+          console.warn(
+            `[GlobeItinerary] Reconcile request failed while waiting (${reconcileRes.status}):`,
+            errorText
+          );
+        }
+      } catch (error) {
+        console.warn('[GlobeItinerary] Failed to reconcile payment while waiting for projection', error);
+      }
+
+      try {
         const trip = await dispatch(fetchActiveTrip(tripId)).unwrap();
         if (isBookingProjectedAsBooked(trip, bookingId)) {
           return true;
@@ -625,23 +793,76 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   };
 
   const handlePaymentSuccess = async () => {
-      const bookingId = paymentModalState.bookingId;
-      setPaymentModalState({ isOpen: false, bookingId: '' });
+      const { bookingId, hostId, hostName, hostPhoto } = paymentModalState;
+      setPaymentModalState({ isOpen: false, bookingId: '', hostId: '', hostName: '', hostPhoto: '' });
 
       if (!tripId) {
         alert('Payment Successful!');
         return;
       }
 
+      if (bookingId) {
+        try {
+          const reconcileRes = await fetch(`/api/bookings/${bookingId}/reconcile`, { method: 'POST' });
+          if (reconcileRes.ok) {
+            const reconcileData = (await reconcileRes.json()) as { state?: string };
+            if (reconcileData.state === 'CONFIRMED') {
+              await dispatch(fetchActiveTrip(tripId));
+              if (hostId) {
+                const thread = await openChatThread(hostId, bookingId);
+                dispatch(
+                  initThread({
+                    threadId: thread.id,
+                    bookingId: thread.bookingId,
+                    hostId: thread.counterpartId,
+                    hostName: thread.counterpartName || hostName,
+                    hostPhoto: thread.counterpartPhoto || hostPhoto,
+                  })
+                );
+                dispatch(setP2PChatOpen(true));
+              }
+              alert('Payment Successful!');
+              return;
+            }
+            if (reconcileData.state === 'FAILED') {
+              alert('Payment failed. Please try another payment method.');
+              return;
+            }
+          } else {
+            const errorText = await reconcileRes.text();
+            console.warn(
+              `[GlobeItinerary] Reconcile request failed after payment (${reconcileRes.status}):`,
+              errorText
+            );
+          }
+        } catch (error) {
+          console.warn('[GlobeItinerary] Payment reconcile request failed', error);
+        }
+      }
+
       const confirmed = bookingId ? await waitForBookedProjection(bookingId) : false;
 
       if (confirmed) {
+        await dispatch(fetchActiveTrip(tripId));
+        if (bookingId && hostId) {
+          const thread = await openChatThread(hostId, bookingId);
+          dispatch(
+            initThread({
+              threadId: thread.id,
+              bookingId: thread.bookingId,
+              hostId: thread.counterpartId,
+              hostName: thread.counterpartName || hostName,
+              hostPhoto: thread.counterpartPhoto || hostPhoto,
+            })
+          );
+          dispatch(setP2PChatOpen(true));
+        }
         alert('Payment Successful!');
         return;
       }
 
       await dispatch(fetchActiveTrip(tripId));
-      alert('Payment submitted. Booking confirmation may take a few seconds to appear.');
+      alert('Payment submitted. Booking confirmation may take a few seconds to appear. If it does not update, refresh the page and retry.');
   };
 
   const cityMarkers = useMemo<CityMarkerData[]>(() => {
@@ -788,8 +1009,20 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     dispatch(setHoveredItemId(itemId));
   }, [dispatch]);
 
-  const handleItemClick = useCallback((itemId: string, dayId: string, lat?: number, lng?: number) => {
-    dispatch(setActiveItemId(itemId));
+  const resolveItemDescription = useCallback((item: ItineraryItem) => {
+    const primary = item.description?.trim();
+    if (primary) return primary;
+    const secondary = item.place?.description?.trim();
+    if (secondary) return secondary;
+    const tertiary = item.location?.trim();
+    return tertiary || undefined;
+  }, []);
+
+  const handleItemClick = useCallback(async (item: ItineraryItem, dayId: string, source: 'user' | 'tour' = 'user') => {
+    if (tourState === 'playing' && source === 'user') {
+      pauseTour();
+    }
+    dispatch(setActiveItemId(item.id));
     
     // Select the day this item belongs to
     if (dayId !== selectedDestination) {
@@ -797,10 +1030,123 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     }
 
     // Fly to location if coordinates exist
-    if (lat && lng) {
+    const lat = item.place?.location?.lat;
+    const lng = item.place?.location?.lng;
+    if (typeof lat === 'number' && typeof lng === 'number') {
       dispatch(setVisualTarget({ lat, lng, height: 5000 }));
+
+      const cachedImages = imageCacheRef.current.get(item.id);
+      setItemPreview({
+        itemId: item.id,
+        title: item.title,
+        description: resolveItemDescription(item),
+        lat,
+        lng,
+        images: cachedImages ?? (item.place?.imageUrl ? [{ url: item.place.imageUrl }] : []),
+        isLoading: !cachedImages,
+      });
+
+      if (!cachedImages) {
+        const listUrl = buildPlaceImageListUrl({
+          name: item.place?.name ?? item.title,
+          city: item.place?.city,
+          category: item.category ?? item.type,
+          count: 5,
+        });
+
+        if (!listUrl) {
+          setItemPreview((prev) =>
+            prev?.itemId === item.id
+              ? { ...prev, images: [{ url: PLACE_IMAGE_FALLBACK }], isLoading: false }
+              : prev
+          );
+          return;
+        }
+
+        try {
+          const response = await fetch(listUrl);
+          const data = (await response.json()) as { images?: ItemPreviewImage[] };
+          const images = Array.isArray(data.images) ? data.images : [];
+          const finalImages =
+            images.length > 0
+              ? images
+              : (item.place?.imageUrl
+                ? [{ url: item.place.imageUrl }]
+                : [{ url: PLACE_IMAGE_FALLBACK }]);
+
+          imageCacheRef.current.set(item.id, finalImages);
+          setItemPreview((prev) =>
+            prev?.itemId === item.id
+              ? { ...prev, images: finalImages, isLoading: false }
+              : prev
+          );
+        } catch (error) {
+          console.error('[GlobeItinerary] Failed to load images', error);
+          setItemPreview((prev) =>
+            prev?.itemId === item.id
+              ? { ...prev, images: [{ url: PLACE_IMAGE_FALLBACK }], isLoading: false }
+              : prev
+          );
+        }
+      }
+    } else {
+      setItemPreview(null);
     }
-  }, [dispatch, selectedDestination]);
+  }, [dispatch, pauseTour, resolveItemDescription, selectedDestination, tourState]);
+
+  const findItemByMarkerId = useCallback((markerId: string) => {
+    for (const destination of destinations) {
+      for (const item of destination.activities) {
+        if (item.place?.id === markerId || item.id === markerId) {
+          return { item, dayId: destination.id };
+        }
+      }
+    }
+    return null;
+  }, [destinations]);
+
+  useEffect(() => {
+    if (tourState !== 'playing') return;
+    if (orderedActivities.length === 0) {
+      stopTour();
+      return;
+    }
+    if (tourIndex >= orderedActivities.length) {
+      stopTour();
+      return;
+    }
+
+    const { item, dayId } = orderedActivities[tourIndex];
+    void handleItemClick(item, dayId, 'tour');
+
+    clearTourTimer();
+    tourTimerRef.current = window.setTimeout(() => {
+      setTourIndex((current) => current + 1);
+    }, TOUR_STEP_MS);
+
+    return () => {
+      clearTourTimer();
+    };
+  }, [
+    clearTourTimer,
+    handleItemClick,
+    orderedActivities,
+    stopTour,
+    tourIndex,
+    tourState,
+  ]);
+
+  useEffect(() => {
+    if (tourState !== 'idle') {
+      stopTour();
+    }
+  }, [destinations, stopTour, tourState]);
+
+  const handleMarkerClick = useCallback((markerId: string) => {
+    const match = findItemByMarkerId(markerId);
+    if (!match) return;
+    void handleItemClick(match.item, match.dayId, 'user');
+  }, [findItemByMarkerId, handleItemClick]);
 
   const handleDaySelect = useCallback((dayId: string) => {
     dispatch(setSelectedDestination(dayId));
@@ -824,6 +1170,22 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     dispatch(setSelectedDestination(destinations[0].id));
   }, [destinations, dispatch, selectedDestination]);
 
+  const handlePlayTour = useCallback(() => {
+    if (orderedActivities.length === 0) return;
+    setTourState('playing');
+    setTourIndex((current) => (tourState === 'idle' ? 0 : current));
+  }, [orderedActivities.length, tourState]);
+
+  const handlePauseTour = useCallback(() => {
+    if (tourState === 'playing') {
+      pauseTour();
+    }
+  }, [pauseTour, tourState]);
+
+  const handleStopTour = useCallback(() => {
+    stopTour();
+  }, [stopTour]);
+
   return (
     <div
       className="h-full w-full flex flex-col bg-[var(--deep-space-blue)]"
@@ -841,12 +1203,61 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
       <div className="flex-1 flex overflow-hidden">
         {/* Globe */}
         <div data-testid="globe-container" className="flex-1 relative">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none w-[320px] max-w-[90%]">
+            <OrchestratorJobStatus />
+          </div>
+          {SHOW_TOUR_CONTROLS ? (
+            <div className="absolute top-4 left-4 z-30 pointer-events-auto flex items-center gap-2 rounded-xl border border-white/10 bg-[rgba(12,16,24,0.65)] px-2 py-1 shadow-lg">
+              <button
+                onClick={handlePlayTour}
+                className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
+                  tourState === 'playing'
+                    ? 'text-white/40 cursor-not-allowed'
+                    : 'text-white hover:bg-white/10'
+                }`}
+                disabled={tourState === 'playing' || orderedActivities.length === 0}
+              >
+                <Play className="h-3.5 w-3.5" />
+                Play
+              </button>
+              <button
+                onClick={handlePauseTour}
+                className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
+                  tourState === 'playing'
+                    ? 'text-white hover:bg-white/10'
+                    : 'text-white/40 cursor-not-allowed'
+                }`}
+                disabled={tourState !== 'playing'}
+              >
+                <Pause className="h-3.5 w-3.5" />
+                Pause
+              </button>
+              <button
+                onClick={handleStopTour}
+                className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
+                  tourState === 'idle'
+                    ? 'text-white/40 cursor-not-allowed'
+                    : 'text-white hover:bg-white/10'
+                }`}
+                disabled={tourState === 'idle'}
+              >
+                <Square className="h-3.5 w-3.5" />
+                Stop
+              </button>
+              <span className="pl-2 pr-1 text-[10px] uppercase tracking-wide text-white/50">
+                {orderedActivities.length === 0
+                  ? 'No stops'
+                  : `${Math.min(tourIndex + 1, orderedActivities.length)} / ${orderedActivities.length}`}
+              </span>
+            </div>
+          ) : null}
           <CesiumGlobe
             destinations={destinations}
             cityMarkers={cityMarkers}
             routeMarkers={visibleRouteMarkers}
+            routes={routes}
             hostMarkers={visibleHostMarkers}
-            placeMarkers={placeMarkers}
+            placeMarkers={effectivePlaceMarkers}
             selectedDestination={selectedDestination}
             onCityMarkerClick={handleCityMarkerClick}
             onHostClick={handleHostSelection}
@@ -855,7 +1266,10 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
             activeItemId={activeItemId}
             hoveredItemId={hoveredItemId}
             onItemHover={handleItemHover}
+            onItemClick={handleMarkerClick}
             onZoomChange={(height) => dispatch(setCameraHeight(height))}
+            itemPreview={itemPreview}
+            autoCycleDurationMs={tourState === 'playing' ? TOUR_STEP_MS : null}
           />
           {/* Itinerary Panel / Mobile Drawer */}
           <div
@@ -946,12 +1360,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                       onSelect={() => handleDaySelect(day.id)}
                       onAddActivity={(dayId) => handleAddActivity(dayId)}
                       onItemClick={(item) =>
-                        handleItemClick(
-                          item.id,
-                          day.id,
-                          item.place?.location?.lat,
-                          item.place?.location?.lng
-                        )
+                        handleItemClick(item, day.id, 'user')
                       }
                       onItemHover={(itemId) => handleItemHover(itemId)}
                       onBookItem={(item) => handleBookItem(day.id, item)}
@@ -960,7 +1369,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                 )}
               </div>
             ) : (
-              <div className="flex-1 min-h-0 flex flex-col p-3 gap-3">
+              <div className="flex-1 min-h-0 overflow-hidden flex flex-col p-3 gap-3">
                 {/* Desktop day chips */}
                 <div className="hidden sm:flex gap-2 overflow-x-auto pb-1">
                   {orderedDestinations.map((day) => (
@@ -1008,6 +1417,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                       handleFocusExperience({
                         hostId: host.id,
                         hostName: host.name,
+                        hostPhoto: host.photo ?? undefined,
                         hostCity: host.city ?? undefined,
                         hostLat: marker?.lat,
                         hostLng: marker?.lng,
@@ -1023,10 +1433,25 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                       handleAddExperience({
                         hostId: host.id,
                         hostName: host.name,
+                        hostPhoto: host.photo ?? undefined,
                         hostCity: host.city ?? undefined,
                         hostLat: marker?.lat,
                         hostLng: marker?.lng,
                         experience,
+                      });
+                    }}
+                    onChatExperience={(host, experience, marker) => {
+                      void handleChatExperience({
+                        hostId: host.id,
+                        hostName: host.name,
+                        hostPhoto: host.photo ?? undefined,
+                        hostCity: host.city ?? undefined,
+                        hostLat: marker?.lat,
+                        hostLng: marker?.lng,
+                        experience,
+                      }).catch((error) => {
+                        console.error('[GlobeItinerary] Failed to open chat thread', error);
+                        alert('Failed to open chat. Please try again.');
                       });
                     }}
                   />
@@ -1051,7 +1476,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
       <PaymentModal
         isOpen={paymentModalState.isOpen}
         bookingId={paymentModalState.bookingId}
-        onClose={() => setPaymentModalState({ isOpen: false, bookingId: '' })}
+        onClose={() => setPaymentModalState({ isOpen: false, bookingId: '', hostId: '', hostName: '', hostPhoto: '' })}
         onSuccess={handlePaymentSuccess}
       />
     </div>

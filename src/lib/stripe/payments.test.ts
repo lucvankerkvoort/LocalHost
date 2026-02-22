@@ -7,8 +7,10 @@ type BookingLike = {
   guestId: string;
   status: string;
   amountSubtotal: number;
+  totalPrice: number;
   currency: string;
   experience: {
+    price: number;
     host: {
       id: string;
       stripeConnectedAccountId: string | null;
@@ -63,8 +65,10 @@ function makeBooking(overrides: Partial<BookingLike> = {}): BookingLike {
     guestId: 'guest-1',
     status: 'TENTATIVE',
     amountSubtotal: 15000,
+    totalPrice: 15000,
     currency: 'usd',
     experience: {
+      price: 15000,
       host: {
         id: 'host-1',
         stripeConnectedAccountId: 'acct_123',
@@ -146,6 +150,7 @@ test('createBookingPayment throws when host is not onboarded', async () => {
   prismaMock.booking.findUnique = async () =>
     makeBooking({
       experience: {
+        price: 15000,
         host: {
           id: 'host-1',
           stripeConnectedAccountId: null,
@@ -165,6 +170,7 @@ test('createBookingPayment throws when host charges are disabled', async () => {
   prismaMock.booking.findUnique = async () =>
     makeBooking({
       experience: {
+        price: 15000,
         host: {
           id: 'host-1',
           stripeConnectedAccountId: 'acct_123',
@@ -181,13 +187,48 @@ test('createBookingPayment throws when host charges are disabled', async () => {
 
 test('createBookingPayment throws when amount subtotal is invalid', async () => {
   const { createBookingPayment } = await getPaymentsModule();
-  prismaMock.booking.findUnique = async () => makeBooking({ amountSubtotal: 0 });
+  prismaMock.booking.findUnique = async () =>
+    makeBooking({ amountSubtotal: 0, totalPrice: 0, experience: { price: 0, host: makeBooking().experience.host } });
 
   await assert.rejects(
     () => createBookingPayment('booking-1', 'guest-1'),
     /Invalid booking amount/
   );
 });
+
+test(
+  'createBookingPayment falls back to totalPrice when amountSubtotal is zero',
+  { concurrency: false },
+  async () => {
+    const { createBookingPayment } = await getPaymentsModule();
+    const { stripe } = await getStripeModule();
+
+    const updateCalls: Array<{ data?: Record<string, unknown> }> = [];
+    prismaMock.booking.findUnique = async () => makeBooking({ amountSubtotal: 0, totalPrice: 9900 });
+    prismaMock.booking.update = async (args) => {
+      updateCalls.push(args as { data?: Record<string, unknown> });
+      return {};
+    };
+
+    const paymentIntentsProto = Object.getPrototypeOf(stripe.paymentIntents) as {
+      create: (params: unknown) => Promise<{ id: string; client_secret: string }>;
+    };
+    const originalCreate = paymentIntentsProto.create;
+    paymentIntentsProto.create = async () => ({
+      id: 'pi_fallback',
+      client_secret: 'secret_fallback',
+    });
+
+    try {
+      const result = await createBookingPayment('booking-1', 'guest-1');
+      assert.equal(result.amount, 9900);
+      assert.equal(updateCalls[0].data?.amountSubtotal, 9900);
+      assert.equal(updateCalls[0].data?.totalPrice, 9900);
+    } finally {
+      paymentIntentsProto.create = originalCreate;
+    }
+  }
+);
 
 test(
   'createBookingPayment calculates platform fee and host net amount',

@@ -24,6 +24,10 @@ model User {
   languages     String[]  @default([])
   interests     String[]  @default([])
   
+  // Traveler Profile
+  occupation        String?
+  travelPreferences Json?    @default("{}")
+  
   // Host Profile
   bio           String?
   quote         String?
@@ -63,6 +67,7 @@ model User {
   reviewsGiven      Review[]     @relation("ReviewerReviews")
   reviewsReceived   Review[]     @relation("RevieweeReviews")
   messagesSent      Message[]    @relation("SentMessages")
+  chatParticipants  ChatParticipant[]
   trips             Trip[]
   experienceDrafts  ExperienceDraft[]
   hostExperience    HostExperience?
@@ -348,6 +353,7 @@ model Booking {
   
   // Communication
   messages      Message[]
+  chatThread    ChatThread?
   syntheticReplyJobs SyntheticReplyJob[]
   
   // Reviews
@@ -363,24 +369,31 @@ model Booking {
 }
 
 // ============================================
-// CHAT (Updated for Booking-centric flow)
+// CHAT
 // ============================================
 
 model ChatThread {
-  id            String   @id @default(cuid())
-  
-  // Linked to Booking (Tentative or Confirmed)
-  bookingId     String   @unique
-  // We can't link to Booking here directly *if* Booking already has `messages`. 
-  // But the new design suggests ChatThread might be better than loose Messages.
-  // For now, let's keep it simple: Messages can belong to Booking directly (as they did).
-  // But if we want Thread metadata...
-  
-  // Wait, existing schema had Message linked to Booking.
-  // The User's spec didn't mention ChatThread model, but I promised to persist Chat.
-  // I will link ChatThread to Booking for now to enable the P2P features.
-  // Actually, let's just use the Booking's messages relation for now to allow conversation
-  // even if status is TENTATIVE.
+  id            String            @id @default(cuid())
+  bookingId     String?           @unique
+  booking       Booking?          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  participants  ChatParticipant[]
+  messages      Message[]         @relation("ThreadMessages")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([bookingId])
+}
+
+model ChatParticipant {
+  id        String     @id @default(cuid())
+  threadId  String
+  thread    ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+
+  @@unique([threadId, userId])
+  @@index([userId])
 }
 
 // ============================================
@@ -415,8 +428,10 @@ model Review {
 
 model Message {
   id           String   @id @default(cuid())
-  bookingId    String
-  booking      Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId    String?
+  booking      Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  threadId     String?
+  thread       ChatThread? @relation("ThreadMessages", fields: [threadId], references: [id], onDelete: Cascade)
   
   senderId     String
   sender       User     @relation("SentMessages", fields: [senderId], references: [id])
