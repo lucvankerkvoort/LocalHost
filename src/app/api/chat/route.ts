@@ -4,8 +4,12 @@ import { agentRouter } from '@/lib/conversation/router';
 import { conversationController } from '@/lib/conversation/controller';
 import { validateAgentOutput, withExecution } from '@/lib/agent-constraints';
 import type { HostOnboardingStage } from '@/lib/agents/agent';
+import { rateLimit } from '@/lib/api/rate-limit';
 
 export const maxDuration = 300; // Allow 5 minutes for generation
+
+// Rate limit: 20 requests per minute per IP
+const chatLimiter = rateLimit({ interval: 60_000, limit: 20 });
 
 const HOST_ONBOARDING_STAGES: HostOnboardingStage[] = [
   'CITY_MISSING',
@@ -23,6 +27,19 @@ function parseOnboardingStage(value: unknown): HostOnboardingStage | undefined {
 }
 
 export async function POST(req: Request) {
+  // Rate limit check
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '127.0.0.1';
+  const { success: withinLimit, resetAt } = await chatLimiter.check(ip);
+  if (!withinLimit) {
+    return new Response(JSON.stringify({ error: 'Too many requests. Please slow down.' }), {
+      status: 429,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': String(Math.ceil((resetAt - Date.now()) / 1000)),
+      },
+    });
+  }
+
   const session = await auth();
   const body = await req.json();
   const { messages, id, tripId } = body;

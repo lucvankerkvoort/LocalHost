@@ -133,6 +133,68 @@ function calculateDistanceMeters(
   return R * c;
 }
 
+/**
+ * Generate a curved flight arc between two points.
+ * Interpolates along the great circle and adds a parabolic altitude profile
+ * so the flight path visibly arcs above the globe surface.
+ */
+function generateFlightArc(
+  fromLat: number,
+  fromLng: number,
+  toLat: number,
+  toLng: number,
+  numSegments: number = 32
+): Array<{ lat: number; lng: number; alt: number }> {
+  const toRad = (d: number) => d * Math.PI / 180;
+  const toDeg = (r: number) => r * 180 / Math.PI;
+
+  const lat1 = toRad(fromLat);
+  const lng1 = toRad(fromLng);
+  const lat2 = toRad(toLat);
+  const lng2 = toRad(toLng);
+
+  // Great-circle distance in meters
+  const d = calculateDistanceMeters(fromLat, fromLng, toLat, toLng);
+
+  // Arc peak height: scales with distance, minimum 50km, maximum 300km
+  const peakAlt = Math.min(300000, Math.max(50000, d * 0.15));
+
+  const points: Array<{ lat: number; lng: number; alt: number }> = [];
+
+  for (let i = 0; i <= numSegments; i++) {
+    const f = i / numSegments;
+
+    // Spherical interpolation (slerp) along the great circle
+    const angularDist = 2 * Math.asin(
+      Math.sqrt(
+        Math.sin((lat2 - lat1) / 2) ** 2 +
+        Math.cos(lat1) * Math.cos(lat2) * Math.sin((lng2 - lng1) / 2) ** 2
+      )
+    );
+
+    let lat: number, lng: number;
+    if (angularDist < 1e-10) {
+      lat = fromLat;
+      lng = fromLng;
+    } else {
+      const A = Math.sin((1 - f) * angularDist) / Math.sin(angularDist);
+      const B = Math.sin(f * angularDist) / Math.sin(angularDist);
+      const x = A * Math.cos(lat1) * Math.cos(lng1) + B * Math.cos(lat2) * Math.cos(lng2);
+      const y = A * Math.cos(lat1) * Math.sin(lng1) + B * Math.cos(lat2) * Math.sin(lng2);
+      const z = A * Math.sin(lat1) + B * Math.sin(lat2);
+      lat = toDeg(Math.atan2(z, Math.sqrt(x * x + y * y)));
+      lng = toDeg(Math.atan2(y, x));
+    }
+
+    // Sine-curve altitude: 0 at endpoints, peak in the middle
+    const alt = peakAlt * Math.sin(f * Math.PI);
+
+    points.push({ lat, lng, alt });
+  }
+
+  return points;
+}
+
 function getPlaceMarkerColor(marker: PlaceMarkerData): string {
   if (marker.category && PLACE_MARKER_COLORS[marker.category]) {
     return PLACE_MARKER_COLORS[marker.category];
@@ -877,6 +939,32 @@ export default function CesiumGlobe({
            
            const style = getRouteStyle(route.mode);
            const color = Color.fromCssColorString(style.color);
+
+           // Flight routes: generate elevated arc above the globe
+           if (route.mode === 'flight') {
+             const arcPoints = generateFlightArc(
+               route.fromLat, route.fromLng,
+               route.toLat, route.toLng,
+             );
+             const positions = arcPoints.map((pt) =>
+               Cartesian3.fromDegrees(pt.lng, pt.lat, pt.alt)
+             );
+
+             return (
+               <Entity
+                 key={`route-${route.id}`}
+                 polyline={{
+                   positions,
+                   width: style.width,
+                   material: color.withAlpha(0.7),
+                   arcType: ArcType.NONE,
+                   clampToGround: false,
+                 }}
+               />
+             );
+           }
+
+           // Non-flight routes: use detailed path or fallback
            const routePath =
              (Array.isArray(route.path) && route.path.length >= 2
                ? route.path
@@ -898,7 +986,7 @@ export default function CesiumGlobe({
                  material: color.withAlpha(0.7),
                  // Ground polylines only support GEODESIC or RHUMB arc types.
                  arcType: style.arcType,
-                 clampToGround: hasDetailedPath && route.mode !== 'flight',
+                 clampToGround: hasDetailedPath,
                }}
              />
            );

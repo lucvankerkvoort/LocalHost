@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { prisma } from '@/lib/prisma';
 import { isObviouslyInvalid, validateCoordinate } from '../validation/geo-validator';
 import { createTool, ToolResult } from './tool-registry';
 
@@ -49,6 +50,78 @@ type GooglePlaceResult = {
 
 const GEOCODE_CACHE = new Map<string, ResolvePlaceResult[]>();
 const GOOGLE_PLACES_TIMEOUT_MS = 8000;
+
+// ---------------------------------------------------------------------------
+// PlaceCache — DB-backed geocoding cache
+// ---------------------------------------------------------------------------
+
+function normalizeCacheKey(name: string, context?: string): { name: string; context: string } {
+  return {
+    name: name.trim().toLowerCase(),
+    context: (context ?? '').trim().toLowerCase(),
+  };
+}
+
+async function checkPlaceCache(
+  name: string,
+  context?: string
+): Promise<ResolvePlaceResult | null> {
+  try {
+    const key = normalizeCacheKey(name, context);
+    const row = await prisma.placeCache.findUnique({
+      where: { name_context: key },
+    });
+    if (!row) return null;
+    console.log(`[PlaceCache] HIT: "${name}" in "${context ?? ''}"`);
+    return {
+      id: row.placeId ? `gplaces-${row.placeId}` : `cached-${row.id}`,
+      name: row.name,
+      formattedAddress: row.formattedAddress ?? row.name,
+      location: { lat: row.lat, lng: row.lng },
+      category: (row.category as ResolvePlaceResult['category']) ?? 'other',
+      confidence: row.confidence ?? 0.9,
+      city: row.city ?? undefined,
+    };
+  } catch {
+    // Cache miss or DB error — fall through to API
+    return null;
+  }
+}
+
+async function writePlaceCache(
+  name: string,
+  context: string | undefined,
+  result: ResolvePlaceResult
+): Promise<void> {
+  try {
+    const key = normalizeCacheKey(name, context);
+    await prisma.placeCache.upsert({
+      where: { name_context: key },
+      create: {
+        ...key,
+        placeId: result.id.replace(/^gplaces-/, '') || null,
+        formattedAddress: result.formattedAddress,
+        lat: result.location.lat,
+        lng: result.location.lng,
+        category: result.category,
+        city: result.city ?? null,
+        confidence: result.confidence,
+      },
+      update: {
+        placeId: result.id.replace(/^gplaces-/, '') || null,
+        formattedAddress: result.formattedAddress,
+        lat: result.location.lat,
+        lng: result.location.lng,
+        category: result.category,
+        city: result.city ?? null,
+        confidence: result.confidence,
+      },
+    });
+  } catch (error) {
+    // Non-fatal — just log and continue
+    console.warn('[PlaceCache] Failed to write cache entry:', error);
+  }
+}
 
 function resolveGoogleApiKey(): string | null {
   const key =
@@ -334,6 +407,13 @@ export const resolvePlaceTool = createTool({
       const expectedCity = extractContextCity(params.context);
       const cacheKey = `${params.name}|${params.context || ''}`;
 
+      // 1. Check DB-backed PlaceCache first
+      const dbCached = await checkPlaceCache(params.name, params.context);
+      if (dbCached) {
+        return { success: true, data: attachDistanceToAnchor(dbCached, params.anchorPoint) };
+      }
+
+      // 2. Check in-memory cache (survives within same request/process)
       if (GEOCODE_CACHE.has(cacheKey)) {
         const cachedResults = GEOCODE_CACHE.get(cacheKey) ?? [];
         if (cachedResults.length > 0) {
@@ -353,6 +433,8 @@ export const resolvePlaceTool = createTool({
         const candidateResults = filterResultsByCity(results, expectedCity);
         const best = pickBestCandidate(candidateResults, params.anchorPoint);
         if (best) {
+          // Write to DB cache for future requests/cold starts
+          void writePlaceCache(params.name, params.context, best);
           return { success: true, data: attachDistanceToAnchor(best, params.anchorPoint) };
         }
       }

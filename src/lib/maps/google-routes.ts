@@ -104,21 +104,20 @@ function resolveGoogleMapsApiKey(): string | null {
   return key && key.trim().length > 0 ? key.trim() : null;
 }
 
-export async function computeGoogleRoutePath(
+const MAX_RETRIES = 3;
+const INITIAL_BACKOFF_MS = 500;
+const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchRoute(
   from: RoutePoint,
   to: RoutePoint,
-  mode: RouteMode
-): Promise<RoutePathResult> {
-  const googleMode = mapRouteMode(mode);
-  if (!googleMode) {
-    return buildFallbackPath(from, to);
-  }
-
-  const apiKey = resolveGoogleMapsApiKey();
-  if (!apiKey) {
-    return buildFallbackPath(from, to);
-  }
-
+  googleMode: 'DRIVE' | 'TRANSIT' | 'WALK',
+  apiKey: string
+): Promise<RoutePathResult | null> {
   const body: Record<string, unknown> = {
     origin: {
       location: {
@@ -146,44 +145,90 @@ export async function computeGoogleRoutePath(
     body.routingPreference = 'TRAFFIC_AWARE_OPTIMAL';
   }
 
-  try {
-    const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
-      },
-      cache: 'no-store',
-      body: JSON.stringify(body),
-    });
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
+        },
+        cache: 'no-store',
+        body: JSON.stringify(body),
+      });
 
-    if (!response.ok) {
-      console.warn('[google-routes] computeRoutes failed', response.status, response.statusText);
-      return buildFallbackPath(from, to);
+      if (!response.ok) {
+        if (RETRYABLE_STATUS_CODES.has(response.status) && attempt < MAX_RETRIES - 1) {
+          const backoff = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
+          console.warn(`[google-routes] ${response.status} on attempt ${attempt + 1}, retrying in ${backoff}ms`);
+          await delay(backoff);
+          continue;
+        }
+        console.warn('[google-routes] computeRoutes failed', response.status, response.statusText);
+        return null;
+      }
+
+      const payload = (await response.json()) as GoogleRouteResponse;
+      const route = payload.routes?.[0];
+      const encoded = route?.polyline?.encodedPolyline;
+      if (!encoded || typeof encoded !== 'string') {
+        return null;
+      }
+
+      const points = decodePolyline(encoded);
+      if (points.length < 2) {
+        return null;
+      }
+
+      return {
+        points,
+        distanceMeters: typeof route?.distanceMeters === 'number' ? route.distanceMeters : null,
+        durationSeconds: decodeDurationSeconds(route?.duration),
+        source: 'google',
+      };
+    } catch (error) {
+      if (attempt < MAX_RETRIES - 1) {
+        const backoff = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
+        console.warn(`[google-routes] exception on attempt ${attempt + 1}, retrying in ${backoff}ms`, error);
+        await delay(backoff);
+        continue;
+      }
+      console.warn('[google-routes] computeRoutes failed after all retries', error);
+      return null;
     }
+  }
 
-    const payload = (await response.json()) as GoogleRouteResponse;
-    const route = payload.routes?.[0];
-    const encoded = route?.polyline?.encodedPolyline;
-    if (!encoded || typeof encoded !== 'string') {
-      return buildFallbackPath(from, to);
-    }
+  return null;
+}
 
-    const points = decodePolyline(encoded);
-    if (points.length < 2) {
-      return buildFallbackPath(from, to);
-    }
-
-    return {
-      points,
-      distanceMeters: typeof route?.distanceMeters === 'number' ? route.distanceMeters : null,
-      durationSeconds: decodeDurationSeconds(route?.duration),
-      source: 'google',
-    };
-  } catch (error) {
-    console.warn('[google-routes] computeRoutes exception', error);
+export async function computeGoogleRoutePath(
+  from: RoutePoint,
+  to: RoutePoint,
+  mode: RouteMode
+): Promise<RoutePathResult> {
+  const googleMode = mapRouteMode(mode);
+  if (!googleMode) {
     return buildFallbackPath(from, to);
   }
+
+  const apiKey = resolveGoogleMapsApiKey();
+  if (!apiKey) {
+    return buildFallbackPath(from, to);
+  }
+
+  // Try the requested mode first
+  const result = await fetchRoute(from, to, googleMode, apiKey);
+  if (result) return result;
+
+  // If TRANSIT failed, retry with DRIVE — Google's transit data
+  // is spotty in many regions (Alps, cross-border routes, etc.)
+  if (googleMode === 'TRANSIT') {
+    console.info('[google-routes] TRANSIT failed, retrying with DRIVE');
+    const driveResult = await fetchRoute(from, to, 'DRIVE', apiKey);
+    if (driveResult) return driveResult;
+  }
+
+  return buildFallbackPath(from, to);
 }
 

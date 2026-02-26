@@ -1,14 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { ItineraryOrchestrator } from '@/lib/ai/orchestrator';
 import { getDefaultRegistry } from '@/lib/ai/tools';
 import { TripSession, HostMarker } from '@/lib/ai/trip-session';
 import { getOrchestratorJob } from '@/lib/ai/orchestrator-jobs';
+import { auth } from '@/auth';
+import { rateLimit } from '@/lib/api/rate-limit';
+import { prisma } from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Allow up to 60 seconds for complex itineraries
 
-// In-memory session store (would be Redis/DB in production)
-const sessionStore = new Map<string, TripSession>();
+// Rate limit: 10 requests per minute per IP (orchestrator is expensive)
+const orchestratorLimiter = rateLimit({ interval: 60_000, limit: 10 });
 
 /**
  * POST /api/orchestrator
@@ -34,6 +37,26 @@ const sessionStore = new Map<string, TripSession>();
  * }
  */
 export async function POST(request: NextRequest) {
+  // Auth check
+  const authSession = await auth();
+  if (!authSession?.user?.id) {
+    return NextResponse.json(
+      { success: false, error: 'Authentication required' },
+      { status: 401 }
+    );
+  }
+  const userId = authSession.user.id;
+
+  // Rate limit check
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '127.0.0.1';
+  const { success: withinLimit, resetAt } = await orchestratorLimiter.check(ip);
+  if (!withinLimit) {
+    return NextResponse.json(
+      { success: false, error: 'Too many requests. Please slow down.' },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((resetAt - Date.now()) / 1000)) } }
+    );
+  }
+
   try {
     const body = await request.json();
     const { prompt, sessionId } = body;
@@ -45,10 +68,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Retrieve existing session if provided
+    // Retrieve existing session from DB
     let existingSession: TripSession | null = null;
-    if (sessionId && sessionStore.has(sessionId)) {
-      existingSession = sessionStore.get(sessionId) || null;
+    if (sessionId) {
+      const stored = await prisma.orchestratorSession.findUnique({
+        where: { id: sessionId },
+      });
+      if (stored) {
+        existingSession = stored.data as unknown as TripSession;
+      }
     }
 
     // Track tool calls and callbacks
@@ -92,8 +120,24 @@ export async function POST(request: NextRequest) {
     // Use the new session-aware handleMessage
     const { session, response } = await orchestrator.handleMessage(prompt, existingSession);
 
-    // Store updated session
-    sessionStore.set(session.id, session);
+    // Persist session to DB after response is sent (non-blocking)
+    after(async () => {
+      try {
+        await prisma.orchestratorSession.upsert({
+          where: { id: session.id },
+          create: {
+            id: session.id,
+            userId,
+            data: session as unknown as Record<string, unknown>,
+          },
+          update: {
+            data: session as unknown as Record<string, unknown>,
+          },
+        });
+      } catch (err) {
+        console.error('[API] Failed to persist orchestrator session:', err);
+      }
+    });
 
     // Debug logging for hostMarkers
     const hostMarkersToReturn = foundHosts.length > 0 ? foundHosts : session.suggestedHosts;
@@ -125,33 +169,51 @@ export async function POST(request: NextRequest) {
 /**
  * GET /api/orchestrator
  * 
- * List available tools in the registry.
+ * Retrieve job status by jobId, or list available tools.
  */
 export async function GET(request: NextRequest) {
   const jobId = request.nextUrl.searchParams.get('jobId');
   if (jobId) {
-    const job = getOrchestratorJob(jobId);
-    if (!job) {
+    try {
+      const job = await getOrchestratorJob(jobId);
+      if (!job) {
+        return NextResponse.json(
+          { success: false, error: 'Job not found' },
+          { status: 404 }
+        );
+      }
+
       return NextResponse.json(
-        { success: false, error: 'Job not found' },
-        { status: 404 }
+        {
+          success: true,
+          job: {
+            id: job.id,
+            status: job.status,
+            generationId: job.generationId,
+            generationMode: job.generationMode,
+            progress: job.progress,
+            updatedAt: job.updatedAt,
+            plan: job.plan,
+            hostMarkers: job.hostMarkers,
+            error: job.status === 'error' ? job.error : undefined,
+          },
+        },
+        {
+          headers: {
+            'Cache-Control': 'no-store',
+          },
+        }
+      );
+    } catch (error) {
+      console.error('[API] Orchestrator job lookup error:', error);
+      return NextResponse.json(
+        {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to load planner status',
+        },
+        { status: 500 }
       );
     }
-
-    return NextResponse.json({
-      success: true,
-      job: {
-        id: job.id,
-        status: job.status,
-        generationId: job.generationId,
-        generationMode: job.generationMode,
-        progress: job.progress,
-        updatedAt: job.updatedAt,
-        plan: job.plan,
-        hostMarkers: job.hostMarkers,
-        error: job.status === 'error' ? job.error : undefined,
-      },
-    });
   }
 
   const registry = getDefaultRegistry();

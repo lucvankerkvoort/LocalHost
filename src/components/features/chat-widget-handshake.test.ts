@@ -6,6 +6,7 @@ import {
   buildHostOnboardingTrigger,
   getChatId,
   getChatIntent,
+  getTripIdFromPath,
   getHostToolOnlyFallbackQuestion,
   resolveHostOnboardingStage,
   shouldStartHostOnboardingHandshake,
@@ -27,6 +28,13 @@ test('getChatId scopes general chat ids by tripId when provided', () => {
   assert.equal(getChatId('general', '/trips/trip-1', 'trip-1'), 'chat-general-trip-1');
   assert.equal(getChatId('general', '/trips/trip-2', '  trip-2  '), 'chat-general-trip-2');
   assert.equal(getChatId('general', '/trips/trip-3', null), 'chat-general');
+});
+
+test('getTripIdFromPath extracts trip ids only from trip detail routes', () => {
+  assert.equal(getTripIdFromPath('/trips/trip-1'), 'trip-1');
+  assert.equal(getTripIdFromPath('/trips/trip-2/plan'), 'trip-2');
+  assert.equal(getTripIdFromPath('/'), null);
+  assert.equal(getTripIdFromPath('/become-host/draft-1'), null);
 });
 
 test('shouldStartHostOnboardingHandshake gates handshake correctly', () => {

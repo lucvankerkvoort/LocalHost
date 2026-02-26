@@ -650,3 +650,88 @@ enum HostExperienceStatus {
   UNPUBLISHED
   FLAGGED
 }
+
+// ---------------------------------------------------------------------------
+// Orchestrator state (replaces in-memory Maps for serverless compatibility)
+// ---------------------------------------------------------------------------
+
+model OrchestratorJob {
+  id              String   @id @default(cuid())
+  userId          String?
+  prompt          String
+  status          String   @default("draft") // draft | running | complete | error
+  stage           String   @default("draft") // draft | geocoding | routing | hosts | final | complete | error
+  message         String   @default("")
+  progressCurrent Int?
+  progressTotal   Int?
+  generationId    String?
+  generationMode  String? // draft | refine
+  plan            Json?
+  hostMarkers     Json?
+  error           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model OrchestratorSession {
+  id        String   @id
+  userId    String
+  data      Json // Serialized TripSession
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Conversation session state (replaces in-memory ConversationController)
+// ---------------------------------------------------------------------------
+
+model ConversationSession {
+  id        String   @id              // session ID from client
+  intent    String   @default("general") // general | plan_trip | become_host | profile_setup
+  metadata  Json?    @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Place geocoding cache (avoids repeated Google Places API calls)
+// ---------------------------------------------------------------------------
+
+model PlaceCache {
+  id               String   @id @default(cuid())
+  name             String        // search name (e.g. "Sagrada Familia")
+  context          String        // search context (e.g. "Barcelona, Spain")
+  placeId          String?       // Google Places ID
+  formattedAddress String?
+  lat              Float
+  lng              Float
+  category         String?
+  city             String?
+  confidence       Float?
+  createdAt        DateTime @default(now())
+
+  @@unique([name, context])
+  @@index([name])
+}
+
+// ---------------------------------------------------------------------------
+// Rate limiting (replaces in-memory Map for serverless compatibility)
+// ---------------------------------------------------------------------------
+
+model RateLimitEntry {
+  id         String   @id @default(cuid())
+  identifier String        // e.g. IP address or user ID
+  windowKey  String        // e.g. "chat:2026-02-25T12:30" (bucket key)
+  count      Int      @default(1)
+  expiresAt  DateTime      // when this window expires
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([identifier, windowKey])
+  @@index([expiresAt])
+}

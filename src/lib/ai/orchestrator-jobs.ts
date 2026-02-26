@@ -1,5 +1,56 @@
+/**
+ * Orchestrator Job Management — Prisma-backed
+ *
+ * Replaces the previous in-memory Map implementation so job state
+ * survives serverless cold starts and multi-instance deployments.
+ *
+ * Every function is async since it hits the database.
+ */
+
+import { Prisma } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import type { ItineraryPlan } from './types';
 import type { HostMarker } from './trip-session';
+
+const DEBUG_ORCHESTRATOR_JOBS = process.env.DEBUG_ORCHESTRATOR_JOBS === '1';
+
+function logOrchestratorJobDebug(event: string, payload: Record<string, unknown>) {
+  if (!DEBUG_ORCHESTRATOR_JOBS) return;
+  console.info(`[orchestrator-jobs] ${event}`, payload);
+}
+
+function summarizeJobRowForDebug(
+  row:
+    | {
+        id: string;
+        status: string;
+        stage: string;
+        message: string | null;
+        generationId: string | null;
+        generationMode: string | null;
+        updatedAt: Date;
+        progressCurrent: number | null;
+        progressTotal: number | null;
+      }
+    | null
+) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    status: row.status,
+    stage: row.stage,
+    message: row.message,
+    generationId: row.generationId,
+    generationMode: row.generationMode,
+    updatedAt: row.updatedAt.toISOString(),
+    current: row.progressCurrent,
+    total: row.progressTotal,
+  };
+}
+
+// ============================================================================
+// Types (unchanged public API shape)
+// ============================================================================
 
 export type OrchestratorJobStatus = 'draft' | 'running' | 'complete' | 'error';
 export type OrchestratorJobStage = 'draft' | 'geocoding' | 'routing' | 'hosts' | 'final' | 'complete' | 'error';
@@ -26,102 +77,168 @@ export type OrchestratorJob = {
   error?: string;
 };
 
-// Use globalThis to persist jobs across hot reloads in development
-const globalForJobs = globalThis as unknown as {
-  orchestratorJobs: Map<string, OrchestratorJob>;
-};
+// ============================================================================
+// Helpers — map between Prisma row ↔ public OrchestratorJob shape
+// ============================================================================
 
-if (!globalForJobs.orchestratorJobs) {
-  globalForJobs.orchestratorJobs = new Map<string, OrchestratorJob>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToJob(row: any): OrchestratorJob {
+  return {
+    id: row.id,
+    prompt: row.prompt,
+    status: row.status as OrchestratorJobStatus,
+    progress: {
+      stage: row.stage as OrchestratorJobStage,
+      message: row.message ?? '',
+      current: row.progressCurrent ?? undefined,
+      total: row.progressTotal ?? undefined,
+    },
+    createdAt: new Date(row.createdAt).getTime(),
+    updatedAt: new Date(row.updatedAt).getTime(),
+    generationId: row.generationId ?? undefined,
+    generationMode: row.generationMode as OrchestratorGenerationMode | undefined,
+    plan: row.plan as ItineraryPlan | undefined,
+    hostMarkers: row.hostMarkers as HostMarker[] | undefined,
+    error: row.error ?? undefined,
+  };
 }
 
-const jobs = globalForJobs.orchestratorJobs;
-const JOB_TTL_MS = 1000 * 60 * 30;
+// ============================================================================
+// CRUD functions
+// ============================================================================
 
-function scheduleCleanup(id: string) {
-  setTimeout(() => {
-    jobs.delete(id);
-  }, JOB_TTL_MS);
-}
-
-export function createOrchestratorJob(
+export async function createOrchestratorJob(
   prompt: string,
   progress: OrchestratorJobProgress,
   metadata?: {
     generationId?: string;
     generationMode?: OrchestratorGenerationMode;
   }
-): OrchestratorJob {
-  const now = Date.now();
-  const job: OrchestratorJob = {
-    id: crypto.randomUUID(),
-    prompt,
-    status: 'draft',
-    progress,
-    createdAt: now,
-    updatedAt: now,
-    generationId: metadata?.generationId,
-    generationMode: metadata?.generationMode,
-  };
-  jobs.set(job.id, job);
-  scheduleCleanup(job.id);
-  return job;
+): Promise<OrchestratorJob> {
+  const row = await prisma.orchestratorJob.create({
+    data: {
+      prompt,
+      status: 'draft',
+      stage: progress.stage,
+      message: progress.message,
+      progressCurrent: progress.current ?? null,
+      progressTotal: progress.total ?? null,
+      generationId: metadata?.generationId ?? null,
+      generationMode: metadata?.generationMode ?? null,
+    },
+  });
+  return rowToJob(row);
 }
 
-export function updateOrchestratorJob(
+export async function updateOrchestratorJob(
   id: string,
   updates: Partial<Omit<OrchestratorJob, 'id' | 'createdAt'>> & {
     progress?: Partial<OrchestratorJobProgress>;
   }
-): OrchestratorJob | null {
-  const job = jobs.get(id);
-  if (!job) return null;
+): Promise<OrchestratorJob | null> {
+  try {
+    const beforeRow = DEBUG_ORCHESTRATOR_JOBS
+      ? await prisma.orchestratorJob.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            status: true,
+            stage: true,
+            message: true,
+            generationId: true,
+            generationMode: true,
+            updatedAt: true,
+            progressCurrent: true,
+            progressTotal: true,
+          },
+        })
+      : null;
 
-  if (updates.progress) {
-    job.progress = { ...job.progress, ...updates.progress };
+    // Build the flat Prisma update data from the nested public shape
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: Record<string, any> = {};
+
+    if (typeof updates.status === 'string') data.status = updates.status;
+    if (typeof updates.error === 'string') data.error = updates.error;
+    if (typeof updates.prompt === 'string') data.prompt = updates.prompt;
+    if (typeof updates.generationId === 'string') data.generationId = updates.generationId;
+    if (updates.generationMode === 'draft' || updates.generationMode === 'refine') {
+      data.generationMode = updates.generationMode;
+    }
+    if (updates.plan !== undefined) data.plan = updates.plan ?? Prisma.JsonNull;
+    if (Object.prototype.hasOwnProperty.call(updates, 'hostMarkers')) {
+      data.hostMarkers = updates.hostMarkers ?? Prisma.JsonNull;
+    }
+
+    // Progress fields
+    if (updates.progress) {
+      if (updates.progress.stage) data.stage = updates.progress.stage;
+      if (typeof updates.progress.message === 'string') data.message = updates.progress.message;
+      if (updates.progress.current !== undefined) data.progressCurrent = updates.progress.current;
+      if (updates.progress.total !== undefined) data.progressTotal = updates.progress.total;
+    }
+
+    logOrchestratorJobDebug('update.request', {
+      id,
+      before: summarizeJobRowForDebug(beforeRow),
+      update: {
+        status: typeof updates.status === 'string' ? updates.status : null,
+        error: typeof updates.error === 'string' ? updates.error : null,
+        generationId: typeof updates.generationId === 'string' ? updates.generationId : null,
+        generationMode:
+          updates.generationMode === 'draft' || updates.generationMode === 'refine'
+            ? updates.generationMode
+            : null,
+        hasPlan: Object.prototype.hasOwnProperty.call(updates, 'plan'),
+        hasHostMarkers: Object.prototype.hasOwnProperty.call(updates, 'hostMarkers'),
+        progress: updates.progress
+          ? {
+              stage: updates.progress.stage ?? null,
+              message: updates.progress.message ?? null,
+              current: updates.progress.current ?? null,
+              total: updates.progress.total ?? null,
+            }
+          : null,
+      },
+    });
+
+    const row = await prisma.orchestratorJob.update({
+      where: { id },
+      data,
+    });
+    logOrchestratorJobDebug('update.result', {
+      id,
+      before: summarizeJobRowForDebug(beforeRow),
+      after: summarizeJobRowForDebug({
+        id: row.id,
+        status: row.status,
+        stage: row.stage,
+        message: row.message,
+        generationId: row.generationId,
+        generationMode: row.generationMode,
+        updatedAt: row.updatedAt,
+        progressCurrent: row.progressCurrent,
+        progressTotal: row.progressTotal,
+      }),
+      regressedFromComplete:
+        beforeRow?.status === 'complete' && row.status !== 'complete',
+    });
+    return rowToJob(row);
+  } catch (error) {
+    logOrchestratorJobDebug('update.error', {
+      id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    // Record not found
+    return null;
   }
-
-  if (typeof updates.status === 'string') {
-    job.status = updates.status;
-  }
-
-  if (typeof updates.error === 'string') {
-    job.error = updates.error;
-  }
-
-  if (updates.plan) {
-    job.plan = updates.plan;
-  }
-
-  if (typeof updates.prompt === 'string') {
-    job.prompt = updates.prompt;
-  }
-
-  if (typeof updates.generationId === 'string') {
-    job.generationId = updates.generationId;
-  }
-
-  if (
-    updates.generationMode === 'draft' ||
-    updates.generationMode === 'refine'
-  ) {
-    job.generationMode = updates.generationMode;
-  }
-
-  if (Object.prototype.hasOwnProperty.call(updates, 'hostMarkers')) {
-    job.hostMarkers = updates.hostMarkers;
-  }
-
-  job.updatedAt = Date.now();
-  jobs.set(id, job);
-  return job;
 }
 
-export function completeOrchestratorJob(
+export async function completeOrchestratorJob(
   id: string,
   plan: ItineraryPlan,
   hostMarkers?: HostMarker[]
-): OrchestratorJob | null {
+): Promise<OrchestratorJob | null> {
   return updateOrchestratorJob(id, {
     status: 'complete',
     plan,
@@ -133,7 +250,7 @@ export function completeOrchestratorJob(
   });
 }
 
-export function resetOrchestratorJob(
+export async function resetOrchestratorJob(
   id: string,
   input: {
     prompt: string;
@@ -141,25 +258,31 @@ export function resetOrchestratorJob(
     generationId: string;
     generationMode: OrchestratorGenerationMode;
   }
-): OrchestratorJob | null {
-  const job = jobs.get(id);
-  if (!job) return null;
-
-  job.prompt = input.prompt;
-  job.status = 'draft';
-  job.progress = input.progress;
-  job.generationId = input.generationId;
-  job.generationMode = input.generationMode;
-  job.plan = undefined;
-  job.hostMarkers = undefined;
-  job.error = undefined;
-  job.updatedAt = Date.now();
-
-  jobs.set(id, job);
-  return job;
+): Promise<OrchestratorJob | null> {
+  try {
+    const row = await prisma.orchestratorJob.update({
+      where: { id },
+      data: {
+        prompt: input.prompt,
+        status: 'draft',
+        stage: input.progress.stage,
+        message: input.progress.message,
+        progressCurrent: input.progress.current ?? null,
+        progressTotal: input.progress.total ?? null,
+        generationId: input.generationId,
+        generationMode: input.generationMode,
+        plan: Prisma.JsonNull,
+        hostMarkers: Prisma.JsonNull,
+        error: null,
+      },
+    });
+    return rowToJob(row);
+  } catch {
+    return null;
+  }
 }
 
-export function failOrchestratorJob(id: string, error: string): OrchestratorJob | null {
+export async function failOrchestratorJob(id: string, error: string): Promise<OrchestratorJob | null> {
   return updateOrchestratorJob(id, {
     status: 'error',
     error,
@@ -170,6 +293,21 @@ export function failOrchestratorJob(id: string, error: string): OrchestratorJob 
   });
 }
 
-export function getOrchestratorJob(id: string): OrchestratorJob | null {
-  return jobs.get(id) ?? null;
+const STALE_JOB_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+
+export async function getOrchestratorJob(id: string): Promise<OrchestratorJob | null> {
+  const row = await prisma.orchestratorJob.findUnique({ where: { id } });
+  if (!row) return null;
+
+  // Auto-fail jobs stuck in 'running' for too long (orphaned by dead serverless instance)
+  if (
+    row.status === 'running' &&
+    Date.now() - new Date(row.updatedAt).getTime() > STALE_JOB_THRESHOLD_MS
+  ) {
+    console.warn(`[OrchestratorJob] Auto-failing stale job ${id} (last updated ${row.updatedAt})`);
+    const failed = await failOrchestratorJob(id, 'Generation timed out — please try again');
+    return failed;
+  }
+
+  return rowToJob(row);
 }

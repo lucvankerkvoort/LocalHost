@@ -76,6 +76,11 @@ export function getChatId(
   return draftId ? `chat-${intent}-${draftId}` : `chat-${intent}`;
 }
 
+export function getTripIdFromPath(pathname: string | null): string | null {
+  if (!pathname?.startsWith('/trips/')) return null;
+  return pathname.split('/').filter(Boolean)[1] ?? null;
+}
+
 export function getHostDraftIdFromPath(pathname: string | null): string | null {
   if (!pathname?.startsWith('/become-host/')) return null;
   return pathname.split('/').filter(Boolean)[1] ?? null;

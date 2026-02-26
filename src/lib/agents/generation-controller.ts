@@ -43,13 +43,13 @@ type GenerationControllerOptions<TSnapshot extends PlannerSnapshot> = {
     snapshot: TSnapshot;
     mode: GenerationMode;
     generationId: string;
-  }) => string;
+  }) => string | Promise<string>;
   onQueued?: (params: {
     key: string;
     jobId: string;
     snapshot: TSnapshot;
     mode: GenerationMode;
-  }) => void;
+  }) => void | Promise<void>;
   runGeneration: (task: GenerationTask<TSnapshot>) => Promise<void>;
 };
 
@@ -78,14 +78,27 @@ export class GenerationController<TSnapshot extends PlannerSnapshot> {
     this.refineDebounceMs = options.refineDebounceMs ?? DEFAULT_REFINEMENT_DEBOUNCE_MS;
   }
 
-  schedule(key: string, snapshot: TSnapshot): ScheduleResult {
+  async schedule(key: string, snapshot: TSnapshot): Promise<ScheduleResult> {
     const record = this.getOrCreateRecord(key);
     record.currentSnapshot = snapshot;
     const mode: GenerationMode = record.hasDraftCompleted ? 'refine' : 'draft';
 
     if (record.state === 'IDLE') {
       if (mode === 'draft') {
-        const generationId = this.startGenerationNow(key, record, snapshot, mode);
+        // Await ensureJobId so the real jobId is in the result,
+        // then fire-and-forget the actual generation.
+        const generationId = crypto.randomUUID();
+        const jobId = await this.options.ensureJobId({
+          key,
+          existingJobId: record.activeJobId,
+          snapshot,
+          mode,
+          generationId,
+        });
+        record.activeJobId = jobId;
+        record.currentGenerationId = generationId;
+        // Fire-and-forget: the generation runs in the background
+        void this.startGenerationNow(key, record, snapshot, mode, jobId, generationId);
         return this.toResult(record, mode, false, generationId);
       }
 
@@ -97,7 +110,7 @@ export class GenerationController<TSnapshot extends PlannerSnapshot> {
 
     record.pendingSnapshot = snapshot;
     if (record.activeJobId) {
-      this.options.onQueued?.({
+      void this.options.onQueued?.({
         key,
         jobId: record.activeJobId,
         snapshot,
@@ -183,12 +196,14 @@ export class GenerationController<TSnapshot extends PlannerSnapshot> {
     }, this.refineDebounceMs);
   }
 
-  private startGenerationNow(
+  private async startGenerationNow(
     key: string,
     record: GenerationRecord<TSnapshot>,
     snapshot: TSnapshot,
-    mode: GenerationMode
-  ): string {
+    mode: GenerationMode,
+    jobId?: string,
+    generationId?: string
+  ): Promise<void> {
     if (record.refineDebounceTimer) {
       clearTimeout(record.refineDebounceTimer);
       record.refineDebounceTimer = null;
@@ -200,25 +215,27 @@ export class GenerationController<TSnapshot extends PlannerSnapshot> {
     }
 
     const abortController = new AbortController();
-    const generationId = crypto.randomUUID();
-    const jobId = this.options.ensureJobId({
+    // Use pre-resolved values if provided (from schedule()),
+    // otherwise resolve them here (from refinement debounce path)
+    const resolvedGenerationId = generationId ?? crypto.randomUUID();
+    const resolvedJobId = jobId ?? await this.options.ensureJobId({
       key,
       existingJobId: record.activeJobId,
       snapshot,
       mode,
-      generationId,
+      generationId: resolvedGenerationId,
     });
 
-    record.activeJobId = jobId;
-    record.currentGenerationId = generationId;
+    record.activeJobId = resolvedJobId;
+    record.currentGenerationId = resolvedGenerationId;
     record.inFlightAbortController = abortController;
     record.state = mode === 'draft' ? 'DRAFTING' : 'REFINING';
     record.currentSnapshot = snapshot;
 
     void this.runGeneration(key, record, {
       key,
-      jobId,
-      generationId,
+      jobId: resolvedJobId,
+      generationId: resolvedGenerationId,
       mode,
       snapshot,
       signal: abortController.signal,
@@ -226,13 +243,11 @@ export class GenerationController<TSnapshot extends PlannerSnapshot> {
         const latestRecord = this.records.get(key);
         return (
           latestRecord === record &&
-          latestRecord?.currentGenerationId === generationId &&
+          latestRecord?.currentGenerationId === resolvedGenerationId &&
           !abortController.signal.aborted
         );
       },
     });
-
-    return generationId;
   }
 
   private async runGeneration(
