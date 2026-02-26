@@ -6,9 +6,9 @@ import {
   createOrchestratorJob,
   updateOrchestratorJob,
   resetOrchestratorJob,
-  completeOrchestratorJob,
   failOrchestratorJob,
 } from '@/lib/ai/orchestrator-jobs';
+import { jobWriteQueue } from '@/lib/ai/job-write-queue';
 import type { DraftItinerary } from '@/lib/ai/orchestrator';
 import { buildHostMarkersFromPlan } from '@/lib/ai/host-markers';
 import { 
@@ -66,6 +66,13 @@ STYLE RULES (STRICT):
 - Trip days should be city-based with real sights/POIs (not travel-day activities).`;
 
 const PLANNER_ONBOARDING_START_TOKEN = 'ACTION:START_PLANNER';
+const DEBUG_ORCHESTRATOR_PROGRESS =
+  process.env.DEBUG_ORCHESTRATOR_PROGRESS === '1' || process.env.DEBUG_ORCHESTRATOR_JOBS === '1';
+
+function logPlannerProgressDebug(event: string, payload: Record<string, unknown>) {
+  if (!DEBUG_ORCHESTRATOR_PROGRESS) return;
+  console.info(`[planning-agent][progress] ${event}`, payload);
+}
 
 type PlannerFlowState = {
   destinations: string[];
@@ -217,6 +224,9 @@ async function seedPlannerStateFromTrip(
       destinations,
       destinationScope: destinations.length > 1 ? 'multi_city' : 'city',
       needsCities: false,
+      // Existing trip anchors indicate a persisted plan (or prior generated itinerary)
+      // so the planner handshake should not auto-trigger generateItinerary again.
+      hasGenerated: true,
     };
   } catch (error) {
     console.warn('[PlanningAgent] Failed to seed planner state from trip', {
@@ -454,6 +464,11 @@ type HydrationTotals = {
 };
 
 function getHydrationTotals(draft: DraftItinerary): HydrationTotals {
+  // During planTripFromDraft, processDay calls resolve_place for:
+  // 1. The day anchor (often 1 call, but sometimes 2 if fallback city center is needed)
+  // 2. Each activity
+  // Since we can't perfectly predict the fallback, we use activities + 1 as a baseline
+  // and ensure the progress bar completes even if the exact number varies slightly.
   const geocodes = draft.days.reduce((sum, day) => sum + day.activities.length + 1, 0);
   const routes = draft.days.filter((day) => day.activities.length > 1).length;
   const hosts = draft.days.length;
@@ -464,13 +479,14 @@ function buildProgress(
   geocoded: number,
   totals: HydrationTotals,
   routed: number,
-  hosted: number
+  hosted: number,
+  isHydrationComplete: boolean = false
 ) {
-  if (geocoded < totals.geocodes) {
+  if (!isHydrationComplete && geocoded < totals.geocodes) {
     return {
       stage: 'geocoding' as const,
-      message: 'Resolving places',
-      current: geocoded,
+      message: 'Hydrating places',
+      current: Math.min(geocoded, totals.geocodes),
       total: totals.geocodes,
     };
   }
@@ -511,7 +527,7 @@ async function runPlannerGenerationTask(
   task: GenerationTask<PlannerGenerationSnapshot>
 ) {
   const { ItineraryOrchestrator } = await import('@/lib/ai/orchestrator');
-  const { jobId, mode, snapshot, signal, isLatest } = task;
+  const { jobId, mode, snapshot, signal, isLatest, generationId } = task;
   const shouldIgnore = () => signal.aborted || !isLatest();
 
   try {
@@ -527,11 +543,27 @@ async function runPlannerGenerationTask(
     }
 
     if (!draftResult.plan) {
-      failOrchestratorJob(jobId, 'Unable to locate the main city for this trip.');
+      logPlannerProgressDebug('draft.missing-plan', {
+        jobId,
+        generationId,
+        mode,
+      });
+      await jobWriteQueue.flush(jobId, {
+        status: 'error',
+        error: 'Unable to locate the main city for this trip.',
+        progress: { stage: 'error', message: 'Unable to locate the main city for this trip.' },
+      });
       return;
     }
 
-    updateOrchestratorJob(jobId, {
+    logPlannerProgressDebug('draft.write.start', {
+      jobId,
+      generationId,
+      mode,
+      days: draftResult.plan.days.length,
+      title: draftResult.plan.title,
+    });
+    const draftWriteResult = await updateOrchestratorJob(jobId, {
       status: 'draft',
       plan: draftResult.plan,
       progress: {
@@ -539,16 +571,40 @@ async function runPlannerGenerationTask(
         message: `Draft ready: ${draftResult.plan.title}`,
       },
     });
+    logPlannerProgressDebug('draft.write.result', {
+      jobId,
+      generationId,
+      rowStatus: draftWriteResult?.status ?? null,
+      rowStage: draftWriteResult?.progress.stage ?? null,
+      rowGenerationId: draftWriteResult?.generationId ?? null,
+      rowUpdatedAt: draftWriteResult?.updatedAt ?? null,
+    });
 
     const totals = getHydrationTotals(draftResult.context.draft);
     let geocoded = 0;
     let routed = 0;
     let hosted = 0;
+    let progressWriteSeq = 0;
 
     const updateProgress = () => {
       if (shouldIgnore()) return;
       const progress = buildProgress(geocoded, totals, routed, hosted);
-      updateOrchestratorJob(jobId, { status: 'running', progress });
+      const seq = ++progressWriteSeq;
+      logPlannerProgressDebug('progress.enqueue', {
+        jobId,
+        generationId,
+        seq,
+        progress,
+        counters: {
+          geocoded,
+          routed,
+          hosted,
+          geocodeTotal: totals.geocodes,
+          routeTotal: totals.routes,
+          hostTotal: totals.hosts,
+        },
+      });
+      jobWriteQueue.enqueue(jobId, { status: 'running', progress });
     };
 
     const hydrationOrchestrator = new ItineraryOrchestrator(undefined, {
@@ -557,19 +613,13 @@ async function runPlannerGenerationTask(
         if (toolName === 'resolve_place') geocoded += 1;
         if (toolName === 'generate_route') routed += 1;
         if (toolName === 'search_localhosts') hosted += 1;
-        updateProgress();
-      },
-      onDayProcessed: (dayNumber, total) => {
-        if (shouldIgnore()) return;
-        updateOrchestratorJob(jobId, {
-          status: 'running',
-          progress: {
-            stage: 'geocoding',
-            message: `Processing day ${dayNumber} of ${total}`,
-            current: geocoded,
-            total: totals.geocodes,
-          },
+        logPlannerProgressDebug('tool.result', {
+          jobId,
+          generationId,
+          toolName,
+          counters: { geocoded, routed, hosted },
         });
+        updateProgress();
       },
     });
 
@@ -582,26 +632,53 @@ async function runPlannerGenerationTask(
     if (shouldIgnore()) return;
 
     const hostMarkers = buildHostMarkersFromPlan(plan);
-    completeOrchestratorJob(jobId, plan, hostMarkers);
+    logPlannerProgressDebug('complete.flush.start', {
+      jobId,
+      generationId,
+      hostMarkerCount: hostMarkers.length,
+      dayCount: plan.days.length,
+    });
+    const completeResult = await jobWriteQueue.flush(jobId, {
+      status: 'complete',
+      plan,
+      hostMarkers,
+      progress: { stage: 'complete', message: 'Plan ready' },
+    });
+    logPlannerProgressDebug('complete.flush.result', {
+      jobId,
+      generationId,
+      rowStatus: completeResult?.status ?? null,
+      rowStage: completeResult?.progress.stage ?? null,
+      rowGenerationId: completeResult?.generationId ?? null,
+      rowUpdatedAt: completeResult?.updatedAt ?? null,
+    });
   } catch (error) {
     if (shouldIgnore()) return;
-    failOrchestratorJob(
+    const errorMsg = error instanceof Error ? error.message : 'Failed to generate itinerary.';
+    logPlannerProgressDebug('generation.error', {
       jobId,
-      error instanceof Error ? error.message : 'Failed to generate itinerary.'
-    );
+      generationId,
+      mode,
+      error: errorMsg,
+    });
+    await jobWriteQueue.flush(jobId, {
+      status: 'error',
+      error: errorMsg,
+      progress: { stage: 'error', message: errorMsg },
+    });
   }
 }
 
 const plannerGenerationController = new GenerationController<PlannerGenerationSnapshot>({
   refineDebounceMs: 600,
-  ensureJobId: ({ existingJobId, snapshot, mode, generationId }) => {
+  ensureJobId: async ({ existingJobId, snapshot, mode, generationId }) => {
     const progress = {
       stage: 'draft' as const,
       message: getGenerationStartMessage(mode),
     };
 
     if (existingJobId) {
-      const reset = resetOrchestratorJob(existingJobId, {
+      const reset = await resetOrchestratorJob(existingJobId, {
         prompt: snapshot.request,
         progress,
         generationId,
@@ -610,14 +687,14 @@ const plannerGenerationController = new GenerationController<PlannerGenerationSn
       if (reset) return reset.id;
     }
 
-    const created = createOrchestratorJob(snapshot.request, progress, {
+    const created = await createOrchestratorJob(snapshot.request, progress, {
       generationId,
       generationMode: mode,
     });
     return created.id;
   },
-  onQueued: ({ jobId }) => {
-    updateOrchestratorJob(jobId, {
+  onQueued: async ({ jobId }) => {
+    await updateOrchestratorJob(jobId, {
       status: 'running',
       progress: {
         stage: 'final',
@@ -655,17 +732,17 @@ export class PlanningAgent implements Agent {
     const controllerKey = context.tripId
       ? `trip:${context.tripId}:session:${sessionId}`
       : `session:${sessionId}`;
-    const session = conversationController.getOrCreateSession(sessionId);
+    const session = await conversationController.getOrCreateSession(sessionId);
     const storedState = (session.metadata?.plannerState as PlannerFlowState | undefined)
       ?? DEFAULT_PLANNER_STATE;
     const currentState =
       isPlannerMode ? await seedPlannerStateFromTrip(storedState, context) : storedState;
 
     if (isPlannerMode && currentState !== storedState) {
-      session.metadata = {
+      await conversationController.updateMetadata(sessionId, {
         ...session.metadata,
         plannerState: currentState,
-      };
+      });
     }
 
     let nextState = currentState;
@@ -903,13 +980,13 @@ Rules:
 - Do NOT call generateItinerary unless instructed above.
 `;
 
-      session.metadata = {
+      await conversationController.updateMetadata(sessionId, {
         ...session.metadata,
         plannerState: {
           ...nextState,
           lastQuestionKey: nextQuestionKey,
         },
-      };
+      });
     }
 
     return streamText({
@@ -1008,7 +1085,7 @@ Rules:
                 tripId: context.tripId ?? null,
                 state: nextState,
               });
-              const scheduled = plannerGenerationController.schedule(
+              const scheduled = await plannerGenerationController.schedule(
                 controllerKey,
                 snapshot
               );
@@ -1016,6 +1093,7 @@ Rules:
               return {
                 success: true,
                 jobId: scheduled.jobId,
+                tripId: context.tripId ?? undefined,
                 generationId: scheduled.generationId ?? undefined,
                 queued: scheduled.queued,
                 mode: scheduled.mode,

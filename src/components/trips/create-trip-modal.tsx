@@ -10,17 +10,23 @@ export function CreateTripModal({ children }: { children: ReactNode }) {
 
   const handleCreate = async () => {
     if (isLoading) return;
+
     setIsLoading(true);
+    try {
+      const res = await createTrip({});
 
-    const res = await createTrip({});
+      if (res.success && res.tripId) {
+        router.push(`/trips/${res.tripId}`);
+        return;
+      }
 
-    if (res.success && res.tripId) {
-      router.push(`/trips/${res.tripId}`);
-      return;
+      alert('Failed to create trip');
+      setIsLoading(false);
+    } catch (error) {
+      console.error(error);
+      alert('Failed to create trip');
+      setIsLoading(false);
     }
-
-    alert('Failed to create trip');
-    setIsLoading(false);
   };
 
   return (

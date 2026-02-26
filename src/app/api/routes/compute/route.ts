@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { computeGoogleRoutePath } from '@/lib/maps/google-routes';
+import { auth } from '@/auth';
 
 const ComputeRouteSchema = z.object({
   fromLat: z.number(),
@@ -12,6 +13,11 @@ const ComputeRouteSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const parsed = ComputeRouteSchema.safeParse(body);

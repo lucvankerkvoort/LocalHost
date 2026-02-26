@@ -23,6 +23,7 @@ import {
   type ChatWidgetIntent,
   getChatId,
   getHostDraftIdFromPath,
+  getTripIdFromPath,
   getHostToolOnlyFallbackQuestion,
   getChatIntent,
   resolveHostOnboardingStage,
@@ -157,11 +158,9 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
   const uiConfig = INTENT_UI_CONFIG[intent];
   const hostCreationState = useAppSelector(selectHostCreation);
   const activeTripId = useAppSelector((state) => state.globe.tripId);
-  const tripIdFromPath =
-    pathname?.startsWith('/trips/') && pathname.length > '/trips/'.length
-      ? pathname.split('/').filter(Boolean)[1] ?? null
-      : null;
-  const scopedTripId = activeTripId || tripIdFromPath;
+  const tripIdFromPath = getTripIdFromPath(pathname);
+  // On trip pages, the route param is the source of truth; Redux can be stale during navigation.
+  const scopedTripId = tripIdFromPath ?? activeTripId;
   // Stable chat ID per intent/session (draft-specific for host onboarding)
   const chatId = getChatId(intent, pathname, scopedTripId);
 
@@ -446,17 +445,17 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
 
     if (hasToolParts) {
       ingestToolParts(dispatch, parts, 'chat', seenToolEventsRef.current, {
-        tripId: activeTripId,
+        tripId: scopedTripId,
       });
       return;
     }
 
     if (lastMessage?.toolInvocations) {
       ingestToolInvocations(dispatch, lastMessage.toolInvocations, 'chat', {
-        tripId: activeTripId,
+        tripId: scopedTripId,
       });
     }
-  }, [activeTripId, dispatch, messages]);
+  }, [dispatch, messages, scopedTripId]);
 
   // Listen for custom chat triggers (e.g. from "Add to Plan" buttons)
   useEffect(() => {

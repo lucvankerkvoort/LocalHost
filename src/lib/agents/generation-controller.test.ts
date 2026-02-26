@@ -33,9 +33,9 @@ test('latest wins: replaces pending snapshot while one generation is in flight',
     },
   });
 
-  controller.schedule('trip-1', { request: 'A', createdAt: 1 });
-  controller.schedule('trip-1', { request: 'B', createdAt: 2 });
-  controller.schedule('trip-1', { request: 'C', createdAt: 3 });
+  await controller.schedule('trip-1', { request: 'A', createdAt: 1 });
+  await controller.schedule('trip-1', { request: 'B', createdAt: 2 });
+  await controller.schedule('trip-1', { request: 'C', createdAt: 3 });
 
   const pendingState = controller.getState('trip-1');
   assert.equal(pendingState?.hasPendingSnapshot, true);
@@ -62,10 +62,10 @@ test('debounces refinements after initial draft', async () => {
     },
   });
 
-  controller.schedule('trip-1', { request: 'Draft request', createdAt: 1 });
+  await controller.schedule('trip-1', { request: 'Draft request', createdAt: 1 });
   await wait(5);
 
-  controller.schedule('trip-1', { request: 'Refine request', createdAt: 2 });
+  await controller.schedule('trip-1', { request: 'Refine request', createdAt: 2 });
   await wait(10);
   assert.deepEqual(startedRequests, ['Draft request']);
 
@@ -84,12 +84,12 @@ test('debounce window keeps only the latest snapshot when user types quickly', a
     },
   });
 
-  controller.schedule('trip-1', { request: 'Draft request', createdAt: 1 });
+  await controller.schedule('trip-1', { request: 'Draft request', createdAt: 1 });
   await wait(5);
 
-  controller.schedule('trip-1', { request: 'Refine #1', createdAt: 2 });
-  controller.schedule('trip-1', { request: 'Refine #2', createdAt: 3 });
-  controller.schedule('trip-1', { request: 'Refine #3', createdAt: 4 });
+  await controller.schedule('trip-1', { request: 'Refine #1', createdAt: 2 });
+  await controller.schedule('trip-1', { request: 'Refine #2', createdAt: 3 });
+  await controller.schedule('trip-1', { request: 'Refine #3', createdAt: 4 });
 
   await wait(60);
   assert.deepEqual(startedRequests, ['Draft request', 'Refine #3']);
@@ -115,7 +115,7 @@ test('cancel aborts in-flight generation and clears pending work', async () => {
     },
   });
 
-  controller.schedule('trip-1', { request: 'Long running', createdAt: 1 });
+  await controller.schedule('trip-1', { request: 'Long running', createdAt: 1 });
   await wait(5);
   controller.cancel('trip-1');
   await wait(5);

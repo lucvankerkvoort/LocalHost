@@ -3,7 +3,13 @@ import { NextResponse } from 'next/server';
 import { getSyntheticBotsConfig } from '@/lib/synthetic-bots/config';
 import { processDueSyntheticReplyJobs } from '@/lib/synthetic-bots/jobs';
 
+const isDev = process.env.NODE_ENV === 'development';
+
 async function runProcessor() {
+  if (!isDev) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   const config = getSyntheticBotsConfig();
   if (!config.enabled) {
     return NextResponse.json(

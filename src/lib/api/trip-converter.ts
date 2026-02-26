@@ -1,6 +1,15 @@
 import { GlobeDestination, getColorForDay } from '@/types/globe';
 import { ItineraryItem } from '@/types/itinerary';
 
+const DEBUG_TRIP_COORDINATES =
+  process.env.NEXT_PUBLIC_DEBUG_TRIP_COORDINATES === '1' ||
+  process.env.DEBUG_TRIP_COORDINATES === '1';
+
+function logTripConverterDebug(event: string, payload: Record<string, unknown>) {
+  if (!DEBUG_TRIP_COORDINATES) return;
+  console.warn(`[trip-converter] ${event}`, payload);
+}
+
 // Define partial types matching the Prisma response we expect
 interface ApiItineraryItem {
   id: string;
@@ -110,6 +119,17 @@ function deriveCandidateId(item: ApiItineraryItem): string | undefined {
 
 export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[] {
   const destinations: GlobeDestination[] = [];
+  let fallbackItemCoordinateCount = 0;
+  const fallbackSamples: Array<{
+    stopTitle: string;
+    dayIndex: number;
+    itemId: string;
+    itemTitle: string;
+    anchorLat: number;
+    anchorLng: number;
+    itemLat: number | null;
+    itemLng: number | null;
+  }> = [];
 
   for (const stop of trip.stops) {
     // Determine primary location (first one)
@@ -118,7 +138,24 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
     for (const day of stop.days) {
         const activities: ItineraryItem[] = day.items
             .sort((a, b) => a.orderIndex - b.orderIndex)
-            .map(item => ({
+            .map(item => {
+                if (typeof item.lat !== 'number' || typeof item.lng !== 'number') {
+                  fallbackItemCoordinateCount += 1;
+                  if (fallbackSamples.length < 5) {
+                    fallbackSamples.push({
+                      stopTitle: stop.title,
+                      dayIndex: day.dayIndex,
+                      itemId: item.id,
+                      itemTitle: item.title,
+                      anchorLat: primaryLoc.lat,
+                      anchorLng: primaryLoc.lng,
+                      itemLat: item.lat,
+                      itemLng: item.lng,
+                    });
+                  }
+                }
+
+                return {
                 id: item.id,
                 type: normalizeItineraryType(item.type), 
                 category: item.type.toLowerCase(), 
@@ -139,7 +176,8 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
                         lng: item.lng ?? primaryLoc.lng,
                     }
                 }
-            } as ItineraryItem));
+            } as ItineraryItem;
+          });
 
         destinations.push({
             id: day.id, 
@@ -155,6 +193,15 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
             suggestedHosts: day.suggestedHosts || [],
         });
     }
+  }
+
+  if (fallbackItemCoordinateCount > 0) {
+    logTripConverterDebug('item-coordinate-fallbacks', {
+      tripId: trip.id,
+      fallbackItemCoordinateCount,
+      stopCount: trip.stops.length,
+      samples: fallbackSamples,
+    });
   }
 
   return destinations.sort((a, b) => a.day - b.day);
