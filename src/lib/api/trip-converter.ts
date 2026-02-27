@@ -20,6 +20,7 @@ interface ApiItineraryItem {
   experienceId: string | null;
   hostId?: string | null; // Some items may have hostId directly
   locationName: string | null;
+  placeId?: string | null;
   lat: number | null;
   lng: number | null;
   orderIndex: number;
@@ -117,6 +118,20 @@ function deriveCandidateId(item: ApiItineraryItem): string | undefined {
   return activeTentative?.id;
 }
 
+function normalizePlaceIdForPersistence(placeId: string | undefined): string | undefined {
+  if (!placeId || placeId.trim().length === 0) return undefined;
+  const normalized = placeId.trim();
+  if (
+    normalized === 'unknown' ||
+    normalized.startsWith('fallback-') ||
+    normalized.startsWith('place-') ||
+    normalized.startsWith('loc-')
+  ) {
+    return undefined;
+  }
+  return normalized;
+}
+
 export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[] {
   const destinations: GlobeDestination[] = [];
   let fallbackItemCoordinateCount = 0;
@@ -169,7 +184,7 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
                 description: item.description || '',
                 price: undefined,
                 place: {
-                    id: item.locationName ? `loc-${item.id}` : 'unknown',
+                    id: item.placeId || (item.locationName ? `loc-${item.id}` : 'unknown'),
                     name: item.locationName || primaryLoc.name,
                     location: {
                         lat: item.lat ?? primaryLoc.lat,
@@ -214,6 +229,7 @@ type ApiTripPayloadItem = {
   startTime: string | null;
   experienceId: string | null | undefined;
   locationName: string;
+  placeId?: string;
   lat?: number;
   lng?: number;
   orderIndex: number;
@@ -279,18 +295,22 @@ export function convertGlobeDestinationsToApiPayload(destinations: GlobeDestinat
       title: dest.name,
       suggestedHosts: dest.suggestedHosts || [],
       // date: computed? we don't track absolute dates in GlobeDestination yet, usually relative
-      items: dest.activities.map((item, idx) => ({
-        type: mapItemType(item.type),
-        title: item.title,
-        description: item.description,
-        startTime: null, // item.timeSlot? we need mapping
-        experienceId: item.experienceId,
-        locationName: item.place?.name || item.location || dest.city || dest.name,
-        lat: item.place?.location?.lat,
-        lng: item.place?.location?.lng,
-        orderIndex: idx,
-        createdByAI: true // Assumed
-      }))
+      items: dest.activities.map((item, idx) => {
+        const placeId = normalizePlaceIdForPersistence(item.place?.id);
+        return {
+          type: mapItemType(item.type),
+          title: item.title,
+          description: item.description,
+          startTime: null, // item.timeSlot? we need mapping
+          experienceId: item.experienceId,
+          locationName: item.place?.name || item.location || dest.city || dest.name,
+          ...(placeId ? { placeId } : {}),
+          lat: item.place?.location?.lat,
+          lng: item.place?.location?.lng,
+          orderIndex: idx,
+          createdByAI: true // Assumed
+        };
+      })
     });
   }
 

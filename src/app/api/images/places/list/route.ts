@@ -3,8 +3,10 @@ import { NextResponse } from 'next/server';
 import {
   buildTextQuery,
   fallbackImageUrl,
+  getStoredActivityPhotoUrls,
   parseCount,
   parseDimensions,
+  persistActivityPhotoUrls,
   resolvePlaceImages,
   type PlaceImageEntry,
 } from '../utils';
@@ -19,8 +21,15 @@ type CacheEntry = {
 
 const responseCache = new Map<string, CacheEntry>();
 
-function getCacheKey(query: string, width: number, height: number, sig: number, count: number) {
-  return `${query}|${width}x${height}|${sig}|${count}`;
+function getCacheKey(
+  query: string,
+  width: number,
+  height: number,
+  sig: number,
+  count: number,
+  placeId?: string | null
+) {
+  return `${query}|${width}x${height}|${sig}|${count}|${placeId ?? '-'}`;
 }
 
 function pruneCache() {
@@ -39,9 +48,18 @@ export async function GET(request: Request) {
   const name = searchParams.get('name');
   const city = searchParams.get('city');
   const category = searchParams.get('category');
+  const placeId = searchParams.get('placeId');
   const sig = Number(searchParams.get('sig') ?? 0);
   const { width, height } = parseDimensions(searchParams);
   const count = parseCount(searchParams);
+
+  const storedPhotos = await getStoredActivityPhotoUrls(placeId);
+  if (storedPhotos.length > 0) {
+    const rotated =
+      sig > 0 ? [...storedPhotos.slice(sig % storedPhotos.length), ...storedPhotos.slice(0, sig % storedPhotos.length)] : storedPhotos;
+    const images = rotated.slice(0, count).map((url) => ({ url }));
+    return NextResponse.json({ images });
+  }
 
   const textQuery = buildTextQuery({ rawQuery, name, city, category });
   if (!textQuery) {
@@ -53,7 +71,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ images: [{ url: fallbackImageUrl(request) }] });
   }
 
-  const cacheKey = getCacheKey(textQuery, width, height, sig, count);
+  const cacheKey = getCacheKey(textQuery, width, height, sig, count, placeId);
   const cached = responseCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return NextResponse.json({ images: cached.images });
@@ -73,6 +91,10 @@ export async function GET(request: Request) {
 
     const finalImages =
       images.length > 0 ? images : [{ url: fallbackImageUrl(request) }];
+
+    if (placeId && images.length > 0) {
+      void persistActivityPhotoUrls(placeId, images.map((image) => image.url));
+    }
 
     responseCache.set(cacheKey, {
       images: finalImages,

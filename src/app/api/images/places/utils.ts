@@ -1,4 +1,5 @@
 import { PLACE_IMAGE_FALLBACK } from '@/lib/images/places';
+import { prisma } from '@/lib/prisma';
 
 const DEFAULT_WIDTH = 600;
 const DEFAULT_HEIGHT = 400;
@@ -28,6 +29,52 @@ export type PlaceImageEntry = {
   url: string;
   attribution?: PlaceImageAttribution;
 };
+
+function sanitizePhotoUrls(urls: unknown): string[] {
+  if (!Array.isArray(urls)) return [];
+  return urls
+    .filter((url): url is string => typeof url === 'string' && /^https?:\/\//.test(url))
+    .slice(0, MAX_COUNT);
+}
+
+export async function getStoredActivityPhotoUrls(placeId?: string | null): Promise<string[]> {
+  const normalizedPlaceId = placeId?.trim();
+  if (!normalizedPlaceId) return [];
+
+  try {
+    const activity = await prisma.activity.findUnique({
+      where: { externalId: normalizedPlaceId },
+      select: { photos: true },
+    });
+    return sanitizePhotoUrls(activity?.photos);
+  } catch (error) {
+    console.warn('[places] failed to load cached Activity photos', error);
+    return [];
+  }
+}
+
+export async function persistActivityPhotoUrls(placeId: string, urls: string[]): Promise<void> {
+  const normalizedPlaceId = placeId.trim();
+  if (!normalizedPlaceId) return;
+  const sanitized = sanitizePhotoUrls(urls);
+  if (sanitized.length === 0) return;
+
+  try {
+    const activity = await prisma.activity.findUnique({
+      where: { externalId: normalizedPlaceId },
+      select: { id: true, photos: true },
+    });
+    if (!activity) return;
+    if (Array.isArray(activity.photos) && activity.photos.length > 0) return;
+
+    await prisma.activity.update({
+      where: { id: activity.id },
+      data: { photos: sanitized },
+    });
+  } catch (error) {
+    console.warn('[places] failed to persist Activity photos', error);
+  }
+}
 
 const GENERIC_TERMS = new Set([
   'breakfast',

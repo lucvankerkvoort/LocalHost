@@ -6,13 +6,11 @@ import { usePathname } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { jobStarted, jobProgress, jobCompleted, jobFailed } from '@/store/orchestrator-slice';
 import { recordToolResult } from '@/lib/ai/tool-events';
-import { saveTripPlanForTrip } from '@/store/globe-thunks';
 import type { ItineraryPlan } from '@/lib/ai/types';
 import { getTripIdFromPath } from '@/components/features/chat-widget-handshake';
 
 const POLL_INTERVAL_MS = 1500;
 const DEBUG_ORCHESTRATOR_LISTENER = process.env.NEXT_PUBLIC_DEBUG_ORCHESTRATOR_PROGRESS === '1';
-const TRACE = true; // temporary trace for debugging
 
 function logOrchestratorListenerDebug(event: string, payload: Record<string, unknown>) {
   if (!DEBUG_ORCHESTRATOR_LISTENER) return;
@@ -38,11 +36,6 @@ export function OrchestratorJobListener() {
   const startedRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
-    if (TRACE) console.log('[TRACE] useEffect fired', {
-      hasLatestGenerate: !!latestGenerate,
-      tripIdFromPath: tripIdFromPath ?? null,
-      activeTripId: activeTripId ?? null,
-    });
     const result = latestGenerate?.result as {
       jobId?: string;
       message?: string;
@@ -62,10 +55,6 @@ export function OrchestratorJobListener() {
           latestJobId: result?.jobId ?? null,
           latestGenerationId: result?.generationId ?? null,
         });
-        if (TRACE) console.log('[TRACE] bail: tripId mismatch', {
-          routeTripId: tripIdFromPath,
-          resultTripId: resultTripId ?? null,
-        });
         return;
       }
     }
@@ -73,10 +62,7 @@ export function OrchestratorJobListener() {
     const toolGenerationId =
       typeof result?.generationId === 'string' ? result.generationId : undefined;
     const jobTripId = resultTripId ?? activeTripId ?? undefined;
-    if (!jobId) {
-      if (TRACE) console.log('[TRACE] bail: no jobId');
-      return;
-    }
+    if (!jobId) return;
     const pollState = pollRef.current;
     const generationKey = toolGenerationId ?? pollState.generationId ?? 'unknown';
 
@@ -85,7 +71,6 @@ export function OrchestratorJobListener() {
     // useEffect re-runs, and without this guard it would dispatch
     // jobStarted again — resetting the bar back to draft/20%.
     if (completeAppliedRef.current[jobId] === generationKey) {
-      if (TRACE) console.log('[TRACE] skip: already completed', { jobId, generationKey });
       return;
     }
 
@@ -94,10 +79,7 @@ export function OrchestratorJobListener() {
       ? pollState.generationId === toolGenerationId
       : true;
     const hasActivePoll = typeof pollState.timer === 'number';
-    if (sameJob && sameGeneration && hasActivePoll) {
-      if (TRACE) console.log('[TRACE] skip: same job+gen, active poll', { jobId, generationKey });
-      return;
-    }
+    if (sameJob && sameGeneration && hasActivePoll) return;
     logOrchestratorListenerDebug('poll.start', {
       jobId,
       toolGenerationId: toolGenerationId ?? null,
@@ -118,7 +100,6 @@ export function OrchestratorJobListener() {
     // re-dispatch jobStarted or it resets the progress bar to 20%.
     if (startedRef.current[jobId] !== generationKey) {
       startedRef.current[jobId] = generationKey;
-      if (TRACE) console.log('[TRACE] dispatch jobStarted', { jobId, generationKey, stage: 'draft' });
       dispatch(
         jobStarted({
           id: jobId,
@@ -126,8 +107,6 @@ export function OrchestratorJobListener() {
           message: result?.message ?? 'Draft ready',
         })
       );
-    } else {
-      if (TRACE) console.log('[TRACE] skip jobStarted (already started)', { jobId, generationKey });
     }
 
     const poll = async () => {
@@ -177,9 +156,6 @@ export function OrchestratorJobListener() {
         });
 
         if (pollState.generationId !== jobGenerationId) {
-          if (TRACE) console.log('[TRACE] poll: generation advanced, dispatching jobStarted AGAIN', {
-            jobId, prev: pollState.generationId, next: jobGenerationId,
-          });
           logOrchestratorListenerDebug('poll.generation-advanced', {
             jobId,
             previousGenerationId: pollState.generationId ?? null,
@@ -206,9 +182,6 @@ export function OrchestratorJobListener() {
             tripId: jobTripId ?? null,
           });
           draftAppliedRef.current[jobId] = jobGenerationId;
-          if (TRACE) console.log('[TRACE] poll: calling recordToolResult for DRAFT', {
-            jobId, generationId: jobGenerationId,
-          });
           recordToolResult(dispatch, {
             toolName: 'generateItinerary',
             result: {
@@ -252,14 +225,6 @@ export function OrchestratorJobListener() {
             },
             source: 'orchestrator',
           });
-          if (jobTripId) {
-            logOrchestratorListenerDebug('persist.trip-plan.dispatch', {
-              jobId,
-              generationId: jobGenerationId,
-              tripId: jobTripId,
-            });
-            dispatch(saveTripPlanForTrip({ tripId: jobTripId, plan: job.plan as ItineraryPlan }));
-          }
           window.clearInterval(intervalId);
           pollState.timer = undefined;
           return;
@@ -289,9 +254,6 @@ export function OrchestratorJobListener() {
             stage === 'error'
               ? stage
               : 'geocoding';
-          if (TRACE) console.log('[TRACE] poll: dispatching jobProgress', {
-            jobId, stage: normalizedStage, current: job.progress.current, total: job.progress.total,
-          });
           dispatch(
             jobProgress({
               id: jobId,
@@ -318,7 +280,6 @@ export function OrchestratorJobListener() {
     poll();
 
     return () => {
-      if (TRACE) console.log('[TRACE] cleanup: clearing interval');
       window.clearInterval(intervalId);
       if (pollState.timer === intervalId) {
         pollState.timer = undefined;

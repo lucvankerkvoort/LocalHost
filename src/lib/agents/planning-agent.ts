@@ -6,7 +6,6 @@ import {
   createOrchestratorJob,
   updateOrchestratorJob,
   resetOrchestratorJob,
-  failOrchestratorJob,
 } from '@/lib/ai/orchestrator-jobs';
 import { jobWriteQueue } from '@/lib/ai/job-write-queue';
 import type { DraftItinerary } from '@/lib/ai/orchestrator';
@@ -26,6 +25,11 @@ import {
   normalizeDestinations,
 } from './planner-helpers';
 import { GenerationController, type GenerationTask, type PlannerSnapshot as ControllerPlannerSnapshot } from './generation-controller';
+
+import { convertPlanToGlobeData, mapTransportPreferenceToMode, extractTransportPreference } from '@/lib/ai/plan-converter';
+import { convertGlobeDestinationsToApiPayload } from '@/lib/api/trip-converter';
+import { generateTripTitleFromPlan } from '@/lib/trips/title';
+import { persistTripPlanAsUser } from '@/lib/trips/persistence';
 
 // System prompt that handles semantic search and itinerary planning
 const SYSTEM_PROMPT = `You are a friendly, helpful travel planner for Localhost, a platform that connects travelers with locals and authentic experiences.
@@ -118,6 +122,7 @@ const DEFAULT_PLANNER_STATE: PlannerFlowState = {
 type PlannerGenerationSnapshot = ControllerPlannerSnapshot & {
   sessionId: string;
   tripId: string | null;
+  userId: string | null;
   destinations: string[];
   startDate?: string;
   endDate?: string;
@@ -145,6 +150,7 @@ function buildPlannerGenerationSnapshot(params: {
   request: string;
   sessionId: string;
   tripId: string | null;
+  userId: string | null;
   state: PlannerFlowState;
 }): PlannerGenerationSnapshot {
   return {
@@ -152,6 +158,7 @@ function buildPlannerGenerationSnapshot(params: {
     createdAt: Date.now(),
     sessionId: params.sessionId,
     tripId: params.tripId,
+    userId: params.userId,
     destinations: [...params.state.destinations],
     startDate: params.state.startDate,
     endDate: params.state.endDate,
@@ -551,6 +558,7 @@ async function runPlannerGenerationTask(
       await jobWriteQueue.flush(jobId, {
         status: 'error',
         error: 'Unable to locate the main city for this trip.',
+        expectedGenerationId: generationId,
         progress: { stage: 'error', message: 'Unable to locate the main city for this trip.' },
       });
       return;
@@ -566,6 +574,7 @@ async function runPlannerGenerationTask(
     const draftWriteResult = await updateOrchestratorJob(jobId, {
       status: 'draft',
       plan: draftResult.plan,
+      expectedGenerationId: generationId,
       progress: {
         stage: 'draft',
         message: `Draft ready: ${draftResult.plan.title}`,
@@ -574,10 +583,12 @@ async function runPlannerGenerationTask(
     logPlannerProgressDebug('draft.write.result', {
       jobId,
       generationId,
-      rowStatus: draftWriteResult?.status ?? null,
-      rowStage: draftWriteResult?.progress.stage ?? null,
-      rowGenerationId: draftWriteResult?.generationId ?? null,
-      rowUpdatedAt: draftWriteResult?.updatedAt ?? null,
+      applied: draftWriteResult.applied,
+      reason: draftWriteResult.reason,
+      rowStatus: draftWriteResult.row?.status ?? null,
+      rowStage: draftWriteResult.row?.progress.stage ?? null,
+      rowGenerationId: draftWriteResult.row?.generationId ?? null,
+      rowUpdatedAt: draftWriteResult.row?.updatedAt ?? null,
     });
 
     const totals = getHydrationTotals(draftResult.context.draft);
@@ -604,7 +615,7 @@ async function runPlannerGenerationTask(
           hostTotal: totals.hosts,
         },
       });
-      jobWriteQueue.enqueue(jobId, { status: 'running', progress });
+      jobWriteQueue.enqueue(jobId, { status: 'running', expectedGenerationId: generationId, progress });
     };
 
     const hydrationOrchestrator = new ItineraryOrchestrator(undefined, {
@@ -627,7 +638,8 @@ async function runPlannerGenerationTask(
     const plan = await hydrationOrchestrator.planTripFromDraft(
       snapshot.request,
       draftResult.context.draft,
-      draftResult.context.tripAnchor
+      draftResult.context.tripAnchor,
+      draftResult.context.inventory
     );
     if (shouldIgnore()) return;
 
@@ -638,19 +650,69 @@ async function runPlannerGenerationTask(
       hostMarkerCount: hostMarkers.length,
       dayCount: plan.days.length,
     });
+    if (snapshot.tripId) {
+      if (!snapshot.userId) {
+        throw new Error(
+          `Missing user context for planner persistence (tripId=${snapshot.tripId})`
+        );
+      }
+      logPlannerProgressDebug('complete.persist.start', {
+        jobId,
+        generationId,
+        tripId: snapshot.tripId,
+      });
+      try {
+        const { destinations } = convertPlanToGlobeData(plan);
+        const { stops } = convertGlobeDestinationsToApiPayload(destinations);
+        const title = generateTripTitleFromPlan(plan);
+        const transportPreference = mapTransportPreferenceToMode(
+          extractTransportPreference(plan.request)
+        );
+        const preferences = transportPreference ? { transportPreference } : undefined;
+        await persistTripPlanAsUser({
+          tripId: snapshot.tripId,
+          userId: snapshot.userId,
+          stops,
+          preferences,
+          title,
+          audit: {
+            source: 'planner',
+            actor: 'planning-agent',
+            jobId,
+            generationId,
+            reason: 'planner_generation_complete',
+          },
+        });
+        logPlannerProgressDebug('complete.persist.success', {
+          jobId,
+          generationId,
+        });
+      } catch (persistError) {
+        logPlannerProgressDebug('complete.persist.error', {
+          jobId,
+          generationId,
+          error: persistError instanceof Error ? persistError.message : String(persistError),
+        });
+        throw persistError; // Caught by outer block, sets status to 'error'
+      }
+    }
+
     const completeResult = await jobWriteQueue.flush(jobId, {
       status: 'complete',
       plan,
       hostMarkers,
+      expectedGenerationId: generationId,
       progress: { stage: 'complete', message: 'Plan ready' },
     });
     logPlannerProgressDebug('complete.flush.result', {
       jobId,
       generationId,
-      rowStatus: completeResult?.status ?? null,
-      rowStage: completeResult?.progress.stage ?? null,
-      rowGenerationId: completeResult?.generationId ?? null,
-      rowUpdatedAt: completeResult?.updatedAt ?? null,
+      applied: completeResult.applied,
+      reason: completeResult.reason,
+      rowStatus: completeResult.row?.status ?? null,
+      rowStage: completeResult.row?.progress.stage ?? null,
+      rowGenerationId: completeResult.row?.generationId ?? null,
+      rowUpdatedAt: completeResult.row?.updatedAt ?? null,
     });
   } catch (error) {
     if (shouldIgnore()) return;
@@ -664,6 +726,7 @@ async function runPlannerGenerationTask(
     await jobWriteQueue.flush(jobId, {
       status: 'error',
       error: errorMsg,
+      expectedGenerationId: generationId,
       progress: { stage: 'error', message: errorMsg },
     });
   }
@@ -693,9 +756,14 @@ const plannerGenerationController = new GenerationController<PlannerGenerationSn
     });
     return created.id;
   },
-  onQueued: async ({ jobId }) => {
-    await updateOrchestratorJob(jobId, {
+  onQueued: async ({ jobId, generationId }) => {
+    if (!generationId) {
+      logPlannerProgressDebug('queued.skipped-missing-generation', { jobId });
+      return;
+    }
+    jobWriteQueue.enqueue(jobId, {
       status: 'running',
+      expectedGenerationId: generationId,
       progress: {
         stage: 'final',
         message: getQueuedMessage(),
@@ -1083,6 +1151,7 @@ Rules:
                 request,
                 sessionId,
                 tripId: context.tripId ?? null,
+                userId: context.userId ?? null,
                 state: nextState,
               });
               const scheduled = await plannerGenerationController.schedule(

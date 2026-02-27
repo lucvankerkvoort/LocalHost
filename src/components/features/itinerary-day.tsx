@@ -91,6 +91,7 @@ export function ItineraryDayColumn({
                   name: item.place?.name ?? item.title,
                   city: item.place?.city,
                   category: item.category ?? item.type,
+                  placeId: item.place?.id,
                 }));
             
             return (

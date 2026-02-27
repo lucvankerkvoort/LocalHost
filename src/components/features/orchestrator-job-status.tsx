@@ -8,7 +8,8 @@ export function OrchestratorJobStatus() {
     const activeId = state.orchestrator.activeJobId;
     return activeId ? state.orchestrator.jobs[activeId] : null;
   });
-  const ui = job ? deriveOrchestratorProgressUi(job) : null;
+  const isVisualReady = useAppSelector((state) => state.globe.destinations.length > 0);
+  const ui = job ? deriveOrchestratorProgressUi(job, undefined, isVisualReady) : null;
 
   if (!job || !ui) return null;
 

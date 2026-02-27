@@ -126,3 +126,37 @@ test('cancel aborts in-flight generation and clears pending work', async () => {
   assert.equal(state?.hasInFlightRequest, false);
   assert.equal(state?.hasPendingSnapshot, false);
 });
+
+test('onQueued receives the current generationId while a generation is in flight', async () => {
+  let releaseFirst = () => {};
+  const blockFirstRun = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  const queuedCalls: Array<{ jobId: string; generationId: string | null }> = [];
+
+  const controller = new GenerationController<Snapshot>({
+    refineDebounceMs: 20,
+    ensureJobId: ({ existingJobId }) => existingJobId ?? 'job-1',
+    onQueued: async ({ jobId, generationId }) => {
+      queuedCalls.push({ jobId, generationId });
+    },
+    runGeneration: async ({ signal }) => {
+      await new Promise<void>((resolve) => {
+        const finish = () => resolve();
+        signal.addEventListener('abort', finish, { once: true });
+        void blockFirstRun.then(finish);
+      });
+    },
+  });
+
+  await controller.schedule('trip-1', { request: 'Draft request', createdAt: 1 });
+  await controller.schedule('trip-1', { request: 'Refine request', createdAt: 2 });
+
+  assert.equal(queuedCalls.length, 1);
+  assert.equal(queuedCalls[0]?.jobId, 'job-1');
+  assert.equal(typeof queuedCalls[0]?.generationId, 'string');
+  assert.ok(queuedCalls[0]?.generationId);
+
+  releaseFirst();
+  await wait(40);
+});

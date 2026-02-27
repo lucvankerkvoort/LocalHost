@@ -11,6 +11,10 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import type { ItineraryPlan } from './types';
 import type { HostMarker } from './trip-session';
+import {
+  buildAtomicOrchestratorJobUpdateWhere,
+  classifyOrchestratorJobUpdateRejectReason,
+} from './orchestrator-job-update-guards';
 
 const DEBUG_ORCHESTRATOR_JOBS = process.env.DEBUG_ORCHESTRATOR_JOBS === '1';
 
@@ -77,6 +81,25 @@ export type OrchestratorJob = {
   error?: string;
 };
 
+export type OrchestratorJobUpdateRejectReason =
+  | 'generation_mismatch'
+  | 'terminal_state_protection'
+  | 'not_found'
+  | 'guard_rejected'
+  | 'update_error';
+
+export type OrchestratorJobUpdateResult =
+  | {
+      applied: true;
+      reason: null;
+      row: OrchestratorJob;
+    }
+  | {
+      applied: false;
+      reason: OrchestratorJobUpdateRejectReason;
+      row: OrchestratorJob | null;
+    };
+
 // ============================================================================
 // Helpers — map between Prisma row ↔ public OrchestratorJob shape
 // ============================================================================
@@ -134,25 +157,24 @@ export async function updateOrchestratorJob(
   id: string,
   updates: Partial<Omit<OrchestratorJob, 'id' | 'createdAt'>> & {
     progress?: Partial<OrchestratorJobProgress>;
+    expectedGenerationId?: string;
   }
-): Promise<OrchestratorJob | null> {
+): Promise<OrchestratorJobUpdateResult> {
   try {
-    const beforeRow = DEBUG_ORCHESTRATOR_JOBS
-      ? await prisma.orchestratorJob.findUnique({
-          where: { id },
-          select: {
-            id: true,
-            status: true,
-            stage: true,
-            message: true,
-            generationId: true,
-            generationMode: true,
-            updatedAt: true,
-            progressCurrent: true,
-            progressTotal: true,
-          },
-        })
-      : null;
+    const beforeRow = await prisma.orchestratorJob.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        status: true,
+        stage: true,
+        message: true,
+        generationId: true,
+        generationMode: true,
+        updatedAt: true,
+        progressCurrent: true,
+        progressTotal: true,
+      },
+    });
 
     // Build the flat Prisma update data from the nested public shape
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -202,10 +224,77 @@ export async function updateOrchestratorJob(
       },
     });
 
-    const row = await prisma.orchestratorJob.update({
-      where: { id },
+    const guardedWhere = buildAtomicOrchestratorJobUpdateWhere({
+      id,
+      expectedGenerationId: updates.expectedGenerationId,
+      nextStatus: updates.status,
+    });
+
+    const updateResult = await prisma.orchestratorJob.updateMany({
+      where: guardedWhere,
       data,
     });
+
+    if (updateResult.count === 0) {
+      const currentRow = await prisma.orchestratorJob.findUnique({ where: { id } });
+      const rejectReason = classifyOrchestratorJobUpdateRejectReason({
+        row: currentRow
+          ? {
+              generationId: currentRow.generationId,
+              status: currentRow.status,
+            }
+          : null,
+        expectedGenerationId: updates.expectedGenerationId,
+        nextStatus: updates.status,
+      });
+
+      if (rejectReason === 'generation_mismatch') {
+        console.warn(
+          `[OrchestratorJob] Rejected update for job ${id}: generation mismatch. Expected ${updates.expectedGenerationId}, got ${currentRow?.generationId ?? 'null'}`
+        );
+      } else if (rejectReason === 'terminal_state_protection') {
+        console.warn(
+          `[OrchestratorJob] Rejected update for job ${id}: terminal state protection. Cannot apply non-terminal update to a ${currentRow?.status ?? 'missing'} job.`
+        );
+      }
+
+      logOrchestratorJobDebug('update.rejected', {
+        id,
+        before: summarizeJobRowForDebug(beforeRow),
+        current: summarizeJobRowForDebug(
+          currentRow
+            ? {
+                id: currentRow.id,
+                status: currentRow.status,
+                stage: currentRow.stage,
+                message: currentRow.message,
+                generationId: currentRow.generationId,
+                generationMode: currentRow.generationMode,
+                updatedAt: currentRow.updatedAt,
+                progressCurrent: currentRow.progressCurrent,
+                progressTotal: currentRow.progressTotal,
+              }
+            : null
+        ),
+        reason: rejectReason,
+      });
+
+      return {
+        applied: false,
+        reason: rejectReason,
+        row: currentRow ? rowToJob(currentRow) : null,
+      };
+    }
+
+    const row = await prisma.orchestratorJob.findUnique({ where: { id } });
+    if (!row) {
+      return {
+        applied: false,
+        reason: 'not_found',
+        row: null,
+      };
+    }
+
     logOrchestratorJobDebug('update.result', {
       id,
       before: summarizeJobRowForDebug(beforeRow),
@@ -223,31 +312,41 @@ export async function updateOrchestratorJob(
       regressedFromComplete:
         beforeRow?.status === 'complete' && row.status !== 'complete',
     });
-    return rowToJob(row);
+    return {
+      applied: true,
+      reason: null,
+      row: rowToJob(row),
+    };
   } catch (error) {
     logOrchestratorJobDebug('update.error', {
       id,
       error: error instanceof Error ? error.message : String(error),
     });
-    // Record not found
-    return null;
+    return {
+      applied: false,
+      reason: 'update_error',
+      row: null,
+    };
   }
 }
 
 export async function completeOrchestratorJob(
   id: string,
   plan: ItineraryPlan,
-  hostMarkers?: HostMarker[]
+  hostMarkers?: HostMarker[],
+  expectedGenerationId?: string
 ): Promise<OrchestratorJob | null> {
-  return updateOrchestratorJob(id, {
+  const result = await updateOrchestratorJob(id, {
     status: 'complete',
     plan,
     hostMarkers,
+    expectedGenerationId,
     progress: {
       stage: 'complete',
       message: 'Plan ready',
     },
   });
+  return result.row;
 }
 
 export async function resetOrchestratorJob(
@@ -282,15 +381,17 @@ export async function resetOrchestratorJob(
   }
 }
 
-export async function failOrchestratorJob(id: string, error: string): Promise<OrchestratorJob | null> {
-  return updateOrchestratorJob(id, {
+export async function failOrchestratorJob(id: string, error: string, expectedGenerationId?: string): Promise<OrchestratorJob | null> {
+  const result = await updateOrchestratorJob(id, {
     status: 'error',
     error,
+    expectedGenerationId,
     progress: {
       stage: 'error',
       message: 'Failed to build trip plan',
     },
   });
+  return result.row;
 }
 
 const STALE_JOB_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes

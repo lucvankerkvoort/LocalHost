@@ -473,6 +473,49 @@ test('convertTripToGlobeDestinations assigns day color based on day index', () =
   assert.notEqual(destinations[0].color, destinations[1].color);
 });
 
+test('convertTripToGlobeDestinations preserves persisted placeId on activity place', () => {
+  const trip: ApiTrip = {
+    id: 'trip-place-id',
+    userId: 'user-1',
+    title: 'Place id trip',
+    stops: [
+      {
+        id: 'stop-1',
+        title: 'Rome',
+        type: 'CITY',
+        locations: [{ name: 'Rome', lat: 41.9, lng: 12.5 }],
+        days: [
+          {
+            id: 'day-1',
+            dayIndex: 1,
+            title: 'Day 1',
+            items: [
+              {
+                id: 'item-1',
+                type: 'SIGHT',
+                title: 'Colosseum',
+                description: null,
+                experienceId: null,
+                hostId: null,
+                placeId: 'ChIJrRMgU7ZhLxMREzGfygqMnbk',
+                locationName: 'Colosseum',
+                lat: 41.8902,
+                lng: 12.4922,
+                orderIndex: 0,
+                experience: null,
+              },
+            ],
+            suggestedHosts: [],
+          },
+        ],
+      },
+    ],
+  };
+
+  const destinations = convertTripToGlobeDestinations(trip);
+  assert.equal(destinations[0].activities[0].place?.id, 'ChIJrRMgU7ZhLxMREzGfygqMnbk');
+});
+
 test('convertGlobeDestinationsToApiPayload uses destination name when city is missing', () => {
   const payload = convertGlobeDestinationsToApiPayload([
     {
@@ -505,4 +548,37 @@ test('convertGlobeDestinationsToApiPayload preserves explicit item type', () => 
   ]);
 
   assert.equal(payload.stops[0].days[0].items[0].type, 'MEAL');
+});
+
+test('convertGlobeDestinationsToApiPayload persists valid place ids and drops synthetic ids', () => {
+  const keepItem = createItem('SIGHT', 'Colosseum', 0, {
+    place: {
+      id: 'ChIJrRMgU7ZhLxMREzGfygqMnbk',
+      name: 'Colosseum',
+      location: { lat: 41.8902, lng: 12.4922 },
+    },
+  });
+  const dropItem = createItem('SIGHT', 'Synthetic', 1, {
+    place: {
+      id: 'fallback-123',
+      name: 'Synthetic',
+      location: { lat: 41.89, lng: 12.49 },
+    },
+  });
+
+  const payload = convertGlobeDestinationsToApiPayload([
+    {
+      id: 'day-1',
+      name: 'Day 1',
+      city: 'Rome',
+      lat: 41.9,
+      lng: 12.5,
+      day: 1,
+      activities: [keepItem, dropItem],
+      color: '#000',
+    } as unknown as GlobePayloadDestination,
+  ]);
+
+  assert.equal(payload.stops[0].days[0].items[0].placeId, 'ChIJrRMgU7ZhLxMREzGfygqMnbk');
+  assert.equal(payload.stops[0].days[0].items[1].placeId, undefined);
 });
