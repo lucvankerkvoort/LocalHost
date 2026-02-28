@@ -38,11 +38,15 @@ CRITICAL TOOL RULES - ALWAYS FOLLOW THESE:
 
 1. **FOLLOW PLANNER FLOW INSTRUCTIONS**
    The system will include a Planner Flow Instructions block. Follow it exactly.
-   If it says to call \`flyToLocation\` or \`generateItinerary\`, you MUST do so.
+   If it says to call \`flyToLocation\`, \`generateItinerary\`, \`getCurrentItinerary\`, or \`updateItinerary\`, you MUST do so.
    If it says not to, you MUST NOT call those tools.
 
 2. **HOSTS/EXPERIENCES → Use semanticSearch tool**
    For finding hosts or experiences, use semanticSearch with appropriate searchType.
+
+3. **EXISTING ITINERARY EDITS → Use updateItinerary**
+   If the user wants to remove or exclude places/activities from an existing itinerary, call \`updateItinerary\`.
+   Example: "I don't like Barstow in my itinerary" should trigger \`updateItinerary\`.
 
 Your role depends on the MODE indicated in the user's message:
 
@@ -53,7 +57,9 @@ Your role depends on the MODE indicated in the user's message:
 - Use semanticSearch with searchType "experiences"
 
 **ITINERARY MODE** (default):
-- Use generateItinerary for trip planning
+- Use generateItinerary for new trip planning or full regeneration
+- Use getCurrentItinerary when you need current plan context
+- Use updateItinerary for edits to an existing itinerary
 - Use flyToLocation for location viewing
 
 Guidelines:
@@ -77,6 +83,8 @@ function logPlannerProgressDebug(event: string, payload: Record<string, unknown>
   if (!DEBUG_ORCHESTRATOR_PROGRESS) return;
   console.info(`[planning-agent][progress] ${event}`, payload);
 }
+
+
 
 type PlannerFlowState = {
   destinations: string[];
@@ -200,6 +208,7 @@ async function seedPlannerStateFromTrip(
   if (state.destinations.length > 0) return state;
 
   try {
+
     const trip = await prisma.trip.findFirst({
       where: {
         id: context.tripId,
@@ -292,6 +301,464 @@ function mergeUnique(
     }
   });
   return merged;
+}
+
+function normalizeTextForMatch(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function dedupeStrings(values: string[]): string[] {
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const value of values) {
+    const normalized = normalizeTextForMatch(value);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    deduped.push(value.trim());
+  }
+  return deduped;
+}
+
+function cleanRemovalTarget(value: string): string | null {
+  const withoutWrappers = value
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .replace(/\b(in|from)\s+(my|the)\s+(itinerary|trip|plan)\b/gi, '')
+    .replace(/\b(in|from)\s+(itinerary|trip|plan)\b/gi, '')
+    .replace(/\bplease\b/gi, '')
+    .trim();
+  if (!withoutWrappers) return null;
+  const strippedArticle = withoutWrappers.replace(/^(the|a|an)\s+/i, '').trim();
+  const normalized = normalizeTextForMatch(strippedArticle);
+  if (!normalized) return null;
+  if (
+    normalized === 'itinerary' ||
+    normalized === 'trip' ||
+    normalized === 'plan' ||
+    normalized === 'that' ||
+    normalized === 'this'
+  ) {
+    return null;
+  }
+  if (normalized.length < 2) return null;
+  return strippedArticle;
+}
+
+function splitRemovalCandidates(value: string): string[] {
+  return value
+    .split(/\s*(?:,|;| and |&)\s*/i)
+    .map((part) => cleanRemovalTarget(part))
+    .filter((part): part is string => typeof part === 'string' && part.length > 0);
+}
+
+const ITINERARY_REMOVAL_PATTERNS = [
+  /\b(?:remove|delete|drop|skip|exclude)\s+(.+?)(?:\s+from\b|\s+in\b|[.!?]|$)/gi,
+  /\b(?:don['’]t like|do not like|hate|not a fan of)\s+(.+?)(?:\s+from\b|\s+in\b|[.!?]|$)/gi,
+  /\bwithout\s+(.+?)(?:[.!?]|$)/gi,
+];
+
+export function detectItineraryUpdateIntent(message: string): boolean {
+  const normalized = message.toLowerCase();
+  const hasEditVerb = /\b(remove|delete|drop|skip|exclude|without|don['’]t like|do not like|hate|not a fan of)\b/i.test(
+    normalized
+  );
+  const hasItineraryContext = /\b(itinerary|plan|trip|day)\b/i.test(normalized);
+  return hasEditVerb && hasItineraryContext;
+}
+
+export function detectItineraryReadIntent(message: string): boolean {
+  const normalized = message.toLowerCase();
+  const hasItineraryContext = /\b(itinerary|plan|trip)\b/i.test(normalized);
+  const hasReadCue = /\b(show|list|what|current|existing|planned|review|summary|summarize|see)\b/i.test(
+    normalized
+  );
+  const hasDirectQuestion = /\bwhat(?:'s| is)\s+(?:in|on)\s+(?:my|the)\s+(itinerary|plan|trip)\b/i.test(
+    normalized
+  );
+  return hasItineraryContext && (hasReadCue || hasDirectQuestion);
+}
+
+export function extractItineraryRemovalTargets(
+  message: string,
+  explicitTargets: string[] = []
+): string[] {
+  const collected: string[] = [];
+
+  explicitTargets.forEach((target) => {
+    collected.push(...splitRemovalCandidates(target));
+  });
+
+  for (const pattern of ITINERARY_REMOVAL_PATTERNS) {
+    for (const match of message.matchAll(pattern)) {
+      if (!match[1]) continue;
+      collected.push(...splitRemovalCandidates(match[1]));
+    }
+  }
+
+  return dedupeStrings(collected);
+}
+
+export type TripPlanItemSnapshot = {
+  type: 'SIGHT' | 'EXPERIENCE' | 'MEAL' | 'FREE_TIME' | 'TRANSPORT' | 'NOTE' | 'LODGING';
+  title: string;
+  description: string | null;
+  startTime: Date | null;
+  endTime: Date | null;
+  locationName: string | null;
+  lat: number | null;
+  lng: number | null;
+  experienceId: string | null;
+  hostId: string | null;
+  createdByAI: boolean;
+};
+
+export type TripPlanDaySnapshot = {
+  dayIndex: number;
+  date: Date | null;
+  title: string | null;
+  suggestedHosts: unknown[];
+  items: TripPlanItemSnapshot[];
+};
+
+export type TripPlanStopSnapshot = {
+  title: string;
+  type: 'CITY' | 'REGION' | 'ROAD_TRIP' | 'TRAIL';
+  locations: Array<{
+    name: string;
+    lat: number;
+    lng: number;
+    placeId?: string;
+  }>;
+  days: TripPlanDaySnapshot[];
+};
+
+type TripAnchorForUpdateRecord = {
+  title: string;
+  type: TripPlanStopSnapshot['type'];
+  locations: unknown;
+  days: Array<{
+    dayIndex: number;
+    date: Date | null;
+    title: string | null;
+    suggestedHosts: unknown;
+    items: Array<{
+      type: TripPlanItemSnapshot['type'];
+      title: string;
+      description: string | null;
+      startTime: Date | null;
+      endTime: Date | null;
+      locationName: string | null;
+      lat: number | null;
+      lng: number | null;
+      experienceId: string | null;
+      hostId: string | null;
+      createdByAI: boolean;
+    }>;
+  }>;
+};
+
+type TripSummaryRecord = {
+  id: string;
+  title: string;
+  status: string;
+};
+
+type TripPlanSnapshot = {
+  trip: TripSummaryRecord;
+  stops: TripPlanStopSnapshot[];
+};
+
+export type ItineraryRemovalStats = {
+  removedStops: string[];
+  removedDays: string[];
+  removedItems: string[];
+};
+
+function hasTargetMatch(value: string | null | undefined, normalizedTargets: string[]): boolean {
+  if (!value) return false;
+  const normalized = normalizeTextForMatch(value);
+  if (!normalized) return false;
+  return normalizedTargets.some(
+    (target) => normalized.includes(target) || target.includes(normalized)
+  );
+}
+
+function coerceLocations(
+  value: unknown
+): Array<{ name: string; lat: number; lng: number; placeId?: string }> {
+  if (!Array.isArray(value)) return [];
+  const normalized = value
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') return null;
+      const candidate = entry as {
+        name?: unknown;
+        lat?: unknown;
+        lng?: unknown;
+        placeId?: unknown;
+      };
+      if (
+        typeof candidate.name !== 'string' ||
+        typeof candidate.lat !== 'number' ||
+        typeof candidate.lng !== 'number'
+      ) {
+        return null;
+      }
+      return {
+        name: candidate.name,
+        lat: candidate.lat,
+        lng: candidate.lng,
+        placeId: typeof candidate.placeId === 'string' ? candidate.placeId : undefined,
+      };
+    })
+    .filter(
+      (entry): entry is NonNullable<typeof entry> =>
+        entry !== null
+    );
+  return normalized;
+}
+
+function coerceSuggestedHosts(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function mapTripAnchorsToStopSnapshots(
+  tripAnchors: TripAnchorForUpdateRecord[]
+): TripPlanStopSnapshot[] {
+  return tripAnchors.map((stop) => {
+    const locations = coerceLocations(stop.locations);
+    return {
+      title: stop.title,
+      type: stop.type,
+      locations:
+        locations.length > 0
+          ? locations
+          : [{ name: stop.title, lat: 0, lng: 0 }],
+      days: stop.days.map((day) => ({
+        dayIndex: day.dayIndex,
+        date: day.date,
+        title: day.title,
+        suggestedHosts: coerceSuggestedHosts(day.suggestedHosts),
+        items: day.items.map((item) => ({
+          type: item.type,
+          title: item.title,
+          description: item.description,
+          startTime: item.startTime,
+          endTime: item.endTime,
+          locationName: item.locationName,
+          lat: item.lat,
+          lng: item.lng,
+          experienceId: item.experienceId,
+          hostId: item.hostId,
+          createdByAI: item.createdByAI,
+        })),
+      })),
+    };
+  });
+}
+
+async function loadTripPlanSnapshot(
+  userId: string,
+  tripId: string
+): Promise<TripPlanSnapshot | null> {
+  const trip = await prisma.trip.findFirst({
+    where: {
+      id: tripId,
+      userId,
+    },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+    },
+  });
+  if (!trip) return null;
+
+  const tripAnchors = (await prisma.tripAnchor.findMany({
+    where: { tripId: trip.id },
+    orderBy: { order: 'asc' },
+    include: {
+      days: {
+        orderBy: { dayIndex: 'asc' },
+        include: {
+          items: {
+            orderBy: { orderIndex: 'asc' },
+          },
+        },
+      },
+    },
+  })) as unknown as TripAnchorForUpdateRecord[];
+
+  return {
+    trip: {
+      id: trip.id,
+      title: trip.title,
+      status: trip.status,
+    },
+    stops: mapTripAnchorsToStopSnapshots(tripAnchors),
+  };
+}
+
+export function removeItineraryTargetsFromStops(
+  stops: TripPlanStopSnapshot[],
+  targets: string[]
+): { stops: TripPlanStopSnapshot[]; stats: ItineraryRemovalStats } {
+  const normalizedTargets = dedupeStrings(targets).map((target) => normalizeTextForMatch(target));
+  if (normalizedTargets.length === 0) {
+    return {
+      stops,
+      stats: {
+        removedStops: [],
+        removedDays: [],
+        removedItems: [],
+      },
+    };
+  }
+
+  const stats: ItineraryRemovalStats = {
+    removedStops: [],
+    removedDays: [],
+    removedItems: [],
+  };
+
+  const nextStops: TripPlanStopSnapshot[] = [];
+
+  for (const stop of stops) {
+    const stopMatches =
+      hasTargetMatch(stop.title, normalizedTargets) ||
+      stop.locations.some((location) => hasTargetMatch(location.name, normalizedTargets));
+    if (stopMatches) {
+      stats.removedStops.push(stop.title);
+      continue;
+    }
+
+    const nextDays: TripPlanDaySnapshot[] = [];
+    for (const day of stop.days) {
+      if (hasTargetMatch(day.title, normalizedTargets)) {
+        stats.removedDays.push(day.title ?? `Day ${day.dayIndex}`);
+        continue;
+      }
+
+      const nextItems = day.items.filter((item) => {
+        const matches =
+          hasTargetMatch(item.title, normalizedTargets) ||
+          hasTargetMatch(item.locationName, normalizedTargets);
+        if (matches) {
+          stats.removedItems.push(item.title);
+        }
+        return !matches;
+      });
+
+      nextDays.push({
+        ...day,
+        items: nextItems,
+      });
+    }
+
+    if (nextDays.length === 0 && stop.days.length > 0) {
+      stats.removedStops.push(stop.title);
+      continue;
+    }
+
+    nextStops.push({
+      ...stop,
+      days: nextDays,
+    });
+  }
+
+  return {
+    stops: nextStops,
+    stats: {
+      removedStops: dedupeStrings(stats.removedStops),
+      removedDays: dedupeStrings(stats.removedDays),
+      removedItems: dedupeStrings(stats.removedItems),
+    },
+  };
+}
+
+function getRemovalCount(stats: ItineraryRemovalStats): number {
+  return stats.removedStops.length + stats.removedDays.length + stats.removedItems.length;
+}
+
+function formatRemovalSummary(stats: ItineraryRemovalStats): string {
+  const segments: string[] = [];
+  if (stats.removedStops.length > 0) {
+    segments.push(`${stats.removedStops.length} stop${stats.removedStops.length === 1 ? '' : 's'}`);
+  }
+  if (stats.removedDays.length > 0) {
+    segments.push(`${stats.removedDays.length} day${stats.removedDays.length === 1 ? '' : 's'}`);
+  }
+  if (stats.removedItems.length > 0) {
+    segments.push(`${stats.removedItems.length} item${stats.removedItems.length === 1 ? '' : 's'}`);
+  }
+  if (segments.length === 0) return 'No matching itinerary entries were removed.';
+  return `Removed ${segments.join(', ')}.`;
+}
+
+async function persistUpdatedTripStops(
+  tripId: string,
+  stops: TripPlanStopSnapshot[]
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    await tx.tripAnchor.deleteMany({
+      where: { tripId },
+    });
+
+    let dayCounter = 1;
+    for (let stopIndex = 0; stopIndex < stops.length; stopIndex += 1) {
+      const stop = stops[stopIndex];
+      const createdAnchor = await tx.tripAnchor.create({
+        data: {
+          tripId,
+          title: stop.title,
+          type: stop.type,
+          locations: stop.locations,
+          order: stopIndex,
+        },
+      });
+
+      for (const day of stop.days) {
+        const createdDay = await tx.itineraryDay.create({
+          data: {
+            tripAnchorId: createdAnchor.id,
+            dayIndex: dayCounter,
+            date: day.date,
+            title: day.title,
+            suggestedHosts: day.suggestedHosts,
+          },
+        });
+        dayCounter += 1;
+
+        for (let itemIndex = 0; itemIndex < day.items.length; itemIndex += 1) {
+          const item = day.items[itemIndex];
+          await tx.itineraryItem.create({
+            data: {
+              dayId: createdDay.id,
+              type: item.type,
+              title: item.title,
+              description: item.description,
+              startTime: item.startTime,
+              endTime: item.endTime,
+              locationName: item.locationName,
+              lat: item.lat,
+              lng: item.lng,
+              experienceId: item.experienceId,
+              hostId: item.hostId,
+              orderIndex: itemIndex,
+              createdByAI: item.createdByAI,
+            },
+          });
+        }
+      }
+    }
+
+    await tx.trip.update({
+      where: { id: tripId },
+      data: { status: 'PLANNED' },
+    });
+  });
 }
 
 export function buildPlannerRequest(state: PlannerFlowState): string {
@@ -781,7 +1248,6 @@ export class PlanningAgent implements Agent {
     messages: Array<{ role?: string; content?: string | Array<{ type?: string; text?: string }> }>,
     context: AgentContext
   ): Promise<AgentStreamResult> {
-    void context;
     // Get the last user message text
     const lastUserMessage = messages[messages.length - 1];
     const userMessageText = typeof lastUserMessage?.content === 'string'
@@ -817,7 +1283,10 @@ export class PlanningAgent implements Agent {
     let plannerDirective = 'Planner flow disabled for this mode.';
     let shouldGenerate = false;
     let shouldFly = false;
+    let shouldGetCurrentItinerary = false;
+    let shouldUpdateItinerary = false;
     let itineraryRequest: string | null = null;
+    let itineraryUpdateRequest: string | null = null;
     let nextQuestion: string | null = null;
 
     if (isPlannerMode) {
@@ -996,14 +1465,27 @@ export class PlanningAgent implements Agent {
         delta.accessibilityNeeds ||
         typeof delta.hostExperiences === 'boolean' ||
         delta.hostExperiencesPerCity;
+      const hasPersistedTripContext = Boolean(context.tripId && context.userId);
+      const wantsItineraryRead = detectItineraryReadIntent(userMessageText);
+      const wantsItineraryUpdate = detectItineraryUpdateIntent(userMessageText);
+      shouldGetCurrentItinerary = hasPersistedTripContext && (wantsItineraryRead || wantsItineraryUpdate);
+      shouldUpdateItinerary =
+        hasPersistedTripContext &&
+        currentState.hasGenerated &&
+        wantsItineraryUpdate;
+
       shouldFly = hasDestination && !nextState.hasFlown;
+      if (shouldGetCurrentItinerary || shouldUpdateItinerary) {
+        shouldFly = false;
+      }
+
       shouldGenerate =
         (incomingDestinations.length > 0 && !currentState.hasGenerated) ||
         (isPlannerHandshake && currentState.destinations.length > 0 && !currentState.hasGenerated) ||
         destinationsChanged ||
         Boolean(delta.startDate && delta.endDate) ||
         Boolean(delta.durationDays) ||
-        Boolean(preferenceChanged);
+        Boolean(preferenceChanged && !shouldUpdateItinerary && !wantsItineraryRead);
 
       if (shouldFly) {
         nextState = { ...nextState, hasFlown: true };
@@ -1013,7 +1495,10 @@ export class PlanningAgent implements Agent {
       }
 
       itineraryRequest = shouldGenerate ? buildPlannerRequest(nextState) : null;
-      const questionResult = getPlannerQuestion(nextState, userMessageText);
+      itineraryUpdateRequest = shouldUpdateItinerary ? userMessageText : null;
+      const questionResult = (shouldUpdateItinerary || shouldGetCurrentItinerary)
+        ? null
+        : getPlannerQuestion(nextState, userMessageText);
       nextQuestion = questionResult?.question ?? null;
       const nextQuestionKey = questionResult?.key;
 
@@ -1040,12 +1525,18 @@ Planner Flow Instructions:
 - Host experiences per city: ${nextState.hostExperiencesPerCity ?? 'unset'}
 - Call flyToLocation now: ${shouldFly ? 'yes (ONLY once, initial city/region)' : 'no'}
 - Call generateItinerary now: ${shouldGenerate ? 'yes' : 'no'}
+- Call getCurrentItinerary now: ${shouldGetCurrentItinerary ? 'yes' : 'no'}
+- Call updateItinerary now: ${shouldUpdateItinerary ? 'yes' : 'no'}
 ${itineraryRequest ? `- If calling generateItinerary, use request EXACTLY: "${itineraryRequest}"` : ''}
+${itineraryUpdateRequest ? `- If calling updateItinerary, use request EXACTLY: "${itineraryUpdateRequest}"` : ''}
 ${nextQuestion ? `- Ask a single friendly question to cover: "${nextQuestionKey ?? 'missing info'}". Suggested wording: "${nextQuestion}"` : '- Ask no question.'}
 Rules:
 - If both flyToLocation and generateItinerary are required, call flyToLocation first.
+- If both getCurrentItinerary and updateItinerary are required, call getCurrentItinerary first.
 - Do NOT call flyToLocation unless instructed above.
 - Do NOT call generateItinerary unless instructed above.
+- Do NOT call getCurrentItinerary unless instructed above.
+- Do NOT call updateItinerary unless instructed above.
 `;
 
       await conversationController.updateMetadata(sessionId, {
@@ -1175,6 +1666,190 @@ Rules:
               return {
                 success: false,
                 error: 'Failed to generate itinerary. Please try again.',
+              };
+            }
+          },
+        }),
+
+        getCurrentItinerary: tool({
+          description:
+            'Load the current persisted itinerary for the active trip so the assistant can reason about specific stops, days, and activities before making edits.',
+          inputSchema: z.object({
+            includeItems: z
+              .boolean()
+              .default(true)
+              .describe('Whether to include day item details'),
+            maxItemsPerDay: z
+              .number()
+              .int()
+              .min(1)
+              .max(25)
+              .default(12)
+              .describe('Maximum items to return per day when includeItems is true'),
+          }),
+          execute: async ({ includeItems = true, maxItemsPerDay = 12 }) => {
+            if (!context.userId) {
+              return {
+                success: false,
+                error: 'Authentication required to read itinerary.',
+              };
+            }
+            if (!context.tripId) {
+              return {
+                success: false,
+                error: 'No active trip selected.',
+              };
+            }
+
+            try {
+              const snapshot = await loadTripPlanSnapshot(context.userId, context.tripId);
+              if (!snapshot) {
+                return {
+                  success: false,
+                  error: 'Trip not found or access denied.',
+                };
+              }
+
+              const dayCount = snapshot.stops.reduce((total, stop) => total + stop.days.length, 0);
+              const itemCount = snapshot.stops.reduce(
+                (total, stop) =>
+                  total + stop.days.reduce((dayTotal, day) => dayTotal + day.items.length, 0),
+                0
+              );
+              const knownPlaceNames = dedupeStrings([
+                ...snapshot.stops.map((stop) => stop.title),
+                ...snapshot.stops.flatMap((stop) => stop.days.map((day) => day.title ?? `Day ${day.dayIndex}`)),
+                ...snapshot.stops.flatMap((stop) => stop.days.flatMap((day) => day.items.map((item) => item.title))),
+              ]);
+
+              return {
+                success: true,
+                tripId: snapshot.trip.id,
+                title: snapshot.trip.title,
+                status: snapshot.trip.status,
+                summary: {
+                  stopCount: snapshot.stops.length,
+                  dayCount,
+                  itemCount,
+                },
+                knownPlaceNames,
+                stops: snapshot.stops.map((stop) => ({
+                  title: stop.title,
+                  type: stop.type,
+                  dayCount: stop.days.length,
+                  days: stop.days.map((day) => ({
+                    dayIndex: day.dayIndex,
+                    title: day.title,
+                    itemCount: day.items.length,
+                    items: includeItems
+                      ? day.items.slice(0, maxItemsPerDay).map((item) => ({
+                          title: item.title,
+                          type: item.type,
+                          locationName: item.locationName,
+                        }))
+                      : undefined,
+                  })),
+                })),
+                message: 'Loaded current itinerary context.',
+              };
+            } catch (error) {
+              console.error('[PlanningAgent] getCurrentItinerary failed', error);
+              return {
+                success: false,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : 'Failed to load current itinerary.',
+              };
+            }
+          },
+        }),
+
+        updateItinerary: tool({
+          description:
+            'Update an existing itinerary by removing places or activities the user no longer wants. This tool persists the updated itinerary to the trip database.',
+          inputSchema: z.object({
+            request: z
+              .string()
+              .describe('User edit request, e.g. "I do not like Barstow in my itinerary. Remove it."'),
+            remove: z
+              .array(z.string())
+              .optional()
+              .describe('Optional explicit list of places or activities to remove'),
+          }),
+          execute: async ({ request, remove = [] }) => {
+            if (!context.userId) {
+              return {
+                success: false,
+                error: 'Authentication required to update itinerary.',
+              };
+            }
+            if (!context.tripId) {
+              return {
+                success: false,
+                error: 'No active trip selected for itinerary updates.',
+              };
+            }
+
+            const targets = extractItineraryRemovalTargets(request, remove);
+            if (targets.length === 0) {
+              return {
+                success: false,
+                error:
+                  'No removable itinerary target was detected. Specify what should be removed.',
+              };
+            }
+
+            try {
+              const snapshot = await loadTripPlanSnapshot(context.userId, context.tripId);
+              if (!snapshot) {
+                return {
+                  success: false,
+                  error: 'Trip not found or access denied.',
+                };
+              }
+
+              const { stops: updatedStops, stats } = removeItineraryTargetsFromStops(
+                snapshot.stops,
+                targets
+              );
+              if (getRemovalCount(stats) === 0) {
+                return {
+                  success: true,
+                  updated: false,
+                  tripId: snapshot.trip.id,
+                  targets,
+                  removed: stats,
+                  message: 'No matching itinerary entries were found to remove.',
+                };
+              }
+
+              if (updatedStops.length === 0) {
+                return {
+                  success: false,
+                  error:
+                    'This update would remove the entire itinerary. Provide a more specific removal target.',
+                };
+              }
+
+              await persistUpdatedTripStops(snapshot.trip.id, updatedStops);
+
+              return {
+                success: true,
+                updated: true,
+                tripId: snapshot.trip.id,
+                targets,
+                removed: stats,
+                message: formatRemovalSummary(stats),
+              };
+            } catch (error) {
+              console.error('[PlanningAgent] updateItinerary failed', error);
+              return {
+                success: false,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : 'Failed to update itinerary.',
               };
             }
           },

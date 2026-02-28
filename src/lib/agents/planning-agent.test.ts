@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildPlannerRequest, getPlannerQuestion } from './planning-agent';
+import {
+  buildPlannerRequest,
+  detectItineraryReadIntent,
+  detectItineraryUpdateIntent,
+  extractItineraryRemovalTargets,
+  getPlannerQuestion,
+  removeItineraryTargetsFromStops,
+} from './planning-agent';
 
 test('buildPlannerRequest prefers road trip wording when driving between two cities', () => {
   const request = buildPlannerRequest({
@@ -54,4 +61,91 @@ test('getPlannerQuestion returns destination prompt when empty', () => {
   );
 
   assert.equal(question?.key, 'destination');
+});
+
+test('detectItineraryUpdateIntent identifies removal edits on existing itinerary text', () => {
+  assert.equal(
+    detectItineraryUpdateIntent("I don't like Barstow in my itinerary, remove it"),
+    true
+  );
+  assert.equal(detectItineraryUpdateIntent('Plan me a trip to Tokyo'), false);
+});
+
+test('detectItineraryReadIntent identifies itinerary context requests', () => {
+  assert.equal(detectItineraryReadIntent('What is in my itinerary right now?'), true);
+  assert.equal(detectItineraryReadIntent('Show me my current trip plan'), true);
+  assert.equal(detectItineraryReadIntent('Plan me a trip to Tokyo'), false);
+});
+
+test('extractItineraryRemovalTargets parses disliked location from free text', () => {
+  assert.deepEqual(
+    extractItineraryRemovalTargets("I don't like Barstow in my itinerary"),
+    ['Barstow']
+  );
+});
+
+test('removeItineraryTargetsFromStops removes matching stop and keeps other stops', () => {
+  const input = [
+    {
+      title: 'Los Angeles',
+      type: 'CITY' as const,
+      locations: [{ name: 'Los Angeles', lat: 34.05, lng: -118.24 }],
+      days: [
+        {
+          dayIndex: 1,
+          date: null,
+          title: 'LA Highlights',
+          suggestedHosts: [],
+          items: [
+            {
+              type: 'SIGHT' as const,
+              title: 'Griffith Observatory',
+              description: null,
+              startTime: null,
+              endTime: null,
+              locationName: 'Los Angeles',
+              lat: 34.1,
+              lng: -118.3,
+              experienceId: null,
+              hostId: null,
+              createdByAI: true,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      title: 'Barstow',
+      type: 'CITY' as const,
+      locations: [{ name: 'Barstow', lat: 34.9, lng: -117.0 }],
+      days: [
+        {
+          dayIndex: 2,
+          date: null,
+          title: 'Barstow Stopover',
+          suggestedHosts: [],
+          items: [
+            {
+              type: 'SIGHT' as const,
+              title: 'Route 66 Museum',
+              description: null,
+              startTime: null,
+              endTime: null,
+              locationName: 'Barstow',
+              lat: 34.9,
+              lng: -117.0,
+              experienceId: null,
+              hostId: null,
+              createdByAI: true,
+            },
+          ],
+        },
+      ],
+    },
+  ];
+
+  const result = removeItineraryTargetsFromStops(input, ['Barstow']);
+  assert.equal(result.stops.length, 1);
+  assert.equal(result.stops[0].title, 'Los Angeles');
+  assert.deepEqual(result.stats.removedStops, ['Barstow']);
 });

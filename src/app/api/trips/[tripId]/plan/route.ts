@@ -44,6 +44,7 @@ export async function POST(
       return new NextResponse('Forbidden', { status: error.status });
     }
     console.error('[TRIP_PLAN_POST]', error);
-    return new NextResponse('Internal Error', { status: 500 });
+    const msg = error instanceof Error ? `${error.message}\n${error.stack}` : String(error);
+    return new NextResponse(`Internal Error: ${msg}`, { status: 500 });
   }
 }

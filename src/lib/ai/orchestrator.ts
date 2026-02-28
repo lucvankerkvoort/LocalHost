@@ -39,11 +39,13 @@ import { prisma } from '@/lib/prisma';
 const DraftItinerarySchema = z.object({
   title: z.string(),
   country: z.string().describe('The main country for this trip, e.g. "Netherlands"'),
+  state: z.string().nullable().describe('State, province, or region. REQUIRED for US locations (e.g. "Utah" or "CA") to ensure accurate geocoding. Otherwise optional.'),
   city: z.string().describe('The main city for this trip, e.g. "Amsterdam"'),
   days: z.array(z.object({
     dayNumber: z.number(),
     title: z.string(),
     city: z.string().nullable().describe('City for this specific day, if different from main trip city; otherwise null'),
+    state: z.string().nullable().describe('State or region for this specific day, REQUIRED for US locations; otherwise null'),
     country: z.string().nullable().describe('Country for this specific day, if different from main trip country; otherwise null'),
     anchorArea: z.string().describe('Neighborhood or area name, e.g. "Jordaan"'),
     interCityTransportToNext: z
@@ -975,7 +977,7 @@ export class ItineraryOrchestrator {
   ): Promise<ItineraryPlan> {
     const hydratedDays = await Promise.all(
       draft.days.map((day, idx) => {
-        return this.processDay(day, draft.city, draft.country, tripAnchor, inventory).then(result => {
+        return this.processDay(day, draft.city, draft.state, draft.country, tripAnchor, inventory).then(result => {
           this.callbacks.onDayProcessed?.(idx + 1, draft.days.length);
           return result;
         });
@@ -992,7 +994,7 @@ export class ItineraryOrchestrator {
   }
 
   private async resolveTripAnchor(draft: DraftItinerary): Promise<GeoPoint | null> {
-    const tripLocation = `${draft.city}, ${draft.country}`;
+    const tripLocation = [draft.city, draft.state, draft.country].filter(Boolean).join(', ');
     console.log(`[Orchestrator] Establishing trip anchor for: ${tripLocation}...`);
 
     const cityResult = await rateLimiter.schedule(() =>
@@ -1001,7 +1003,7 @@ export class ItineraryOrchestrator {
         name: string;
         location: { lat: number; lng: number };
         formattedAddress: string;
-      }>('resolve_place', { name: draft.city, context: draft.country })
+      }>('resolve_place', { name: draft.city, context: [draft.state, draft.country].filter(Boolean).join(', ') })
     );
 
     const tripAnchor = cityResult?.location ?? null;
@@ -1027,10 +1029,11 @@ export class ItineraryOrchestrator {
 
     for (const day of draft.days) {
       const dayCity = (day.city || draft.city || '').trim();
+      const dayState = (day.state || draft.state || '').trim();
       const dayCountry = (day.country || draft.country || '').trim();
       if (!dayCity) continue;
 
-      const key = `${dayCity}|${dayCountry}`.toLowerCase();
+      const key = `${dayCity}|${dayState}|${dayCountry}`.toLowerCase();
       let resolved = cache.get(key);
 
       if (resolved === undefined) {
@@ -1044,7 +1047,7 @@ export class ItineraryOrchestrator {
             city?: string;
           }>('resolve_place', {
             name: dayCity,
-            context: dayCountry || undefined,
+            context: [dayState, dayCountry].filter(Boolean).join(', ') || undefined,
           })
         );
 
@@ -1257,6 +1260,7 @@ private async draftItinerary(
   private async processDay(
     draftDay: DraftItinerary['days'][0], 
     mainCity: string, 
+    mainState: string | null,
     mainCountry: string,
     tripAnchor: { lat: number; lng: number } | null,
     inventory: ActivitySearchResult[]
@@ -1264,8 +1268,9 @@ private async draftItinerary(
     void inventory; // Reserved for inventory-first hydration (P1-1); currently unused in this branch state.
     // 1. Determine local context for this day
     const baseDayCity = draftDay.city || mainCity;
+    const baseDayState = draftDay.state || mainState;
     const dayCountry = draftDay.country || mainCountry;
-    const dayContext = resolveActivityContext({ dayCity: baseDayCity, dayCountry });
+    const dayContext = resolveActivityContext({ dayCity: baseDayCity, dayState: baseDayState, dayCountry });
     
     // Only use the global trip anchor as a bias when the day city was explicitly set
     // and it matches the main city. This avoids forcing multi-city days back to origin.
@@ -1304,7 +1309,7 @@ private async draftItinerary(
           city?: string;
         }>('resolve_place', {
           name: baseDayCity,
-          context: dayCountry,
+          context: [baseDayState, dayCountry].filter(Boolean).join(', ') || undefined,
         })
       );
 
@@ -1333,7 +1338,8 @@ private async draftItinerary(
     if (!finalAnchorLocation && isMainCity && tripAnchor) {
       finalAnchorLocation = tripAnchor;
     }
-    const activityContext = resolveActivityContext({ dayCity, dayCountry });
+    const dayState = baseDayState;
+    const activityContext = resolveActivityContext({ dayCity, dayState, dayCountry });
     const activityAnchor = resolveActivityAnchor({
       dayAnchor: finalAnchorLocation,
       tripAnchor,
@@ -1362,7 +1368,7 @@ private async draftItinerary(
         const explicitContext = explicitLocation.locationHint
           ? resolveExplicitLocationContext({
               locationHint: explicitLocation.locationHint,
-              dayCountry,
+              dayCountry, // we might be okay without adding state here since they explicitly hinted a location
             })
           : activityContext;
         const anchorPoint = explicitLocation.locationHint ? undefined : activityAnchor ?? undefined;

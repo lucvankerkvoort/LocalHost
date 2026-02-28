@@ -153,9 +153,17 @@ function buildQueryVariants(name: string, context?: string): string[] {
   if (context) {
     const parts = context.split(',').map((part) => part.trim()).filter(Boolean);
     if (parts.length > 0) {
-      variants.push(`${trimmedName}, ${parts[0]}`);
+      const firstPart = parts[0];
+      if (trimmedName.toLowerCase() !== firstPart.toLowerCase()) {
+        variants.push(`${trimmedName}, ${firstPart}`);
+      }
     }
-    variants.push(`${trimmedName}, ${context.trim()}`);
+    // Only prepend the name if it's not already the leading term in the context
+    if (context.toLowerCase().startsWith(trimmedName.toLowerCase() + ',')) {
+      variants.push(context.trim());
+    } else {
+      variants.push(`${trimmedName}, ${context.trim()}`);
+    }
   }
 
   variants.push(trimmedName);
