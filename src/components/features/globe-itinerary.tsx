@@ -22,7 +22,6 @@ import { HostPanel } from './host-panel';
 import { buildAddedExperienceIds, buildBookedExperienceIds } from './host-panel-state';
 import { buildPlannerExperienceStopMarkers } from './globe-itinerary-utils';
 import { OrchestratorJobStatus } from './orchestrator-job-status';
-import { deriveOrchestratorProgressUi } from './orchestrator-progress-ui';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   hydrateGlobeState,
@@ -185,17 +184,6 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   const isCollapsed = useAppSelector((state) => state.ui.isItineraryCollapsed);
   const itineraryPanelTab = useAppSelector((state) => state.ui.itineraryPanelTab);
 
-  const orchestratorJob = useAppSelector((state) => {
-    const activeId = state.orchestrator.activeJobId;
-    return activeId ? state.orchestrator.jobs[activeId] : null;
-  });
-  
-  const isSyncing = useMemo(() => {
-    if (!orchestratorJob) return false;
-    const isVisualReady = destinations.length > 0;
-    const ui = deriveOrchestratorProgressUi(orchestratorJob, undefined, isVisualReady);
-    return ui.displayState === 'visual_ready_syncing';
-  }, [orchestratorJob, destinations.length]);
   const [itemPreview, setItemPreview] = useState<ItineraryItemPreview | null>(null);
   const imageCacheRef = useRef<Map<string, ItemPreviewImage[]>>(new Map());
   const [tourState, setTourState] = useState<'idle' | 'playing' | 'paused'>('idle');
@@ -1290,7 +1278,6 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
             onZoomChange={(height) => dispatch(setCameraHeight(height))}
             itemPreview={itemPreview}
             autoCycleDurationMs={tourState === 'playing' ? TOUR_STEP_MS : null}
-            isSyncing={isSyncing}
           />
           {/* Itinerary Panel / Mobile Drawer */}
           <div
