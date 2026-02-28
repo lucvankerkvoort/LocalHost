@@ -47,6 +47,7 @@ type GenerationControllerOptions<TSnapshot extends PlannerSnapshot> = {
   onQueued?: (params: {
     key: string;
     jobId: string;
+    generationId: string | null;
     snapshot: TSnapshot;
     mode: GenerationMode;
   }) => void | Promise<void>;
@@ -113,6 +114,7 @@ export class GenerationController<TSnapshot extends PlannerSnapshot> {
       void this.options.onQueued?.({
         key,
         jobId: record.activeJobId,
+        generationId: record.currentGenerationId,
         snapshot,
         mode: 'refine',
       });

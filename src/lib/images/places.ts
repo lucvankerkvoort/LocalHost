@@ -24,6 +24,7 @@ export function buildPlaceImageUrl(params: {
   name?: string;
   city?: string;
   category?: string;
+  placeId?: string;
   width?: number;
   height?: number;
 }): string | undefined {
@@ -41,6 +42,7 @@ export function buildPlaceImageUrl(params: {
   if (params.name) searchParams.set('name', params.name);
   if (params.city) searchParams.set('city', params.city);
   if (params.category) searchParams.set('category', params.category);
+  if (params.placeId) searchParams.set('placeId', params.placeId);
   return `/api/images/places?${searchParams.toString()}`;
 }
 
@@ -48,6 +50,7 @@ export function buildPlaceImageListUrl(params: {
   name?: string;
   city?: string;
   category?: string;
+  placeId?: string;
   count?: number;
   width?: number;
   height?: number;
@@ -67,5 +70,6 @@ export function buildPlaceImageListUrl(params: {
   if (params.name) searchParams.set('name', params.name);
   if (params.city) searchParams.set('city', params.city);
   if (params.category) searchParams.set('category', params.category);
+  if (params.placeId) searchParams.set('placeId', params.placeId);
   return `/api/images/places/list?${searchParams.toString()}`;
 }

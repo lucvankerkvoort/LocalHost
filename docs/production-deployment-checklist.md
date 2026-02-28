@@ -21,12 +21,14 @@ The following modules use in-process `Map` singletons that **reset on every cold
 | `resolve_place` cache | [resolve-place.ts](file:///Users/lucvankerkvoort/Documents/LocalHost/src/lib/ai/tools/resolve-place.ts) | Geocoding results not shared (minor — just re-fetches) |
 | Route service cache | [route-service.ts](file:///Users/lucvankerkvoort/Documents/LocalHost/src/lib/ai/services/route-service.ts) | Route computations not shared (minor — just re-fetches) |
 | Host markers cache | [host-markers.ts](file:///Users/lucvankerkvoort/Documents/LocalHost/src/lib/ai/host-markers.ts) | Host marker hashing not shared (minor) |
+| Orchestrator Jobs  | [orchestrator-jobs.ts](file:///Users/lucvankerkvoort/Documents/LocalHost/src/lib/ai/orchestrator-jobs.ts) | Async polling must accurately read DB states without race conditions or overwriting terminal states |
 
 **Action items:**
 - [ ] **P0**: Replace `ConversationController` in-memory `Map` → **Prisma DB-backed** (no Redis — simpler for Netlify)
 - [ ] **P0**: Replace `GenerationController` in-memory `Map` → DB-backed generation records (or accept that generation tasks must complete within a single invocation)
 - [ ] **P1**: Replace rate limiter → DB-backed or [Upstash `@upstash/ratelimit`](https://github.com/upstash/ratelimit)
 - [ ] **P1**: Add a `PlaceCache` table — store resolved geocoding results (name, lat/lng, category, address) so future trips to the same destinations reuse cached data instead of calling Google Places API again. Saves API costs + reduces token usage
+- [x] **P0**: Enable guarded DB updates for `OrchestratorJob` writes (`generationId` check) to prevent terminal state regression.
 
 ### 2. Background Task Execution
 

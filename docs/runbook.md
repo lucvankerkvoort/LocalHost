@@ -16,4 +16,6 @@
 
 ## Orchestrator job stuck
 1) Confirm `/api/orchestrator?jobId=...` returns progress.
-2) Check server logs for tool failures.
+2) Check the `OrchestratorJob` table for the current `status` and `generationId`. If the `status` is `running` but the timestamp hasn't updated in 5 minutes, the process likely died.
+3) Check server logs for `denied.stale-generation` to see if a background worker was rejected from overwriting a completed or out-of-date generation state.
+4) Check server logs for tool failures.

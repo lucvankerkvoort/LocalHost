@@ -26,7 +26,7 @@ export async function POST(
 
     const body = await req.json();
     console.log('[TRIP_ITEM_POST] Received:', { tripId, session_user: session?.user?.id, body });
-    const { dayId, dayNumber, experienceId, hostId, title, type, locationName, lat, lng } = body;
+    const { dayId, dayNumber, experienceId, hostId, title, type, locationName, placeId, lat, lng } = body;
 
     // Find the day to attach to
     let day = null;
@@ -106,6 +106,7 @@ export async function POST(
                 experienceId: experience ? experience.id : null, // Only store if exists in DB (FK constraint)
                 hostId: experience?.hostId || hostId || null, // Store hostId directly
                 locationName,
+                placeId: typeof placeId === 'string' ? placeId : null,
                 lat,
                 lng,
                 orderIndex: newOrder,

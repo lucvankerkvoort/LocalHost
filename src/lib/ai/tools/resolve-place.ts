@@ -123,7 +123,7 @@ async function writePlaceCache(
   }
 }
 
-function resolveGoogleApiKey(): string | null {
+export function resolveGoogleApiKey(): string | null {
   const key =
     process.env.GOOGLE_PLACES_API_KEY ||
     process.env.GOOGLE_MAPS_API_KEY;
@@ -320,7 +320,7 @@ function pickBestCandidate(
   };
 }
 
-async function fetchGooglePlacesResults(
+export async function fetchGooglePlacesResults(
   query: string,
   apiKey: string,
   anchorPoint?: { lat: number; lng: number }

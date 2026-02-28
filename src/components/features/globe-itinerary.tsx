@@ -22,6 +22,7 @@ import { HostPanel } from './host-panel';
 import { buildAddedExperienceIds, buildBookedExperienceIds } from './host-panel-state';
 import { buildPlannerExperienceStopMarkers } from './globe-itinerary-utils';
 import { OrchestratorJobStatus } from './orchestrator-job-status';
+import { deriveOrchestratorProgressUi } from './orchestrator-progress-ui';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   hydrateGlobeState,
@@ -183,6 +184,18 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   const showTimeline = useAppSelector((state) => state.ui.showTimeline);
   const isCollapsed = useAppSelector((state) => state.ui.isItineraryCollapsed);
   const itineraryPanelTab = useAppSelector((state) => state.ui.itineraryPanelTab);
+
+  const orchestratorJob = useAppSelector((state) => {
+    const activeId = state.orchestrator.activeJobId;
+    return activeId ? state.orchestrator.jobs[activeId] : null;
+  });
+  
+  const isSyncing = useMemo(() => {
+    if (!orchestratorJob) return false;
+    const isVisualReady = destinations.length > 0;
+    const ui = deriveOrchestratorProgressUi(orchestratorJob, undefined, isVisualReady);
+    return ui.displayState === 'visual_ready_syncing';
+  }, [orchestratorJob, destinations.length]);
   const [itemPreview, setItemPreview] = useState<ItineraryItemPreview | null>(null);
   const imageCacheRef = useRef<Map<string, ItemPreviewImage[]>>(new Map());
   const [tourState, setTourState] = useState<'idle' | 'playing' | 'paused'>('idle');
@@ -1032,27 +1045,34 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     // Fly to location if coordinates exist
     const lat = item.place?.location?.lat;
     const lng = item.place?.location?.lng;
-    if (typeof lat === 'number' && typeof lng === 'number') {
-      dispatch(setVisualTarget({ lat, lng, height: 5000 }));
+      if (typeof lat === 'number' && typeof lng === 'number') {
+        dispatch(setVisualTarget({ lat, lng, height: 5000 }));
 
-      const cachedImages = imageCacheRef.current.get(item.id);
-      setItemPreview({
-        itemId: item.id,
-        title: item.title,
-        description: resolveItemDescription(item),
-        lat,
-        lng,
-        images: cachedImages ?? (item.place?.imageUrl ? [{ url: item.place.imageUrl }] : []),
-        isLoading: !cachedImages,
-      });
-
-      if (!cachedImages) {
-        const listUrl = buildPlaceImageListUrl({
-          name: item.place?.name ?? item.title,
-          city: item.place?.city,
-          category: item.category ?? item.type,
-          count: 5,
+        const cachedImages = imageCacheRef.current.get(item.id);
+        const preloadedImages = Array.isArray(item.place?.imageUrls)
+          ? item.place.imageUrls.map((url) => ({ url }))
+          : null;
+        setItemPreview({
+          itemId: item.id,
+          title: item.title,
+          description: resolveItemDescription(item),
+          lat,
+          lng,
+          images:
+            cachedImages
+            ?? preloadedImages
+            ?? (item.place?.imageUrl ? [{ url: item.place.imageUrl }] : []),
+          isLoading: !cachedImages && !preloadedImages,
         });
+
+        if (!cachedImages && !preloadedImages) {
+          const listUrl = buildPlaceImageListUrl({
+            name: item.place?.name ?? item.title,
+            city: item.place?.city,
+            category: item.category ?? item.type,
+            placeId: item.place?.id,
+            count: 5,
+          });
 
         if (!listUrl) {
           setItemPreview((prev) =>
@@ -1270,6 +1290,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
             onZoomChange={(height) => dispatch(setCameraHeight(height))}
             itemPreview={itemPreview}
             autoCycleDurationMs={tourState === 'playing' ? TOUR_STEP_MS : null}
+            isSyncing={isSyncing}
           />
           {/* Itinerary Panel / Mobile Drawer */}
           <div
