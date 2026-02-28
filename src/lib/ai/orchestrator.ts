@@ -110,6 +110,23 @@ type DraftInventorySelection = {
   minRequiredInventory: number;
 };
 
+type PrismaCityDelegate = {
+  findFirst: (args: {
+    where: { name: string; country: string };
+    select: { id: true };
+  }) => Promise<{ id: string } | null>;
+};
+
+function getPrismaCityDelegate(): PrismaCityDelegate | null {
+  const candidate = (prisma as unknown as { city?: unknown }).city as
+    | { findFirst?: unknown }
+    | undefined;
+  if (!candidate || typeof candidate.findFirst !== 'function') {
+    return null;
+  }
+  return candidate as unknown as PrismaCityDelegate;
+}
+
 function normalizePlaceCategory(category?: string): PlaceCategory {
   switch (category) {
     case 'landmark':
@@ -138,15 +155,23 @@ async function getActivityPhotoMapForPlaceIds(placeIds: string[]): Promise<Map<s
 
   try {
     const rows = await prisma.activity.findMany({
-      where: { externalId: { in: placeIds } },
-      select: { externalId: true, photos: true },
+      where: {
+        OR: [{ id: { in: placeIds } }, { externalId: { in: placeIds } }],
+      },
+      select: { id: true, externalId: true, photos: true },
     });
 
-    return new Map(
-      rows
-        .filter((row) => row.externalId && Array.isArray(row.photos) && row.photos.length > 0)
-        .map((row) => [row.externalId as string, row.photos.filter((url) => typeof url === 'string')])
-    );
+    const map = new Map<string, string[]>();
+    rows.forEach((row) => {
+      if (!Array.isArray(row.photos) || row.photos.length === 0) return;
+      const urls = row.photos.filter((url) => typeof url === 'string');
+      if (urls.length === 0) return;
+      map.set(row.id, urls);
+      if (row.externalId) {
+        map.set(row.externalId, urls);
+      }
+    });
+    return map;
   } catch (error) {
     console.warn('[Orchestrator] Failed to load Activity photos for hydrated places', error);
     return new Map();
@@ -722,6 +747,7 @@ export class ItineraryOrchestrator {
     const seed = await this.extractDraftInventorySeed(prompt);
     const durationDays = extractRequestedDurationDays(prompt);
     const minRequiredInventory = minimumInventoryCountForStrictDraft(durationDays);
+    const cityDelegate = getPrismaCityDelegate();
 
     if (seed.scope === 'multi_city') {
       if (!seed.destinations.length) {
@@ -733,6 +759,20 @@ export class ItineraryOrchestrator {
           enforceInventoryOnly: false,
           seed,
           reason: 'multi_city_no_destinations',
+          durationDays,
+          minRequiredInventory,
+        };
+      }
+
+      if (!cityDelegate) {
+        console.warn(
+          '[Orchestrator] Prisma city delegate unavailable; skipping segmented inventory lookup and using non-RAG draft mode.'
+        );
+        return {
+          inventory: [],
+          enforceInventoryOnly: false,
+          seed,
+          reason: 'multi_city_segmented_optional',
           durationDays,
           minRequiredInventory,
         };
@@ -750,7 +790,7 @@ export class ItineraryOrchestrator {
       const perCityLimit = Math.max(8, Math.min(20, Math.ceil(50 / Math.max(uniqueDestinations.length, 1))));
       const inventoryChunks = await Promise.all(
         uniqueDestinations.map(async (destination) => {
-          const cityRow = await prisma.city.findFirst({
+          const cityRow = await cityDelegate.findFirst({
             where: { name: destination.city, country: destination.country },
             select: { id: true },
           });
@@ -820,7 +860,21 @@ export class ItineraryOrchestrator {
       console.error('[Orchestrator] Pre-enrichment failed (continuing without strict inventory):', e);
     }
 
-    const cityRow = await prisma.city.findFirst({
+    if (!cityDelegate) {
+      console.warn(
+        '[Orchestrator] Prisma city delegate unavailable; disabling strict inventory draft for single-city prompt.'
+      );
+      return {
+        inventory: [],
+        enforceInventoryOnly: false,
+        seed,
+        reason: 'city_not_in_inventory_db',
+        durationDays,
+        minRequiredInventory,
+      };
+    }
+
+    const cityRow = await cityDelegate.findFirst({
       where: { name: seed.city, country: seed.country },
       select: { id: true },
     });
@@ -1436,6 +1490,8 @@ private async draftItinerary(
             confidence: placeResult?.confidence,
             geoValidation: placeResult?.geoValidation,
             distanceToAnchor: placeResult?.distanceToAnchor,
+            imageUrl: undefined as string | undefined,
+            imageUrls: undefined as string[] | undefined,
           },
           timeSlot: act.timeSlot,
           notes: act.notes ?? undefined,

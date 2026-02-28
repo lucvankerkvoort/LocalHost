@@ -63,6 +63,43 @@ test('getPlannerQuestion returns destination prompt when empty', () => {
   assert.equal(question?.key, 'destination');
 });
 
+test('getPlannerQuestion asks for dates when destination is known and timing is missing', () => {
+  const question = getPlannerQuestion(
+    {
+      destinations: ['Tokyo'],
+      destinationScope: 'city',
+      needsCities: false,
+      mustSeeProvided: false,
+      avoidProvided: false,
+      foodPreferencesProvided: false,
+      hasGenerated: false,
+      hasFlown: false,
+    },
+    'Plan me a trip to Tokyo'
+  );
+
+  assert.equal(question?.key, 'dates');
+});
+
+test('getPlannerQuestion does not run full questionnaire after destination and duration are known', () => {
+  const question = getPlannerQuestion(
+    {
+      destinations: ['Tokyo'],
+      destinationScope: 'city',
+      needsCities: false,
+      durationDays: 5,
+      mustSeeProvided: false,
+      avoidProvided: false,
+      foodPreferencesProvided: false,
+      hasGenerated: false,
+      hasFlown: false,
+    },
+    '5 days in Tokyo'
+  );
+
+  assert.equal(question, null);
+});
+
 test('detectItineraryUpdateIntent identifies removal edits on existing itinerary text', () => {
   assert.equal(
     detectItineraryUpdateIntent("I don't like Barstow in my itinerary, remove it"),
@@ -81,6 +118,21 @@ test('extractItineraryRemovalTargets parses disliked location from free text', (
   assert.deepEqual(
     extractItineraryRemovalTargets("I don't like Barstow in my itinerary"),
     ['Barstow']
+  );
+});
+
+test('extractItineraryRemovalTargets ignores generic pronouns to avoid over-removal', () => {
+  assert.deepEqual(
+    extractItineraryRemovalTargets('Please remove it from my itinerary'),
+    []
+  );
+  assert.deepEqual(
+    extractItineraryRemovalTargets('Remove that from my trip'),
+    []
+  );
+  assert.deepEqual(
+    extractItineraryRemovalTargets('Drop them from the plan'),
+    []
   );
 });
 

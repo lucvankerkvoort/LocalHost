@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 
 import { persistTripPlanAsUser, TripPlanPersistenceError } from '@/lib/trips/persistence';
+import {
+  TripPlanWritePayloadSchema,
+  formatTripPlanValidationIssues,
+} from '@/lib/trips/contracts/trip-plan.schema';
 
 export async function POST(
   req: Request,
@@ -15,13 +19,38 @@ export async function POST(
 
     const { tripId } = await params;
 
-    const body = await req.json();
-    const { stops, preferences, title } = body;
-    // Expect body to be { stops: [ { city, days: [ { items: [] } ] } ] } roughly
-
-    if (!Array.isArray(stops)) {
-      return new NextResponse('Invalid payload', { status: 400 });
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'INVALID_JSON',
+          message: 'Request body must be valid JSON.',
+        },
+        { status: 400 }
+      );
     }
+
+    const parsed = TripPlanWritePayloadSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'INVALID_PAYLOAD',
+          message: 'Trip plan payload failed validation.',
+          issues: formatTripPlanValidationIssues(parsed.error),
+        },
+        { status: 400 }
+      );
+    }
+    const { stops, preferences, title } = parsed.data;
+    const expectedVersionHeader = req.headers.get('x-trip-expected-version');
+    const expectedVersion =
+      expectedVersionHeader && /^\d+$/.test(expectedVersionHeader)
+        ? Number.parseInt(expectedVersionHeader, 10)
+        : undefined;
 
     const dayIdMap = await persistTripPlanAsUser({
       tripId,
@@ -29,6 +58,7 @@ export async function POST(
       stops,
       preferences,
       title,
+      expectedVersion,
       audit: {
         source: 'api',
         actor: 'api.trips.plan.post',
@@ -40,6 +70,16 @@ export async function POST(
     if (error instanceof TripPlanPersistenceError) {
       if (error.code === 'NOT_FOUND') {
         return new NextResponse('Not Found', { status: error.status });
+      }
+      if (error.code === 'VERSION_CONFLICT') {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'VERSION_CONFLICT',
+            message: error.message,
+          },
+          { status: error.status }
+        );
       }
       return new NextResponse('Forbidden', { status: error.status });
     }

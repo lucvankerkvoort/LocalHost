@@ -25,15 +25,40 @@ export function OrchestratorJobListener() {
   );
   const activeTripId = useAppSelector((state) => state.globe.tripId);
   const tripIdFromPath = getTripIdFromPath(pathname);
-  const pollRef = useRef<{
+
+  // References to keep polling loop independent of frequent re-renders
+  const jobStateRef = useRef<{
     jobId?: string;
     generationId?: string;
     timer?: number;
     inFlight?: boolean;
+    abortController?: AbortController;
   }>({});
-  const draftAppliedRef = useRef<Record<string, string>>({});
-  const completeAppliedRef = useRef<Record<string, string>>({});
-  const startedRef = useRef<Record<string, string>>({});
+
+  const appliedRef = useRef<Record<string, { draft?: string; complete?: string; started?: string }>>({});
+
+  // Keep latest context available to the async poll interval without causing re-renders
+  const contextRef = useRef({
+    dispatch,
+    tripIdFromPath,
+    activeTripId,
+  });
+  useEffect(() => {
+    contextRef.current = { dispatch, tripIdFromPath, activeTripId };
+  }, [dispatch, tripIdFromPath, activeTripId]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      const state = jobStateRef.current;
+      if (state.timer) {
+        window.clearInterval(state.timer);
+      }
+      if (state.abortController) {
+        state.abortController.abort();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const result = latestGenerate?.result as {
@@ -42,64 +67,67 @@ export function OrchestratorJobListener() {
       tripId?: string;
       generationId?: string;
     } | undefined;
+
     const resultTripId =
       typeof result?.tripId === 'string' && result.tripId.trim().length > 0
         ? result.tripId
         : undefined;
-    if (tripIdFromPath) {
-      // Trip pages must only react to trip-scoped planner jobs for the current route.
-      if (!resultTripId || resultTripId !== tripIdFromPath) {
+
+    const jobId = result?.jobId;
+    const toolGenerationId = typeof result?.generationId === 'string' ? result.generationId : 'unknown';
+    const jobTripId = resultTripId ?? contextRef.current.activeTripId ?? undefined;
+    
+    // Ensure we have a valid job
+    if (!jobId) return;
+
+    if (contextRef.current.tripIdFromPath) {
+      if (!resultTripId || resultTripId !== contextRef.current.tripIdFromPath) {
         logOrchestratorListenerDebug('ignore.mismatched-trip-result', {
-          routeTripId: tripIdFromPath,
+          routeTripId: contextRef.current.tripIdFromPath,
           resultTripId: resultTripId ?? null,
-          latestJobId: result?.jobId ?? null,
-          latestGenerationId: result?.generationId ?? null,
+          latestJobId: jobId,
         });
         return;
       }
     }
-    const jobId = result?.jobId;
-    const toolGenerationId =
-      typeof result?.generationId === 'string' ? result.generationId : undefined;
-    const jobTripId = resultTripId ?? activeTripId ?? undefined;
-    if (!jobId) return;
-    const pollState = pollRef.current;
-    const generationKey = toolGenerationId ?? pollState.generationId ?? 'unknown';
 
-    // Don't restart polling for a job that's already been completed.
-    // When completion fires recordToolResult, latestGenerate changes,
-    // useEffect re-runs, and without this guard it would dispatch
-    // jobStarted again — resetting the bar back to draft/20%.
-    if (completeAppliedRef.current[jobId] === generationKey) {
+    const state = jobStateRef.current;
+    
+    // Have we already fully completed this job for this generation?
+    const jobRecord = appliedRef.current[jobId] = appliedRef.current[jobId] || {};
+    if (jobRecord.complete === toolGenerationId) {
+      return; 
+    }
+
+    // Is it already actively polling for this EXACT configuration?
+    if (state.jobId === jobId && state.generationId === toolGenerationId && state.timer !== undefined) {
       return;
     }
 
-    const sameJob = pollState.jobId === jobId;
-    const sameGeneration = toolGenerationId
-      ? pollState.generationId === toolGenerationId
-      : true;
-    const hasActivePoll = typeof pollState.timer === 'number';
-    if (sameJob && sameGeneration && hasActivePoll) return;
     logOrchestratorListenerDebug('poll.start', {
       jobId,
-      toolGenerationId: toolGenerationId ?? null,
+      toolGenerationId,
       jobTripId: jobTripId ?? null,
-      routeTripId: tripIdFromPath ?? null,
-      activeTripId: activeTripId ?? null,
     });
 
-    pollState.jobId = jobId;
-    if (toolGenerationId) {
-      pollState.generationId = toolGenerationId;
+    // Tear down any previous polling config
+    if (state.timer) {
+      window.clearInterval(state.timer);
+      state.timer = undefined;
+    }
+    if (state.abortController) {
+      state.abortController.abort();
     }
 
-    // Only dispatch jobStarted once per job+generation.
-    // When recordToolResult (draft or complete) changes latestGenerate,
-    // React re-runs this effect. The cleanup clears the old interval,
-    // so we need to re-establish the poll below — but we must NOT
-    // re-dispatch jobStarted or it resets the progress bar to 20%.
-    if (startedRef.current[jobId] !== generationKey) {
-      startedRef.current[jobId] = generationKey;
+    // Set new polling configuration
+    state.jobId = jobId;
+    state.generationId = toolGenerationId;
+    state.inFlight = false;
+    state.abortController = new AbortController();
+
+    // Dispatch job started if we haven't already for this generation
+    if (jobRecord.started !== toolGenerationId) {
+      jobRecord.started = toolGenerationId;
       dispatch(
         jobStarted({
           id: jobId,
@@ -110,12 +138,19 @@ export function OrchestratorJobListener() {
     }
 
     const poll = async () => {
-      if (pollState.inFlight) return;
-      pollState.inFlight = true;
+      // Abort gracefully if polling configuration has moved on
+      if (jobStateRef.current.jobId !== jobId || jobStateRef.current.generationId !== toolGenerationId) {
+         return;
+      }
+      if (jobStateRef.current.inFlight) return;
+      jobStateRef.current.inFlight = true;
 
       try {
-        const response = await fetch(`/api/orchestrator?jobId=${encodeURIComponent(jobId)}`);
+        const response = await fetch(`/api/orchestrator?jobId=${encodeURIComponent(jobId)}`, {
+          signal: jobStateRef.current.abortController?.signal
+        });
         const data = await response.json();
+        
         if (!response.ok || !data.success) {
           logOrchestratorListenerDebug('poll.bad-response', {
             jobId,
@@ -134,35 +169,29 @@ export function OrchestratorJobListener() {
           hostMarkers?: unknown;
           error?: string;
         };
-        const jobGenerationId =
-          typeof job.generationId === 'string' ? job.generationId : 'unknown';
-        logOrchestratorListenerDebug('poll.snapshot', {
-          jobId,
-          jobTripId: jobTripId ?? null,
-          status: job.status,
-          generationId: jobGenerationId,
-          generationMode: job.generationMode ?? null,
-          hasPlan: Boolean(job.plan),
-          hostMarkerCount: Array.isArray(job.hostMarkers) ? job.hostMarkers.length : null,
-          progress: job.progress
-            ? {
-                stage: job.progress.stage ?? null,
-                message: job.progress.message ?? null,
-                current:
-                  typeof job.progress.current === 'number' ? job.progress.current : null,
-                total: typeof job.progress.total === 'number' ? job.progress.total : null,
-              }
-            : null,
-        });
 
-        if (pollState.generationId !== jobGenerationId) {
+        const jobGenId = typeof job.generationId === 'string' ? job.generationId : 'unknown';
+
+        // Ignore stale backend responses if we are already expecting a newer generation
+        // but the DB hasn't caught up yet.
+        if (jobGenId !== toolGenerationId && jobRecord.complete === jobGenId) {
+          logOrchestratorListenerDebug('poll.ignore-stale-generation', {
+            jobId,
+            expected: toolGenerationId,
+            received: jobGenId,
+          });
+          return;
+        }
+
+        // Update tracking generation ID if backend advanced
+        if (jobStateRef.current.generationId !== jobGenId) {
           logOrchestratorListenerDebug('poll.generation-advanced', {
             jobId,
-            previousGenerationId: pollState.generationId ?? null,
-            nextGenerationId: jobGenerationId,
+            previous: jobStateRef.current.generationId,
+            next: jobGenId,
           });
-          pollState.generationId = jobGenerationId;
-          dispatch(
+          jobStateRef.current.generationId = jobGenId;
+          contextRef.current.dispatch(
             jobStarted({
               id: jobId,
               stage: 'draft',
@@ -171,18 +200,18 @@ export function OrchestratorJobListener() {
           );
         }
 
+        const contextStatus = jobRecord.complete;
+
+        // Draft application
         if (
           job.plan &&
           job.status !== 'complete' &&
-          draftAppliedRef.current[jobId] !== jobGenerationId
+          jobRecord.draft !== jobGenId &&
+          contextStatus !== jobGenId
         ) {
-          logOrchestratorListenerDebug('apply.draft-plan', {
-            jobId,
-            generationId: jobGenerationId,
-            tripId: jobTripId ?? null,
-          });
-          draftAppliedRef.current[jobId] = jobGenerationId;
-          recordToolResult(dispatch, {
+          logOrchestratorListenerDebug('apply.draft-plan', { jobId, genId: jobGenId });
+          jobRecord.draft = jobGenId;
+          recordToolResult(contextRef.current.dispatch, {
             toolName: 'generateItinerary',
             result: {
               success: true,
@@ -190,30 +219,27 @@ export function OrchestratorJobListener() {
               plan: job.plan,
               hostMarkers: job.hostMarkers ?? [],
               tripId: jobTripId,
-              generationId: jobGenerationId,
+              generationId: jobGenId,
             },
             source: 'orchestrator',
           });
         }
 
+        // Complete application
         if (job.status === 'complete' && job.plan) {
-          if (completeAppliedRef.current[jobId] === jobGenerationId) {
-            logOrchestratorListenerDebug('apply.complete.skip-duplicate', {
-              jobId,
-              generationId: jobGenerationId,
-            });
-            window.clearInterval(intervalId);
-            pollState.timer = undefined;
-            return;
+          if (contextStatus === jobGenId) {
+             // Already done
+             if (jobStateRef.current.timer === intervalId) {
+               window.clearInterval(intervalId);
+               jobStateRef.current.timer = undefined;
+             }
+             return;
           }
-          logOrchestratorListenerDebug('apply.complete-plan', {
-            jobId,
-            generationId: jobGenerationId,
-            tripId: jobTripId ?? null,
-          });
-          completeAppliedRef.current[jobId] = jobGenerationId;
-          dispatch(jobCompleted({ id: jobId }));
-          recordToolResult(dispatch, {
+
+          logOrchestratorListenerDebug('apply.complete-plan', { jobId, genId: jobGenId });
+          jobRecord.complete = jobGenId;
+          contextRef.current.dispatch(jobCompleted({ id: jobId }));
+          recordToolResult(contextRef.current.dispatch, {
             toolName: 'generateItinerary',
             result: {
               success: true,
@@ -221,71 +247,66 @@ export function OrchestratorJobListener() {
               plan: job.plan,
               hostMarkers: job.hostMarkers ?? [],
               tripId: jobTripId,
-              generationId: jobGenerationId,
+              generationId: jobGenId,
             },
             source: 'orchestrator',
           });
-          window.clearInterval(intervalId);
-          pollState.timer = undefined;
+          
+          if (jobStateRef.current.timer === intervalId) {
+             window.clearInterval(intervalId);
+             jobStateRef.current.timer = undefined;
+          }
           return;
         }
 
+        // Error handling
         if (job.status === 'error') {
-          logOrchestratorListenerDebug('poll.error-status', {
-            jobId,
-            generationId: jobGenerationId,
-            error: job.error || 'Failed to build itinerary.',
-          });
-          dispatch(jobFailed({ id: jobId, error: job.error || 'Failed to build itinerary.' }));
-          window.clearInterval(intervalId);
-          pollState.timer = undefined;
+          logOrchestratorListenerDebug('poll.error-status', { jobId, genId: jobGenId });
+          contextRef.current.dispatch(jobFailed({ id: jobId, error: job.error || 'Failed to build itinerary.' }));
+          
+          if (jobStateRef.current.timer === intervalId) {
+             window.clearInterval(intervalId);
+             jobStateRef.current.timer = undefined;
+          }
           return;
         }
 
+        // Progress updates
         if (job.progress) {
           const stage = job.progress.stage;
           const normalizedStage =
-            stage === 'draft' ||
-            stage === 'geocoding' ||
-            stage === 'routing' ||
-            stage === 'hosts' ||
-            stage === 'final' ||
-            stage === 'complete' ||
-            stage === 'error'
+            ['draft', 'geocoding', 'routing', 'hosts', 'final', 'complete', 'error'].includes(stage ?? '')
               ? stage
               : 'geocoding';
-          dispatch(
+          
+          contextRef.current.dispatch(
             jobProgress({
               id: jobId,
-              stage: normalizedStage,
+              stage: normalizedStage as 'geocoding' | 'routing' | 'hosts' | 'final' | 'complete' | 'error' | 'draft',
               message: job.progress.message || 'Working...',
               current: job.progress.current,
               total: job.progress.total,
             })
           );
         }
+
       } catch (error) {
         logOrchestratorListenerDebug('poll.exception', {
           jobId,
           error: error instanceof Error ? error.message : String(error),
         });
-        throw error;
       } finally {
-        pollState.inFlight = false;
+        if (jobStateRef.current.jobId === jobId) {
+           jobStateRef.current.inFlight = false;
+        }
       }
     };
 
     const intervalId = window.setInterval(poll, POLL_INTERVAL_MS);
-    pollState.timer = intervalId;
-    poll();
+    state.timer = intervalId;
+    poll(); // Initial run
 
-    return () => {
-      window.clearInterval(intervalId);
-      if (pollState.timer === intervalId) {
-        pollState.timer = undefined;
-      }
-    };
-  }, [activeTripId, dispatch, latestGenerate, tripIdFromPath]);
+  }, [latestGenerate]); // ONLY trigger when latestGenerate changes, other values are read from refs
 
   return null;
 }
