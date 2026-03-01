@@ -36,7 +36,18 @@ function installGoogleFetchMock(
 ): () => void {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' ? new URL(input) : new URL((input as URL).toString());
+    const rawUrl =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input instanceof Request
+            ? input.url
+            : String(input);
+    if (!rawUrl.includes('places.googleapis.com/v1/places:searchText')) {
+      return originalFetch(input as RequestInfo | URL, init);
+    }
+    const url = new URL(rawUrl);
     const places = await handler(url, init);
     return {
       ok: true,
@@ -143,4 +154,3 @@ test(
     }
   }
 );
-

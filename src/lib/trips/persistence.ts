@@ -1,63 +1,17 @@
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@prisma/client';
 import { decideTripPlanWriteAccess } from './persistence-auth';
-
-type TripPlanLocationPayload = {
-  name?: string;
-  lat?: number;
-  lng?: number;
-  placeId?: string;
-};
-
-type TripAnchorType = 'CITY' | 'REGION' | 'ROAD_TRIP' | 'TRAIL';
-type TripItineraryItemType =
-  | 'SIGHT'
-  | 'EXPERIENCE'
-  | 'MEAL'
-  | 'FREE_TIME'
-  | 'TRANSPORT'
-  | 'NOTE'
-  | 'LODGING';
-
-type TripPlanItemPayload = {
-  type?: TripItineraryItemType;
-  title?: string | null;
-  description?: string | null;
-  startTime?: string | null;
-  endTime?: string | null;
-  locationName?: string | null;
-  placeId?: string | null;
-  lat?: number;
-  lng?: number;
-  experienceId?: string | null;
-  orderIndex?: number;
-  createdByAI?: boolean;
-};
-
-type TripPlanDayPayload = {
-  dayIndex: number;
-  date?: string | null;
-  title?: string | null;
-  suggestedHosts?: unknown[];
-  items?: TripPlanItemPayload[];
-};
-
-type TripPlanStopPayload = {
-  title?: string;
-  city?: string;
-  lat?: number;
-  lng?: number;
-  placeId?: string;
-  type?: TripAnchorType;
-  order?: number;
-  locations?: TripPlanLocationPayload[];
-  days?: TripPlanDayPayload[];
-};
+import { supportsItineraryItemPlaceIdColumn } from './place-id-compat';
+import type { TripPlanStopInput, TripPlanWritePayload } from './contracts/trip-plan.schema';
+import { resolveNextTripVersion, TripVersionConflictError } from './versioning';
 
 type PersistTripPlanBaseInput = {
   tripId: string;
-  stops: TripPlanStopPayload[];
-  preferences?: Record<string, unknown> | null;
+  stops: TripPlanStopInput[];
+  preferences?: TripPlanWritePayload['preferences'];
   title?: string;
+  expectedVersion?: number;
+  restoredFromVersion?: number;
   audit?: {
     source: 'api' | 'planner';
     actor: string;
@@ -68,14 +22,17 @@ type PersistTripPlanBaseInput = {
 };
 
 export class TripPlanPersistenceError extends Error {
-  code: 'NOT_FOUND' | 'FORBIDDEN' | 'OWNER_MISMATCH';
-  status: 404 | 403;
+  code: 'NOT_FOUND' | 'FORBIDDEN' | 'OWNER_MISMATCH' | 'VERSION_CONFLICT';
+  status: 404 | 403 | 409;
 
-  constructor(code: 'NOT_FOUND' | 'FORBIDDEN' | 'OWNER_MISMATCH', message: string) {
+  constructor(
+    code: 'NOT_FOUND' | 'FORBIDDEN' | 'OWNER_MISMATCH' | 'VERSION_CONFLICT',
+    message: string
+  ) {
     super(message);
     this.name = 'TripPlanPersistenceError';
     this.code = code;
-    this.status = code === 'NOT_FOUND' ? 404 : 403;
+    this.status = code === 'NOT_FOUND' ? 404 : code === 'VERSION_CONFLICT' ? 409 : 403;
   }
 }
 
@@ -95,19 +52,51 @@ async function getTripForWrite(tripId: string) {
     select: {
       id: true,
       userId: true,
-      preferences: true,
     },
   });
 }
 
+function sanitizeJsonValue(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
 async function persistTripPlanCore(
-  trip: { id: string; userId: string; preferences: unknown },
   input: PersistTripPlanBaseInput
 ) {
-  const { tripId, stops, preferences, title } = input;
+  const { tripId, stops, preferences, title, expectedVersion } = input;
   const dayIdMap: Record<number, string> = {};
+  const supportsItemPlaceId = await supportsItineraryItemPlaceIdColumn(prisma);
+  if (!supportsItemPlaceId) {
+    logTripPlanPersistence('write.compat.placeId_disabled', { tripId });
+  }
 
   await prisma.$transaction(async (tx) => {
+    const txTrip = await tx.trip.findUnique({
+      where: { id: tripId },
+      select: {
+        title: true,
+        preferences: true,
+        currentVersion: true,
+      },
+    });
+    if (!txTrip) {
+      throw new TripPlanPersistenceError('NOT_FOUND', `Trip ${tripId} not found`);
+    }
+
+    let versionInfo: { currentVersion: number; nextVersion: number };
+    try {
+      versionInfo = resolveNextTripVersion({
+        currentVersion: txTrip.currentVersion ?? 0,
+        expectedVersion,
+      });
+    } catch (error) {
+      if (error instanceof TripVersionConflictError) {
+        throw new TripPlanPersistenceError('VERSION_CONFLICT', error.message);
+      }
+      throw error;
+    }
+    const nextVersion = versionInfo.nextVersion;
+
     await tx.tripAnchor.deleteMany({
       where: { tripId },
     });
@@ -148,22 +137,30 @@ async function persistTripPlanCore(
 
           if (day.items && Array.isArray(day.items)) {
             for (const item of day.items) {
+              const baseItemData = {
+                dayId: createdDay.id,
+                type: item.type ?? 'SIGHT',
+                title: item.title ?? 'Untitled',
+                description: item.description,
+                startTime: item.startTime ? new Date(item.startTime) : null,
+                endTime: item.endTime ? new Date(item.endTime) : null,
+                locationName: item.locationName,
+                lat: item.lat,
+                lng: item.lng,
+                experienceId: item.experienceId?.startsWith('mock_') ? null : item.experienceId,
+                hostId: item.hostId ?? null,
+                orderIndex: typeof item.orderIndex === 'number' ? item.orderIndex : 0,
+                createdByAI: item.createdByAI ?? true,
+              };
+
               await tx.itineraryItem.create({
-                data: {
-                  dayId: createdDay.id,
-                  type: item.type ?? 'SIGHT',
-                  title: item.title ?? 'Untitled',
-                  description: item.description,
-                  startTime: item.startTime ? new Date(item.startTime) : null,
-                  endTime: item.endTime ? new Date(item.endTime) : null,
-                  locationName: item.locationName,
-                  placeId: item.placeId ?? null,
-                  lat: item.lat,
-                  lng: item.lng,
-                  experienceId: item.experienceId,
-                  orderIndex: typeof item.orderIndex === 'number' ? item.orderIndex : 0,
-                  createdByAI: item.createdByAI ?? true,
-                },
+                data: supportsItemPlaceId
+                  ? {
+                      ...baseItemData,
+                      placeId: item.placeId ?? null,
+                    }
+                  : baseItemData,
+                select: { id: true },
               });
             }
           }
@@ -171,19 +168,45 @@ async function persistTripPlanCore(
       }
     }
 
-    const existingPreferences = toRecord(trip.preferences);
+    const existingPreferences = toRecord(txTrip.preferences);
     const nextPreferences =
       preferences && typeof preferences === 'object'
         ? { ...(existingPreferences ?? {}), ...preferences }
         : (existingPreferences ?? {});
+    const nextTitle =
+      typeof title === 'string' && title.trim().length > 0 ? title.trim() : txTrip.title;
 
     await tx.trip.update({
       where: { id: tripId },
       data: {
-        ...(typeof title === 'string' && title.trim().length > 0 ? { title: title.trim() } : {}),
+        ...(typeof nextTitle === 'string' && nextTitle.trim().length > 0
+          ? { title: nextTitle.trim() }
+          : {}),
         status: 'PLANNED',
         preferences: nextPreferences,
+        currentVersion: nextVersion,
       },
+    });
+
+    const revisionPayload = sanitizeJsonValue({
+      stops,
+      preferences: nextPreferences,
+      title: nextTitle,
+    });
+
+    await tx.tripRevision.create({
+      data: {
+        tripId,
+        version: nextVersion,
+        payload: revisionPayload,
+        source: input.audit?.source ?? 'api',
+        actor: input.audit?.actor ?? 'unknown',
+        reason: input.audit?.reason ?? null,
+        jobId: input.audit?.jobId ?? null,
+        generationId: input.audit?.generationId ?? null,
+        restoredFromVersion: input.restoredFromVersion ?? null,
+      },
+      select: { id: true },
     });
   });
 
@@ -191,6 +214,8 @@ async function persistTripPlanCore(
     tripId,
     stopCount: stops.length,
     dayCount: Object.keys(dayIdMap).length,
+    expectedVersion: input.expectedVersion ?? null,
+    restoredFromVersion: input.restoredFromVersion ?? null,
     source: input.audit?.source ?? null,
     actor: input.audit?.actor ?? null,
     jobId: input.audit?.jobId ?? null,
@@ -231,14 +256,7 @@ export async function persistTripPlanAsUser(
     throw new TripPlanPersistenceError('FORBIDDEN', `Trip ${input.tripId} does not belong to user ${input.userId}`);
   }
 
-  return persistTripPlanCore(
-    {
-      id: trip!.id,
-      userId: trip!.userId,
-      preferences: trip!.preferences,
-    },
-    input
-  );
+  return persistTripPlanCore(input);
 }
 
 export async function persistTripPlanInternal(
@@ -276,21 +294,14 @@ export async function persistTripPlanInternal(
     );
   }
 
-  return persistTripPlanCore(
-    {
-      id: trip!.id,
-      userId: trip!.userId,
-      preferences: trip!.preferences,
+  return persistTripPlanCore({
+    ...input,
+    audit: {
+      source: input.audit?.source ?? 'planner',
+      actor: input.actor,
+      jobId: input.audit?.jobId,
+      generationId: input.audit?.generationId,
+      reason: input.reason,
     },
-    {
-      ...input,
-      audit: {
-        source: input.audit?.source ?? 'planner',
-        actor: input.actor,
-        jobId: input.audit?.jobId,
-        generationId: input.audit?.generationId,
-        reason: input.reason,
-      },
-    }
-  );
+  });
 }

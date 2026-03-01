@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-import { prisma } from '@/lib/prisma';
 import { isObviouslyInvalid, validateCoordinate } from '../validation/geo-validator';
 import { createTool, ToolResult } from './tool-registry';
 
@@ -50,6 +49,17 @@ type GooglePlaceResult = {
 
 const GEOCODE_CACHE = new Map<string, ResolvePlaceResult[]>();
 const GOOGLE_PLACES_TIMEOUT_MS = 8000;
+const SKIP_DB_LOOKUPS = process.env.NODE_ENV === 'test';
+
+type PrismaClientRef = typeof import('@/lib/prisma').prisma;
+let prismaClientPromise: Promise<PrismaClientRef> | null = null;
+
+async function getPrismaClient(): Promise<PrismaClientRef> {
+  if (!prismaClientPromise) {
+    prismaClientPromise = import('@/lib/prisma').then((module) => module.prisma);
+  }
+  return prismaClientPromise;
+}
 
 // ---------------------------------------------------------------------------
 // PlaceCache — DB-backed geocoding cache
@@ -62,11 +72,83 @@ function normalizeCacheKey(name: string, context?: string): { name: string; cont
   };
 }
 
+function extractGooglePlaceId(resultId: string): string | null {
+  if (!resultId.startsWith('gplaces-')) return null;
+  const value = resultId.slice('gplaces-'.length).trim();
+  return value.length > 0 ? value : null;
+}
+
+function mapResolveCategoryToActivityCategory(
+  category: ResolvePlaceResult['category']
+): string {
+  switch (category) {
+    case 'landmark':
+      return 'Landmark';
+    case 'museum':
+      return 'Museum';
+    case 'restaurant':
+      return 'Restaurant';
+    case 'park':
+      return 'Park';
+    case 'city':
+      return 'City';
+    default:
+      return 'Other';
+  }
+}
+
+function mapActivityCategoryToResolveCategory(
+  category: string | null | undefined
+): ResolvePlaceResult['category'] {
+  const normalized = (category ?? '').trim().toLowerCase();
+  if (normalized.includes('museum')) return 'museum';
+  if (normalized.includes('restaurant') || normalized.includes('food')) return 'restaurant';
+  if (normalized.includes('park')) return 'park';
+  if (normalized.includes('city')) return 'city';
+  if (normalized.includes('country')) return 'country';
+  if (normalized.includes('neighborhood')) return 'neighborhood';
+  if (normalized.includes('landmark')) return 'landmark';
+  return 'other';
+}
+
+function parseContextLocation(context?: string): { city?: string; country?: string } {
+  if (!context) return {};
+  const parts = context
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return {};
+  if (parts.length === 1) {
+    return { city: parts[0] };
+  }
+  return {
+    city: parts[0],
+    country: parts[parts.length - 1],
+  };
+}
+
+function inferCountryFromAddress(formattedAddress?: string): string | undefined {
+  if (!formattedAddress) return undefined;
+  const parts = formattedAddress
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return undefined;
+  const country = parts[parts.length - 1];
+  return country.length > 1 ? country : undefined;
+}
+
+function canPersistAsActivity(result: ResolvePlaceResult): boolean {
+  return result.category !== 'city' && result.category !== 'country';
+}
+
 async function checkPlaceCache(
   name: string,
   context?: string
 ): Promise<ResolvePlaceResult | null> {
+  if (SKIP_DB_LOOKUPS) return null;
   try {
+    const prisma = await getPrismaClient();
     const key = normalizeCacheKey(name, context);
     const row = await prisma.placeCache.findUnique({
       where: { name_context: key },
@@ -93,13 +175,16 @@ async function writePlaceCache(
   context: string | undefined,
   result: ResolvePlaceResult
 ): Promise<void> {
+  if (SKIP_DB_LOOKUPS) return;
   try {
+    const prisma = await getPrismaClient();
     const key = normalizeCacheKey(name, context);
+    const googlePlaceId = extractGooglePlaceId(result.id);
     await prisma.placeCache.upsert({
       where: { name_context: key },
       create: {
         ...key,
-        placeId: result.id.replace(/^gplaces-/, '') || null,
+        placeId: googlePlaceId,
         formattedAddress: result.formattedAddress,
         lat: result.location.lat,
         lng: result.location.lng,
@@ -108,7 +193,7 @@ async function writePlaceCache(
         confidence: result.confidence,
       },
       update: {
-        placeId: result.id.replace(/^gplaces-/, '') || null,
+        placeId: googlePlaceId,
         formattedAddress: result.formattedAddress,
         lat: result.location.lat,
         lng: result.location.lng,
@@ -153,9 +238,17 @@ function buildQueryVariants(name: string, context?: string): string[] {
   if (context) {
     const parts = context.split(',').map((part) => part.trim()).filter(Boolean);
     if (parts.length > 0) {
-      variants.push(`${trimmedName}, ${parts[0]}`);
+      const firstPart = parts[0];
+      if (trimmedName.toLowerCase() !== firstPart.toLowerCase()) {
+        variants.push(`${trimmedName}, ${firstPart}`);
+      }
     }
-    variants.push(`${trimmedName}, ${context.trim()}`);
+    // Only prepend the name if it's not already the leading term in the context
+    if (context.toLowerCase().startsWith(trimmedName.toLowerCase() + ',')) {
+      variants.push(context.trim());
+    } else {
+      variants.push(`${trimmedName}, ${context.trim()}`);
+    }
   }
 
   variants.push(trimmedName);
@@ -320,6 +413,212 @@ function pickBestCandidate(
   };
 }
 
+async function checkActivityCatalog(
+  name: string,
+  context: string | undefined,
+  anchorPoint?: { lat: number; lng: number }
+): Promise<ResolvePlaceResult | null> {
+  if (SKIP_DB_LOOKUPS) return null;
+  const prisma = await getPrismaClient();
+  const activityDelegate = (prisma as unknown as { activity?: { findMany?: unknown } }).activity;
+  if (!activityDelegate || typeof activityDelegate.findMany !== 'function') {
+    return null;
+  }
+
+  const trimmedName = name.trim();
+  if (!trimmedName) return null;
+  const parsed = parseContextLocation(context);
+
+  try {
+    const rows = await prisma.activity.findMany({
+      where: {
+        name: { equals: trimmedName, mode: 'insensitive' },
+        city: {
+          ...(parsed.city ? { name: { equals: parsed.city, mode: 'insensitive' } } : {}),
+          ...(parsed.country ? { country: { equals: parsed.country, mode: 'insensitive' } } : {}),
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        lat: true,
+        lng: true,
+        formattedAddress: true,
+        cityId: true,
+      },
+      take: 12,
+    });
+
+    if (rows.length === 0) return null;
+
+    const cityIds = Array.from(new Set(rows.map((row) => row.cityId)));
+    const cityRows = await prisma.city.findMany({
+      where: {
+        id: {
+          in: cityIds,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        country: true,
+      },
+    });
+    const cityMap = new Map(cityRows.map((city) => [city.id, city]));
+
+    const candidates: ResolvePlaceResult[] = rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      formattedAddress:
+        row.formattedAddress ??
+        `${row.name}, ${cityMap.get(row.cityId)?.name ?? ''}, ${cityMap.get(row.cityId)?.country ?? ''}`.trim(),
+      location: { lat: row.lat, lng: row.lng },
+      category: mapActivityCategoryToResolveCategory(row.category),
+      confidence: 0.98,
+      city: cityMap.get(row.cityId)?.name,
+      geoValidation: 'HIGH',
+    }));
+
+    const expectedCity = extractContextCity(context);
+    const filtered = filterResultsByCity(candidates, expectedCity);
+    const best = pickBestCandidate(filtered, anchorPoint);
+    if (!best) return null;
+    return attachDistanceToAnchor(best, anchorPoint);
+  } catch (error) {
+    console.warn('[resolve_place] Activity catalog lookup failed', error);
+    return null;
+  }
+}
+
+async function resolveOrCreateActivity(
+  result: ResolvePlaceResult,
+  context?: string
+): Promise<ResolvePlaceResult> {
+  if (SKIP_DB_LOOKUPS) return result;
+  if (!canPersistAsActivity(result)) return result;
+
+  const prisma = await getPrismaClient();
+  const activityDelegate = (prisma as unknown as { activity?: { findUnique?: unknown; findFirst?: unknown; create?: unknown; update?: unknown } }).activity;
+  const cityDelegate = (prisma as unknown as { city?: { findFirst?: unknown; create?: unknown; update?: unknown } }).city;
+  if (
+    !activityDelegate ||
+    !cityDelegate ||
+    typeof activityDelegate.findUnique !== 'function' ||
+    typeof activityDelegate.findFirst !== 'function' ||
+    typeof activityDelegate.create !== 'function' ||
+    typeof activityDelegate.update !== 'function' ||
+    typeof cityDelegate.findFirst !== 'function' ||
+    typeof cityDelegate.create !== 'function' ||
+    typeof cityDelegate.update !== 'function'
+  ) {
+    return result;
+  }
+
+  const googlePlaceId = extractGooglePlaceId(result.id);
+
+  try {
+    if (googlePlaceId) {
+      const existingByExternalId = await prisma.activity.findUnique({
+        where: { externalId: googlePlaceId },
+        select: { id: true },
+      });
+      if (existingByExternalId) {
+        return {
+          ...result,
+          id: existingByExternalId.id,
+        };
+      }
+    }
+
+    const parsed = parseContextLocation(context);
+    const cityName = (result.city || parsed.city || '').trim();
+    const country = (parsed.country || inferCountryFromAddress(result.formattedAddress) || '').trim();
+    if (!cityName || !country) return result;
+
+    let city = await prisma.city.findFirst({
+      where: {
+        name: { equals: cityName, mode: 'insensitive' },
+        country: { equals: country, mode: 'insensitive' },
+      },
+    });
+
+    if (!city) {
+      city = await prisma.city.create({
+        data: {
+          name: cityName,
+          country,
+          tier: 3,
+          activityCount: 0,
+        },
+      });
+    }
+
+    if (!city) return result;
+
+    const existingByName = await prisma.activity.findFirst({
+      where: {
+        cityId: city.id,
+        name: { equals: result.name, mode: 'insensitive' },
+      },
+      select: { id: true },
+    });
+
+    if (existingByName) {
+      await prisma.activity.update({
+        where: { id: existingByName.id },
+        data: {
+          lat: result.location.lat,
+          lng: result.location.lng,
+          formattedAddress: result.formattedAddress,
+          category: mapResolveCategoryToActivityCategory(result.category),
+          ...(googlePlaceId ? { externalId: googlePlaceId } : {}),
+          lastVerifiedAt: new Date(),
+        },
+      });
+      return {
+        ...result,
+        id: existingByName.id,
+        city: city.name,
+      };
+    }
+
+    const created = await prisma.activity.create({
+      data: {
+        cityId: city.id,
+        source: 'google',
+        externalId: googlePlaceId,
+        name: result.name,
+        category: mapResolveCategoryToActivityCategory(result.category),
+        lat: result.location.lat,
+        lng: result.location.lng,
+        formattedAddress: result.formattedAddress,
+        metadataJson: {
+          resolver: 'resolve_place',
+          context: context ?? null,
+        },
+      },
+      select: { id: true },
+    });
+
+    await prisma.city.update({
+      where: { id: city.id },
+      data: {
+        activityCount: { increment: 1 },
+      },
+    });
+
+    return {
+      ...result,
+      id: created.id,
+      city: city.name,
+    };
+  } catch (error) {
+    console.warn('[resolve_place] Failed to resolve-or-create activity', error);
+    return result;
+  }
+}
+
 export async function fetchGooglePlacesResults(
   query: string,
   apiKey: string,
@@ -387,13 +686,55 @@ export async function fetchGooglePlacesResults(
     .filter((place): place is ResolvePlaceResult => Boolean(place));
 }
 
+export const __resolvePlaceInternals = {
+  extractGooglePlaceId,
+  parseContextLocation,
+  canPersistAsActivity,
+};
+
 export const resolvePlaceTool = createTool({
   name: 'resolve_place',
-  description: 'Convert a place name to geographic coordinates using Google Places.',
+  description:
+    'Resolve a place with DB-first lookup. Check Activity catalog first; if missing, geocode via Google Places and upsert canonical City/Activity records.',
   parameters: ResolvePlaceParams,
 
   async handler(params): Promise<ToolResult<ResolvePlaceResult>> {
     try {
+      const queryVariants = buildQueryVariants(params.name, params.context);
+      const expectedCity = extractContextCity(params.context);
+      const cacheKey = `${params.name}|${params.context || ''}`;
+
+      // 1. Check canonical Activity/City catalog first.
+      const catalogResult = await checkActivityCatalog(
+        params.name,
+        params.context,
+        params.anchorPoint
+      );
+      if (catalogResult) {
+        return { success: true, data: attachDistanceToAnchor(catalogResult, params.anchorPoint) };
+      }
+
+      // 2. Check DB-backed PlaceCache.
+      const dbCached = await checkPlaceCache(params.name, params.context);
+      if (dbCached) {
+        const canonical = await resolveOrCreateActivity(dbCached, params.context);
+        return { success: true, data: attachDistanceToAnchor(canonical, params.anchorPoint) };
+      }
+
+      // 3. Check in-memory cache (survives within same request/process).
+      if (GEOCODE_CACHE.has(cacheKey)) {
+        const cachedResults = GEOCODE_CACHE.get(cacheKey) ?? [];
+        if (cachedResults.length > 0) {
+          const candidateResults = filterResultsByCity(cachedResults, expectedCity);
+          const best = pickBestCandidate(candidateResults, params.anchorPoint);
+          if (best) {
+            const canonical = await resolveOrCreateActivity(best, params.context);
+            return { success: true, data: attachDistanceToAnchor(canonical, params.anchorPoint) };
+          }
+        }
+      }
+
+      // 4. Fallback to Google Places API when cache/catalog miss.
       const apiKey = resolveGoogleApiKey();
       if (!apiKey) {
         return {
@@ -401,28 +742,6 @@ export const resolvePlaceTool = createTool({
           error: 'GOOGLE_PLACES_API_KEY is not configured',
           code: 'CONFIG_ERROR',
         };
-      }
-
-      const queryVariants = buildQueryVariants(params.name, params.context);
-      const expectedCity = extractContextCity(params.context);
-      const cacheKey = `${params.name}|${params.context || ''}`;
-
-      // 1. Check DB-backed PlaceCache first
-      const dbCached = await checkPlaceCache(params.name, params.context);
-      if (dbCached) {
-        return { success: true, data: attachDistanceToAnchor(dbCached, params.anchorPoint) };
-      }
-
-      // 2. Check in-memory cache (survives within same request/process)
-      if (GEOCODE_CACHE.has(cacheKey)) {
-        const cachedResults = GEOCODE_CACHE.get(cacheKey) ?? [];
-        if (cachedResults.length > 0) {
-          const candidateResults = filterResultsByCity(cachedResults, expectedCity);
-          const best = pickBestCandidate(candidateResults, params.anchorPoint);
-          if (best) {
-            return { success: true, data: attachDistanceToAnchor(best, params.anchorPoint) };
-          }
-        }
       }
 
       for (const query of queryVariants) {
@@ -434,8 +753,9 @@ export const resolvePlaceTool = createTool({
         const best = pickBestCandidate(candidateResults, params.anchorPoint);
         if (best) {
           // Write to DB cache for future requests/cold starts
-          void writePlaceCache(params.name, params.context, best);
-          return { success: true, data: attachDistanceToAnchor(best, params.anchorPoint) };
+          await writePlaceCache(params.name, params.context, best);
+          const canonical = await resolveOrCreateActivity(best, params.context);
+          return { success: true, data: attachDistanceToAnchor(canonical, params.anchorPoint) };
         }
       }
 

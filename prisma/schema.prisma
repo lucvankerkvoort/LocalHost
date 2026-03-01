@@ -199,16 +199,36 @@ model Trip {
   title       String
   status      TripStatus @default(DRAFT)
   preferences Json       @default("{}")
+  currentVersion Int     @default(0)
   startDate   DateTime?
   endDate     DateTime?
   
   stops       TripAnchor[]
+  revisions   TripRevision[]
   bookings    Booking[]
   
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
   @@index([userId])
+}
+
+model TripRevision {
+  id                 String   @id @default(cuid())
+  tripId             String
+  trip               Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  version            Int
+  payload            Json
+  source             String
+  actor              String
+  reason             String?
+  jobId              String?
+  generationId       String?
+  restoredFromVersion Int?
+  createdAt          DateTime @default(now())
+
+  @@unique([tripId, version])
+  @@index([tripId, createdAt(sort: Desc)])
 }
 
 model TripAnchor {

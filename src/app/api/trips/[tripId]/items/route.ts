@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
+import { supportsItineraryItemPlaceIdColumn } from '@/lib/trips/place-id-compat';
 
 export async function POST(
   req: Request,
@@ -38,7 +39,14 @@ export async function POST(
                 id: dayId,
                 tripAnchor: { tripId: tripId }
             },
-            include: { items: true }
+            include: {
+              items: {
+                select: {
+                  id: true,
+                  orderIndex: true,
+                },
+              },
+            }
         });
     }
 
@@ -60,7 +68,14 @@ export async function POST(
                 // So dayNumber is 1-based, dayIndex is 0-based.
                 tripAnchor: { tripId: tripId }
             },
-            include: { items: true }
+            include: {
+              items: {
+                select: {
+                  id: true,
+                  orderIndex: true,
+                },
+              },
+            }
          });
          
          // If strictly dayIndex passed? 
@@ -71,7 +86,14 @@ export async function POST(
                     dayIndex: dayNumber - 1, // Try 1-based to 0-based conversion
                     tripAnchor: { tripId: tripId }
                 },
-                include: { items: true }
+                include: {
+                  items: {
+                    select: {
+                      id: true,
+                      orderIndex: true,
+                    },
+                  },
+                }
              });
          }
     }
@@ -84,6 +106,7 @@ export async function POST(
     const targetDayId = day.id;
     
     const userId = session.user.id;
+    const supportsItemPlaceId = await supportsItineraryItemPlaceIdColumn(prisma);
 
     // Calculate new order index
     const maxOrder = day.items.reduce((max, item) => Math.max(max, item.orderIndex), -1);
@@ -98,20 +121,59 @@ export async function POST(
             console.warn('[TRIP_ITEM_POST] Experience not found, creating item without experienceId:', experienceId);
         }
 
-        const item = await tx.itineraryItem.create({
-            data: {
-                dayId: targetDayId,
-                type: type || 'EXPERIENCE',
-                title: title || 'New Item',
-                experienceId: experience ? experience.id : null, // Only store if exists in DB (FK constraint)
-                hostId: experience?.hostId || hostId || null, // Store hostId directly
-                locationName,
+        const baseItemData = {
+            dayId: targetDayId,
+            type: type || 'EXPERIENCE',
+            title: title || 'New Item',
+            experienceId: experience ? experience.id : null, // Only store if exists in DB (FK constraint)
+            hostId: experience?.hostId || hostId || null, // Store hostId directly
+            locationName,
+            lat,
+            lng,
+            orderIndex: newOrder,
+            createdByAI: false,
+        } as const;
+
+        let item: {
+          id: string;
+          dayId: string;
+          type: string;
+          title: string;
+          description: string | null;
+          startTime: Date | null;
+          endTime: Date | null;
+          locationName: string | null;
+          lat: number | null;
+          lng: number | null;
+          experienceId: string | null;
+          hostId: string | null;
+          orderIndex: number;
+          createdByAI: boolean;
+        };
+
+        item = await tx.itineraryItem.create({
+          data: supportsItemPlaceId
+            ? {
+                ...baseItemData,
                 placeId: typeof placeId === 'string' ? placeId : null,
-                lat,
-                lng,
-                orderIndex: newOrder,
-                createdByAI: false,
-            }
+              }
+            : baseItemData,
+          select: {
+            id: true,
+            dayId: true,
+            type: true,
+            title: true,
+            description: true,
+            startTime: true,
+            endTime: true,
+            locationName: true,
+            lat: true,
+            lng: true,
+            experienceId: true,
+            hostId: true,
+            orderIndex: true,
+            createdByAI: true,
+          },
         });
 
         let createdBooking = null;

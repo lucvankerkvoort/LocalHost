@@ -318,7 +318,6 @@ interface CesiumGlobeProps {
     isLoading: boolean;
   } | null;
   autoCycleDurationMs?: number | null;
-  isSyncing?: boolean;
 }
 
 type RoutePathPayload = {
@@ -469,7 +468,6 @@ export default function CesiumGlobe({
   onZoomChange,
   itemPreview,
   autoCycleDurationMs,
-  isSyncing = false,
 }: CesiumGlobeProps) {
   const viewerRef = useRef<CesiumViewer | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -915,7 +913,7 @@ export default function CesiumGlobe({
         })}
         
         {/* Route Lines (Road Trip Anchors) */}
-        {!isSyncing && destinations.map(dest => {
+        {destinations.map(dest => {
           if (dest.type === 'ROAD_TRIP' && dest.locations && dest.locations.length > 1) {
              const positions = dest.locations.map(loc => Cartesian3.fromDegrees(loc.lng, loc.lat));
              return (
@@ -934,7 +932,7 @@ export default function CesiumGlobe({
         })}
 
         {/* Inter-City Travel Routes */}
-        {!isSyncing && routes.map((route) => {
+        {routes.map((route) => {
            // Skip if we are filtering by day and this route is for a different day
            // (Optional: usually we want to see the whole trip context, or just the current leg)
            // For now, show all routes to give the "Grand Tour" feel

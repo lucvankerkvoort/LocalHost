@@ -10,6 +10,15 @@ function logTripConverterDebug(event: string, payload: Record<string, unknown>) 
   console.warn(`[trip-converter] ${event}`, payload);
 }
 
+function toTitleCase(value: string): string {
+  if (!value) return '';
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 // Define partial types matching the Prisma response we expect
 interface ApiItineraryItem {
   id: string;
@@ -174,7 +183,7 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
                 id: item.id,
                 type: normalizeItineraryType(item.type), 
                 category: item.type.toLowerCase(), 
-                title: item.title,
+                title: toTitleCase(item.title),
                 hostId: item.experience?.hostId || item.hostId || undefined, 
                 experienceId: item.experienceId,
                 status: deriveItineraryItemStatus(item),
@@ -185,7 +194,7 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
                 price: undefined,
                 place: {
                     id: item.placeId || (item.locationName ? `loc-${item.id}` : 'unknown'),
-                    name: item.locationName || primaryLoc.name,
+                    name: toTitleCase(item.locationName || primaryLoc.name),
                     location: {
                         lat: item.lat ?? primaryLoc.lat,
                         lng: item.lng ?? primaryLoc.lng,

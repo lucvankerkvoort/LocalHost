@@ -235,11 +235,11 @@ export function resolveActivityAnchor(input: {
 
 export function resolveActivityContext(input: {
   dayCity: string;
+  dayState?: string | null;
   dayCountry: string;
 }): string {
   const city = input.dayCity.trim();
+  const state = (input.dayState || '').trim();
   const country = input.dayCountry.trim();
-  if (!city) return country;
-  if (!country) return city;
-  return `${city}, ${country}`;
+  return [city, state, country].filter(Boolean).join(', ');
 }
