@@ -63,7 +63,7 @@ function applyPlan(state: GlobeState, plan: ItineraryPlan) {
   const { destinations, routes, routeMarkers } = convertPlanToGlobeData(plan);
   state.destinations = destinations;
   state.routes = routes;
-  state.routeMarkers = routeMarkers;
+  state.routeMarkers = deduplicate(routeMarkers);
   state.selectedDestination = destinations[0]?.id ?? null;
   state.visualTarget = null;
   state.placeMarkers = [];
@@ -106,7 +106,7 @@ const globeSlice = createSlice({
       state.routes = action.payload;
     },
     setRouteMarkers(state, action: PayloadAction<RouteMarkerData[]>) {
-      state.routeMarkers = action.payload;
+      state.routeMarkers = deduplicate(action.payload);
     },
     setSelectedDestination(state, action: PayloadAction<string | null>) {
       state.selectedDestination = action.payload;
@@ -124,7 +124,7 @@ const globeSlice = createSlice({
       state.selectedExperienceId = null;
     },
     setHostMarkers(state, action: PayloadAction<HostMarkerData[]>) {
-      state.hostMarkers = action.payload;
+      state.hostMarkers = deduplicate(action.payload);
     },
     setPlannerHosts(state, action: PayloadAction<PlannerExperienceHost[]>) {
       state.plannerHosts = action.payload;
@@ -145,7 +145,7 @@ const globeSlice = createSlice({
       state.hostMarkers = [];
     },
     setPlaceMarkers(state, action: PayloadAction<PlaceMarkerData[]>) {
-      state.placeMarkers = action.payload;
+      state.placeMarkers = deduplicate(action.payload);
     },
     addPlaceMarker(state, action: PayloadAction<PlaceMarkerData>) {
       const index = state.placeMarkers.findIndex(
