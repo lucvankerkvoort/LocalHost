@@ -30,11 +30,13 @@ import { OPENAI_ORCHESTRATOR_MODEL } from './model-config';
 const DraftItinerarySchema = z.object({
   title: z.string(),
   country: z.string().describe('The main country for this trip, e.g. "Netherlands"'),
+  region: z.string().nullable().describe('The main state or region for this trip, e.g. "California". Null if not applicable.'),
   city: z.string().describe('The main city for this trip, e.g. "Amsterdam"'),
   days: z.array(z.object({
     dayNumber: z.number(),
     title: z.string(),
     city: z.string().nullable().describe('City for this specific day, if different from main trip city; otherwise null'),
+    region: z.string().nullable().describe('State/Region for this day, if different from main trip region; otherwise null'),
     country: z.string().nullable().describe('Country for this specific day, if different from main trip country; otherwise null'),
     anchorArea: z.string().describe('Neighborhood or area name, e.g. "Jordaan"'),
     interCityTransportToNext: z
@@ -648,14 +650,15 @@ export class ItineraryOrchestrator {
     if (!tripAnchor && draft.days.length > 0) {
       const firstDay = draft.days[0];
       const fallbackCity = firstDay.city || draft.city;
+      const fallbackRegion = firstDay.region || draft.region;
       const fallbackCountry = firstDay.country || draft.country;
       
-      console.log(`[Orchestrator] Main anchor failed. Trying fallback to Day 1: ${fallbackCity}, ${fallbackCountry}`);
+      console.log(`[Orchestrator] Main anchor failed. Trying fallback to Day 1: ${fallbackCity}, ${fallbackRegion}, ${fallbackCountry}`);
       
       const cityResult = await rateLimiter.schedule(() =>
         this.executeTool<{
           location: { lat: number; lng: number };
-        }>('resolve_place', { name: fallbackCity, context: fallbackCountry })
+        }>('resolve_place', { name: fallbackCity, context: [fallbackRegion, fallbackCountry].filter(Boolean).join(', ') })
       );
       
       tripAnchor = cityResult?.location ?? null;
@@ -706,7 +709,7 @@ export class ItineraryOrchestrator {
   ): Promise<ItineraryPlan> {
     const hydratedDays = await Promise.all(
       draft.days.map((day, idx) => {
-        return this.processDay(day, draft.city, draft.country, tripAnchor).then(result => {
+        return this.processDay(day, draft.city, draft.region, draft.country, tripAnchor).then(result => {
           this.callbacks.onDayProcessed?.(idx + 1, draft.days.length);
           return result;
         });
@@ -723,7 +726,7 @@ export class ItineraryOrchestrator {
   }
 
   private async resolveTripAnchor(draft: DraftItinerary): Promise<GeoPoint | null> {
-    const tripLocation = `${draft.city}, ${draft.country}`;
+    const tripLocation = [draft.city, draft.region, draft.country].filter(Boolean).join(', ');
     console.log(`[Orchestrator] Establishing trip anchor for: ${tripLocation}...`);
 
     const cityResult = await rateLimiter.schedule(() =>
@@ -732,7 +735,7 @@ export class ItineraryOrchestrator {
         name: string;
         location: { lat: number; lng: number };
         formattedAddress: string;
-      }>('resolve_place', { name: draft.city, context: draft.country })
+      }>('resolve_place', { name: draft.city, context: [draft.region, draft.country].filter(Boolean).join(', ') })
     );
 
     const tripAnchor = cityResult?.location ?? null;
@@ -758,10 +761,11 @@ export class ItineraryOrchestrator {
 
     for (const day of draft.days) {
       const dayCity = (day.city || draft.city || '').trim();
+      const dayRegion = (day.region || draft.region || '').trim();
       const dayCountry = (day.country || draft.country || '').trim();
       if (!dayCity) continue;
 
-      const key = `${dayCity}|${dayCountry}`.toLowerCase();
+      const key = `${dayCity}|${dayRegion}|${dayCountry}`.toLowerCase();
       let resolved = cache.get(key);
 
       if (resolved === undefined) {
@@ -775,7 +779,7 @@ export class ItineraryOrchestrator {
             city?: string;
           }>('resolve_place', {
             name: dayCity,
-            context: dayCountry || undefined,
+            context: [dayRegion, dayCountry].filter(Boolean).join(', ') || undefined,
           })
         );
 
@@ -938,13 +942,15 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
   private async processDay(
     draftDay: DraftItinerary['days'][0], 
     mainCity: string, 
+    mainRegion: string | null,
     mainCountry: string,
     tripAnchor: { lat: number; lng: number } | null
   ) {
     // 1. Determine local context for this day
     const baseDayCity = draftDay.city || mainCity;
+    const dayRegion = draftDay.region || mainRegion;
     const dayCountry = draftDay.country || mainCountry;
-    const dayContext = resolveActivityContext({ dayCity: baseDayCity, dayCountry });
+    const dayContext = resolveActivityContext({ dayCity: baseDayCity, dayRegion, dayCountry });
     
     // Only use the global trip anchor as a bias when the day city was explicitly set
     // and it matches the main city. This avoids forcing multi-city days back to origin.
@@ -983,7 +989,7 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
           city?: string;
         }>('resolve_place', {
           name: baseDayCity,
-          context: dayCountry,
+          context: [dayRegion, dayCountry].filter(Boolean).join(', '),
         })
       );
 
@@ -1041,6 +1047,7 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
         const explicitContext = explicitLocation.locationHint
           ? resolveExplicitLocationContext({
               locationHint: explicitLocation.locationHint,
+              dayRegion,
               dayCountry,
             })
           : activityContext;

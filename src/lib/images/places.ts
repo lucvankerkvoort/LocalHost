@@ -20,14 +20,32 @@ function buildQuery(parts: Array<string | undefined | null>): string | undefined
   return queryParts.join(' ');
 }
 
+function compactDescription(value?: string): string | undefined {
+  if (!value) return undefined;
+  const normalized = value
+    .replace(/[-–—/\\|]+/g, ' ')
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!normalized) return undefined;
+  const words = normalized.split(' ');
+  return words.slice(0, 10).join(' ');
+}
+
 export function buildPlaceImageUrl(params: {
   name?: string;
+  description?: string;
   city?: string;
   category?: string;
   width?: number;
   height?: number;
 }): string | undefined {
-  const query = buildQuery([params.name, params.city, params.category]);
+  const query = buildQuery([
+    params.name,
+    params.city,
+    params.category,
+    compactDescription(params.description),
+  ]);
   if (!query) return undefined;
   const width = params.width ?? DEFAULT_WIDTH;
   const height = params.height ?? DEFAULT_HEIGHT;
@@ -39,6 +57,8 @@ export function buildPlaceImageUrl(params: {
     sig: String(sig),
   });
   if (params.name) searchParams.set('name', params.name);
+  const compactedDescription = compactDescription(params.description);
+  if (compactedDescription) searchParams.set('description', compactedDescription);
   if (params.city) searchParams.set('city', params.city);
   if (params.category) searchParams.set('category', params.category);
   return `/api/images/places?${searchParams.toString()}`;
@@ -46,13 +66,19 @@ export function buildPlaceImageUrl(params: {
 
 export function buildPlaceImageListUrl(params: {
   name?: string;
+  description?: string;
   city?: string;
   category?: string;
   count?: number;
   width?: number;
   height?: number;
 }): string | undefined {
-  const query = buildQuery([params.name, params.city, params.category]);
+  const query = buildQuery([
+    params.name,
+    params.city,
+    params.category,
+    compactDescription(params.description),
+  ]);
   if (!query) return undefined;
   const width = params.width ?? DEFAULT_WIDTH;
   const height = params.height ?? DEFAULT_HEIGHT;
@@ -65,6 +91,8 @@ export function buildPlaceImageListUrl(params: {
     count: String(params.count ?? 5),
   });
   if (params.name) searchParams.set('name', params.name);
+  const compactedDescription = compactDescription(params.description);
+  if (compactedDescription) searchParams.set('description', compactedDescription);
   if (params.city) searchParams.set('city', params.city);
   if (params.category) searchParams.set('category', params.category);
   return `/api/images/places/list?${searchParams.toString()}`;

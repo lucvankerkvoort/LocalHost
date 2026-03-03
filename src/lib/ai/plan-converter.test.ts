@@ -56,7 +56,7 @@ test('convertPlanToGlobeData maps categories, assigns hosts, and extracts city f
     ],
   };
 
-  const { destinations } = convertPlanToGlobeData(plan);
+  const { destinations, routeMarkers } = convertPlanToGlobeData(plan);
   const activities = destinations[0].activities;
 
   assert.equal(destinations.length, 1);
@@ -67,6 +67,8 @@ test('convertPlanToGlobeData maps categories, assigns hosts, and extracts city f
   assert.equal(activities[1].hostId, 'h-2');
   assert.equal(activities[2].type, 'EXPERIENCE');
   assert.equal(activities[2].hostId, 'h-1');
+  assert.deepEqual(routeMarkers.map((marker) => marker.id), activities.map((item) => item.id));
+  assert.equal(new Set(routeMarkers.map((marker) => marker.id)).size, routeMarkers.length);
 });
 
 test('convertPlanToGlobeData skips day without anchor location', () => {
@@ -89,6 +91,60 @@ test('convertPlanToGlobeData skips day without anchor location', () => {
   assert.equal(destinations.length, 0);
   assert.equal(routes.length, 0);
   assert.equal(routeMarkers.length, 0);
+});
+
+test('convertPlanToGlobeData falls back to city coordinates when anchor is missing', () => {
+  const plan: ItineraryPlan = {
+    id: 'plan-city-fallback',
+    title: 'Plan',
+    request: 'request',
+    summary: 'summary',
+    days: [
+      {
+        dayNumber: 1,
+        title: 'Bruges Day',
+        city: 'Bruges',
+        country: 'Belgium',
+        activities: [],
+        suggestedHosts: [],
+      },
+    ],
+  };
+
+  const { destinations } = convertPlanToGlobeData(plan);
+  assert.equal(destinations.length, 1);
+  assert.equal(destinations[0].city, 'Bruges');
+  assert.equal(destinations[0].lat > 51 && destinations[0].lat < 52, true);
+  assert.equal(destinations[0].lng > 3 && destinations[0].lng < 4, true);
+});
+
+test('convertPlanToGlobeData falls back to first activity location when anchor is missing', () => {
+  const plan: ItineraryPlan = {
+    id: 'plan-activity-fallback',
+    title: 'Plan',
+    request: 'request',
+    summary: 'summary',
+    days: [
+      {
+        dayNumber: 1,
+        title: 'Fallback from Activity',
+        city: 'Unknown City',
+        activities: [
+          {
+            id: 'a-1',
+            place: makePlace('p-1', 'Only Place', 48.85, 2.35, 'landmark'),
+            timeSlot: 'morning',
+          },
+        ],
+        suggestedHosts: [],
+      },
+    ],
+  };
+
+  const { destinations } = convertPlanToGlobeData(plan);
+  assert.equal(destinations.length, 1);
+  assert.equal(destinations[0].lat, 48.85);
+  assert.equal(destinations[0].lng, 2.35);
 });
 
 test('convertPlanToGlobeData creates inter-day routes and ignores intra-day navigation events', () => {

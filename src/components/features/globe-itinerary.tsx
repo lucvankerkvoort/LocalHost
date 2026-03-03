@@ -1042,13 +1042,14 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
         description: resolveItemDescription(item),
         lat,
         lng,
-        images: cachedImages ?? (item.place?.imageUrl ? [{ url: item.place.imageUrl }] : []),
+        images: cachedImages ?? [],
         isLoading: !cachedImages,
       });
 
       if (!cachedImages) {
         const listUrl = buildPlaceImageListUrl({
           name: item.place?.name ?? item.title,
+          description: resolveItemDescription(item),
           city: item.place?.city,
           category: item.category ?? item.type,
           count: 5,
@@ -1066,13 +1067,14 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
         try {
           const response = await fetch(listUrl);
           const data = (await response.json()) as { images?: ItemPreviewImage[] };
-          const images = Array.isArray(data.images) ? data.images : [];
+          const backendImages = Array.isArray(data.images) ? data.images : [];
+          const hasRealImages = backendImages.length > 0 && !backendImages[0].url.includes('globe.svg');
+          const imagesToUse = hasRealImages ? backendImages : [];
+
           const finalImages =
-            images.length > 0
-              ? images
-              : (item.place?.imageUrl
-                ? [{ url: item.place.imageUrl }]
-                : [{ url: PLACE_IMAGE_FALLBACK }]);
+            imagesToUse.length > 0
+              ? imagesToUse
+              : [{ url: PLACE_IMAGE_FALLBACK }];
 
           imageCacheRef.current.set(item.id, finalImages);
           setItemPreview((prev) =>

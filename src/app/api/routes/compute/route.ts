@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { computeGoogleRoutePath } from '@/lib/maps/google-routes';
 import { auth } from '@/auth';
+import { rateLimit } from '@/lib/api/rate-limit';
 
 const ComputeRouteSchema = z.object({
   fromLat: z.number(),
@@ -12,10 +13,39 @@ const ComputeRouteSchema = z.object({
   mode: z.enum(['flight', 'train', 'drive', 'boat', 'walk']),
 });
 
-export async function POST(req: Request) {
+const computeRouteIpLimiter = rateLimit({
+  prefix: 'routes-compute-ip',
+  interval: 60_000,
+  limit: 60,
+});
+
+const computeRouteUserLimiter = rateLimit({
+  prefix: 'routes-compute-user',
+  interval: 60_000,
+  limit: 30,
+});
+
+export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '127.0.0.1';
+  const [ipLimit, userLimit] = await Promise.all([
+    computeRouteIpLimiter.check(ip),
+    computeRouteUserLimiter.check(session.user.id),
+  ]);
+
+  if (!ipLimit.success || !userLimit.success) {
+    const retryAfterSeconds = Math.max(
+      1,
+      Math.ceil((Math.max(ipLimit.resetAt, userLimit.resetAt) - Date.now()) / 1000)
+    );
+    return NextResponse.json(
+      { error: 'Too many route requests. Please slow down.' },
+      { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }
+    );
   }
 
   try {
@@ -40,4 +70,3 @@ export async function POST(req: Request) {
     return new NextResponse('Internal Error', { status: 500 });
   }
 }
-

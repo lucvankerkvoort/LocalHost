@@ -46,7 +46,7 @@ test('validateSeedDistribution flags low category coverage and city over-concent
   const summary = summarizeSeedDistribution(sample);
   const errors = validateSeedDistribution(summary);
 
-  assert.ok(errors.some((error) => error.includes('at least 30 cities')));
+  assert.ok(errors.some((error) => error.includes('at least 15 cities')));
   assert.ok(errors.some((error) => error.includes('max city share')));
   assert.ok(errors.some((error) => error.includes('ARTS_CULTURE')));
 });

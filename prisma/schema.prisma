@@ -3,7 +3,6 @@
 
 generator client {
   provider = "prisma-client-js"
-
 }
 
 datasource db {
@@ -23,55 +22,55 @@ model User {
   image         String?
   languages     String[]  @default([])
   interests     String[]  @default([])
-  
+
   // Traveler Profile
   occupation        String?
-  travelPreferences Json?    @default("{}")
-  
+  travelPreferences Json?   @default("{}")
+
   // Host Profile
-  bio           String?
-  quote         String?
-  responseTime  String?   @default("within a day") // e.g. "within an hour"
-  isSyntheticHost Boolean @default(false)
-  syntheticBotEnabled Boolean @default(false)
-  syntheticPersonaKey String?
-  syntheticResponseStyle SyntheticResponseStyle @default(FRIENDLY)
-  syntheticResponseLatencyMinSec Int? @default(5)
-  syntheticResponseLatencyMaxSec Int? @default(30)
-  
+  bio                            String?
+  quote                          String?
+  responseTime                   String?                @default("within a day") // e.g. "within an hour"
+  isSyntheticHost                Boolean                @default(false)
+  syntheticBotEnabled            Boolean                @default(false)
+  syntheticPersonaKey            String?
+  syntheticResponseStyle         SyntheticResponseStyle @default(FRIENDLY)
+  syntheticResponseLatencyMinSec Int?                   @default(5)
+  syntheticResponseLatencyMaxSec Int?                   @default(30)
+
   // Location
-  city          String?
-  country       String?
-  
+  city    String?
+  country String?
+
   // Verification
-  isHost            Boolean @default(false)
-  isVerified        Boolean @default(false)
-  verificationTier  VerificationTier @default(BASIC)
-  trustScore        Int     @default(0)
-  
+  isHost           Boolean          @default(false)
+  isVerified       Boolean          @default(false)
+  verificationTier VerificationTier @default(BASIC)
+  trustScore       Int              @default(0)
+
   // Stripe Connect
   stripeConnectedAccountId String?
   stripeOnboardingStatus   StripeOnboardingStatus @default(NOT_STARTED)
-  payoutsEnabled           Boolean  @default(false)
-  chargesEnabled           Boolean  @default(false)
-  
+  payoutsEnabled           Boolean                @default(false)
+  chargesEnabled           Boolean                @default(false)
+
   // Auth
-  accounts      Account[]
-  sessions      Session[]
-  
+  accounts Account[]
+  sessions Session[]
+
   // Relations
-  hostedExperiences Experience[] @relation("HostedExperiences")
-  bookings          Booking[]    @relation("GuestBookings")
-  hostBookings      Booking[]    @relation("HostBookings")
+  hostedExperiences  Experience[]        @relation("HostedExperiences")
+  bookings           Booking[]           @relation("GuestBookings")
+  hostBookings       Booking[]           @relation("HostBookings")
   syntheticReplyJobs SyntheticReplyJob[] @relation("HostSyntheticJobs")
-  reviewsGiven      Review[]     @relation("ReviewerReviews")
-  reviewsReceived   Review[]     @relation("RevieweeReviews")
-  messagesSent      Message[]    @relation("SentMessages")
-  chatParticipants  ChatParticipant[]
-  trips             Trip[]
-  experienceDrafts  ExperienceDraft[]
-  hostExperience    HostExperience?
-  
+  reviewsGiven       Review[]            @relation("ReviewerReviews")
+  reviewsReceived    Review[]            @relation("RevieweeReviews")
+  messagesSent       Message[]           @relation("SentMessages")
+  chatParticipants   ChatParticipant[]
+  trips              Trip[]
+  experienceDrafts   ExperienceDraft[]
+  hostExperience     HostExperience?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -116,52 +115,52 @@ model VerificationToken {
 // ============================================
 
 model Experience {
-  id          String   @id @default(cuid())
-  hostId      String
-  host        User     @relation("HostedExperiences", fields: [hostId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(cuid())
+  hostId String
+  host   User   @relation("HostedExperiences", fields: [hostId], references: [id], onDelete: Cascade)
+
   title       String
-  description String   @db.Text
+  description String             @db.Text
   category    ExperienceCategory
-  
+
   // Location
   neighborhood String
   city         String
   country      String
-  address      String?  // Revealed after booking
+  address      String? // Revealed after booking
   latitude     Float?
   longitude    Float?
-  
+
   // Details
-  duration     Int      // in minutes
-  minGroupSize Int      @default(1)
-  maxGroupSize Int      @default(6)
-  price        Int      // in cents
-  currency     String   @default("USD")
-  
+  duration     Int // in minutes
+  minGroupSize Int    @default(1)
+  maxGroupSize Int    @default(6)
+  price        Int // in cents
+  currency     String @default("USD")
+
   // What's included/excluded
   includedItems String[] @default([])
   excludedItems String[] @default([])
-  
+
   // Media
-  photos      String[] @default([])
-  
+  photos String[] @default([])
+
   // Stats
-  rating      Float    @default(0)
-  reviewCount Int      @default(0)
-  
+  rating      Float @default(0)
+  reviewCount Int   @default(0)
+
   // Status
-  isActive    Boolean  @default(true)
-  
+  isActive Boolean @default(true)
+
   // Relations
-  bookings    Booking[]
-  reviews     Review[]
-  availability ExperienceAvailability[]
+  bookings       Booking[]
+  reviews        Review[]
+  availability   ExperienceAvailability[]
   itineraryItems ItineraryItem[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([hostId])
   @@index([category])
   @@index([city])
@@ -169,19 +168,19 @@ model Experience {
 }
 
 model ExperienceAvailability {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   experienceId String
   experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
-  
-  date         DateTime
-  startTime    String?  // "09:00"
-  endTime      String?  // "12:00"
-  spotsLeft    Int?     // Optional for date-only availability
-  timezone     String?  // IANA TZ, e.g. "Europe/Rome"
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
+
+  date      DateTime
+  startTime String? // "09:00"
+  endTime   String? // "12:00"
+  spotsLeft Int? // Optional for date-only availability
+  timezone  String? // IANA TZ, e.g. "Europe/Rome"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([experienceId, date])
 }
 
@@ -198,31 +197,31 @@ model Trip {
   preferences Json       @default("{}")
   startDate   DateTime?
   endDate     DateTime?
-  
-  stops       TripAnchor[]
-  bookings    Booking[]
-  
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+
+  stops    TripAnchor[]
+  bookings Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
 }
 
 model TripAnchor {
-  id        String   @id @default(cuid())
-  tripId    String
-  trip      Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  
-  title     String
-  type      AnchorType @default(CITY)
-  
+  id     String @id @default(cuid())
+  tripId String
+  trip   Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  title String
+  type  AnchorType @default(CITY)
+
   // Flexible Location Definition
-  locations Json     // Array of { name: string, lat: number, lng: number, placeId?: string }[]
-  
-  order     Int
-  
-  days      ItineraryDay[]
-  
+  locations Json // Array of { name: string, lat: number, lng: number, placeId?: string }[]
+
+  order Int
+
+  days ItineraryDay[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -237,28 +236,28 @@ enum AnchorType {
 }
 
 model ItineraryDay {
-  id         String   @id @default(cuid())
+  id           String     @id @default(cuid())
   tripAnchorId String
   tripAnchor   TripAnchor @relation(fields: [tripAnchorId], references: [id], onDelete: Cascade)
-  
-  dayIndex   Int
-  date       DateTime?
-  title      String?
+
+  dayIndex       Int
+  date           DateTime?
+  title          String?
   suggestedHosts Json?     @default("[]") // Store array of suggested hosts/experiences
-  
-  items      ItineraryItem[]
-  
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+
+  items ItineraryItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([tripAnchorId, dayIndex])
 }
 
 model ItineraryItem {
-  id           String            @id @default(cuid())
-  dayId        String
-  day          ItineraryDay      @relation(fields: [dayId], references: [id], onDelete: Cascade)
-  
+  id    String       @id @default(cuid())
+  dayId String
+  day   ItineraryDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+
   type         ItineraryItemType
   title        String
   description  String?
@@ -267,19 +266,19 @@ model ItineraryItem {
   locationName String?
   lat          Float?
   lng          Float?
-  
-  experienceId String?
-  experience   Experience?       @relation(fields: [experienceId], references: [id])
-  hostId       String?           // Direct host reference for mock experiences
-  
-  orderIndex   Int
-  createdByAI  Boolean           @default(true)
-  isDeleted    Boolean           @default(false)
-  
-  bookings     Booking[]         @relation("ItemBookings")
 
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  experienceId String?
+  experience   Experience? @relation(fields: [experienceId], references: [id])
+  hostId       String? // Direct host reference for mock experiences
+
+  orderIndex  Int
+  createdByAI Boolean @default(true)
+  isDeleted   Boolean @default(false)
+
+  bookings Booking[] @relation("ItemBookings")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([dayId, orderIndex])
 }
@@ -307,61 +306,61 @@ enum ItineraryItemType {
 // ============================================
 
 model Booking {
-  id            String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Relations
-  tripId        String?
-  trip          Trip?    @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  
-  experienceId  String
-  experience    Experience @relation(fields: [experienceId], references: [id])
-  
-  guestId       String
-  guest         User     @relation("GuestBookings", fields: [guestId], references: [id])
-  
+  tripId String?
+  trip   Trip?   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  experienceId String
+  experience   Experience @relation(fields: [experienceId], references: [id])
+
+  guestId String
+  guest   User   @relation("GuestBookings", fields: [guestId], references: [id])
+
   // Denormalized Host ID for easier payouts
-  hostId        String?
-  host          User?    @relation("HostBookings", fields: [hostId], references: [id])
-  
+  hostId String?
+  host   User?   @relation("HostBookings", fields: [hostId], references: [id])
+
   itemId        String?
   itineraryItem ItineraryItem? @relation("ItemBookings", fields: [itemId], references: [id])
-  
+
   // Details
-  date          DateTime
-  startTime     String?
-  endTime       String?
-  timezone      String?
-  guests        Int
-  
-  totalPrice    Int      @default(0) // Re-added for backward compatibility
-  amountSubtotal  Int    @default(0)
-  platformFee     Int    @default(0)
-  hostNetAmount   Int    @default(0)
-  currency        String @default("USD")
-  
-  stripePaymentId String?
+  date      DateTime
+  startTime String?
+  endTime   String?
+  timezone  String?
+  guests    Int
+
+  totalPrice     Int    @default(0) // Re-added for backward compatibility
+  amountSubtotal Int    @default(0)
+  platformFee    Int    @default(0)
+  hostNetAmount  Int    @default(0)
+  currency       String @default("USD")
+
+  stripePaymentId  String?
   stripeTransferId String?
   stripeRefundId   String?
-  
-  status        BookingStatus   @default(TENTATIVE)
-  paymentStatus PaymentStatus   @default(PENDING)
-  payoutStatus  PayoutStatus    @default(NOT_ELIGIBLE)
+
+  status           BookingStatus @default(TENTATIVE)
+  paymentStatus    PaymentStatus @default(PENDING)
+  payoutStatus     PayoutStatus  @default(NOT_ELIGIBLE)
   payoutEligibleAt DateTime?
-  
+
   // Features
-  chatUnlocked  Boolean       @default(false)
-  
+  chatUnlocked Boolean @default(false)
+
   // Communication
-  messages      Message[]
-  chatThread    ChatThread?
+  messages           Message[]
+  chatThread         ChatThread?
   syntheticReplyJobs SyntheticReplyJob[]
-  
+
   // Reviews
-  reviews       Review[]
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
+  reviews Review[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([experienceId])
   @@index([guestId])
   @@index([tripId])
@@ -373,13 +372,13 @@ model Booking {
 // ============================================
 
 model ChatThread {
-  id            String            @id @default(cuid())
-  bookingId     String?           @unique
-  booking       Booking?          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  participants  ChatParticipant[]
-  messages      Message[]         @relation("ThreadMessages")
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id           String            @id @default(cuid())
+  bookingId    String?           @unique
+  booking      Booking?          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  participants ChatParticipant[]
+  messages     Message[]         @relation("ThreadMessages")
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
   @@index([bookingId])
 }
@@ -401,23 +400,23 @@ model ChatParticipant {
 // ============================================
 
 model Review {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   bookingId    String
-  booking      Booking  @relation(fields: [bookingId], references: [id])
+  booking      Booking    @relation(fields: [bookingId], references: [id])
   experienceId String
   experience   Experience @relation(fields: [experienceId], references: [id])
-  
-  reviewerId   String
-  reviewer     User     @relation("ReviewerReviews", fields: [reviewerId], references: [id])
-  revieweeId   String
-  reviewee     User     @relation("RevieweeReviews", fields: [revieweeId], references: [id])
-  
-  type         ReviewType
-  rating       Int      // 1-5
-  content      String   @db.Text
-  
-  createdAt    DateTime @default(now())
-  
+
+  reviewerId String
+  reviewer   User   @relation("ReviewerReviews", fields: [reviewerId], references: [id])
+  revieweeId String
+  reviewee   User   @relation("RevieweeReviews", fields: [revieweeId], references: [id])
+
+  type    ReviewType
+  rating  Int // 1-5
+  content String     @db.Text
+
+  createdAt DateTime @default(now())
+
   @@index([experienceId])
   @@index([revieweeId])
 }
@@ -427,44 +426,44 @@ model Review {
 // ============================================
 
 model Message {
-  id           String   @id @default(cuid())
-  bookingId    String?
-  booking      Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  threadId     String?
-  thread       ChatThread? @relation("ThreadMessages", fields: [threadId], references: [id], onDelete: Cascade)
-  
-  senderId     String
-  sender       User     @relation("SentMessages", fields: [senderId], references: [id])
+  id        String      @id @default(cuid())
+  bookingId String?
+  booking   Booking?    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  threadId  String?
+  thread    ChatThread? @relation("ThreadMessages", fields: [threadId], references: [id], onDelete: Cascade)
+
+  senderId               String
+  sender                 User                @relation("SentMessages", fields: [senderId], references: [id])
   triggeredSyntheticJobs SyntheticReplyJob[] @relation("TriggeredSyntheticJobs")
-  
-  content      String   @db.Text
-  isRead       Boolean  @default(false)
-  
-  createdAt    DateTime @default(now())
-  
+
+  content String  @db.Text
+  isRead  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
   @@index([bookingId])
   @@index([senderId])
 }
 
 model SyntheticReplyJob {
-  id               String   @id @default(cuid())
+  id               String                  @id @default(cuid())
   bookingId        String
-  booking          Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  booking          Booking                 @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   hostId           String
-  host             User     @relation("HostSyntheticJobs", fields: [hostId], references: [id], onDelete: Cascade)
+  host             User                    @relation("HostSyntheticJobs", fields: [hostId], references: [id], onDelete: Cascade)
   triggerMessageId String
-  triggerMessage   Message  @relation("TriggeredSyntheticJobs", fields: [triggerMessageId], references: [id], onDelete: Cascade)
+  triggerMessage   Message                 @relation("TriggeredSyntheticJobs", fields: [triggerMessageId], references: [id], onDelete: Cascade)
   status           SyntheticReplyJobStatus @default(PENDING)
   dueAt            DateTime
-  attemptCount     Int      @default(0)
-  error            String?  @db.Text
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  attemptCount     Int                     @default(0)
+  error            String?                 @db.Text
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
 
+  @@unique([bookingId, triggerMessageId])
   @@index([status, dueAt])
   @@index([bookingId])
   @@index([hostId])
-  @@unique([bookingId, triggerMessageId])
 }
 
 // ============================================
@@ -472,12 +471,12 @@ model SyntheticReplyJob {
 // ============================================
 
 model PaymentEvent {
-  id           String   @id @default(cuid())
-  bookingId    String?
-  type         String   // e.g. PAYMENT_INTENT_SUCCEEDED, TRANSFER_CREATED
-  payload      Json
-  createdAt    DateTime @default(now())
-  
+  id        String   @id @default(cuid())
+  bookingId String?
+  type      String // e.g. PAYMENT_INTENT_SUCCEEDED, TRANSFER_CREATED
+  payload   Json
+  createdAt DateTime @default(now())
+
   @@index([bookingId])
 }
 
@@ -516,9 +515,9 @@ enum PayoutStatus {
 }
 
 enum VerificationTier {
-  BASIC     // Email verified
-  VERIFIED  // ID + phone verified
-  TRUSTED   // Background check + 10+ reviews
+  BASIC // Email verified
+  VERIFIED // ID + phone verified
+  TRUSTED // Background check + 10+ reviews
 }
 
 enum ExperienceCategory {
@@ -556,35 +555,35 @@ enum ReviewType {
 // ============================================
 
 model ExperienceDraft {
-  id          String   @id @default(cuid())
-  userId      String   // Removed @unique to allow multiple drafts
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(cuid())
+  userId String // Removed @unique to allow multiple drafts
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   // Location
-  city        String?
-  country     String?
-  cityLat     Float?
-  cityLng     Float?
-  
+  city    String?
+  country String?
+  cityLat Float?
+  cityLng Float?
+
   // Content (AI-generated, host-editable)
-  title       String?
-  shortDesc   String?  @db.Text  // Marketing-facing
-  longDesc    String?  @db.Text  // Narrative description
-  
+  title     String?
+  shortDesc String? @db.Text // Marketing-facing
+  longDesc  String? @db.Text // Narrative description
+
   // Flexible sections for AI generation (e.g. house rules, amenities)
-  sections    Json?    @default("{}")
+  sections Json? @default("{}")
 
   // Stops
-  stops       ExperienceStop[] @relation("DraftStops")
-  
+  stops ExperienceStop[] @relation("DraftStops")
+
   // Metadata
-  duration    Int?     // Estimated minutes
-  price       Int?     // Cents
-  currency    String?  @default("USD")
-  status      DraftStatus @default(IN_PROGRESS)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  duration Int? // Estimated minutes
+  price    Int? // Cents
+  currency String?     @default("USD")
+  status   DraftStatus @default(IN_PROGRESS)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum DraftStatus {
@@ -594,53 +593,53 @@ enum DraftStatus {
 }
 
 model ExperienceStop {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Belongs to either draft or published experience
-  draftId     String?
-  draft       ExperienceDraft? @relation("DraftStops", fields: [draftId], references: [id], onDelete: Cascade)
+  draftId      String?
+  draft        ExperienceDraft? @relation("DraftStops", fields: [draftId], references: [id], onDelete: Cascade)
   experienceId String?
-  experience  HostExperience? @relation("ExperienceStops", fields: [experienceId], references: [id], onDelete: Cascade)
-  
+  experience   HostExperience?  @relation("ExperienceStops", fields: [experienceId], references: [id], onDelete: Cascade)
+
   // Stop details
   name        String
-  description String?  @db.Text
+  description String? @db.Text
   address     String?
   lat         Float?
   lng         Float?
-  order       Int      @default(0)
-  
+  order       Int     @default(0)
+
   @@index([draftId])
   @@index([experienceId])
 }
 
 model HostExperience {
-  id          String   @id @default(cuid())
-  hostId      String   @unique  // Only one experience per host (MVP)
-  host        User     @relation(fields: [hostId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(cuid())
+  hostId String @unique // Only one experience per host (MVP)
+  host   User   @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
   // Location
-  city        String
-  country     String
-  
+  city    String
+  country String
+
   // Content
-  title       String
-  shortDesc   String   @db.Text
-  longDesc    String   @db.Text
-  
+  title     String
+  shortDesc String @db.Text
+  longDesc  String @db.Text
+
   // Stops
-  stops       ExperienceStop[] @relation("ExperienceStops")
-  
+  stops ExperienceStop[] @relation("ExperienceStops")
+
   // Metadata
-  duration    Int      // Minutes
-  price       Int?     // Cents (optional for MVP)
-  
+  duration Int // Minutes
+  price    Int? // Cents (optional for MVP)
+
   // Status
-  status      HostExperienceStatus @default(PUBLISHED)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  status HostExperienceStatus @default(PUBLISHED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([city])
   @@index([status])
 }
@@ -691,7 +690,7 @@ model OrchestratorSession {
 // ---------------------------------------------------------------------------
 
 model ConversationSession {
-  id        String   @id              // session ID from client
+  id        String   @id // session ID from client
   intent    String   @default("general") // general | plan_trip | become_host | profile_setup
   metadata  Json?    @default("{}")
   createdAt DateTime @default(now())
@@ -704,9 +703,11 @@ model ConversationSession {
 
 model PlaceCache {
   id               String   @id @default(cuid())
-  name             String        // search name (e.g. "Sagrada Familia")
-  context          String        // search context (e.g. "Barcelona, Spain")
-  placeId          String?       // Google Places ID
+  name             String // search name (e.g. "Sagrada Familia")
+  context          String // search context (e.g. "Barcelona, Spain")
+  placeId          String? // Google Places ID
+  canonicalPlaceId String?
+  canonicalPlace   Place?   @relation(fields: [canonicalPlaceId], references: [id], onDelete: SetNull)
   formattedAddress String?
   lat              Float
   lng              Float
@@ -717,6 +718,137 @@ model PlaceCache {
 
   @@unique([name, context])
   @@index([name])
+  @@index([canonicalPlaceId])
+}
+
+model Place {
+  id               String    @id @default(cuid())
+  canonicalName    String
+  normalizedName   String
+  fingerprint      String    @unique
+  formattedAddress String?
+  lat              Float
+  lng              Float
+  city             String?
+  country          String?
+  category         String?
+  confidence       Float?
+  lastValidatedAt  DateTime  @default(now())
+  expiresAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  providerAliases PlaceProviderAlias[]
+  queryCache      PlaceQueryCache[]
+  placeCaches     PlaceCache[]
+
+  @@index([normalizedName])
+  @@index([city, country])
+  @@index([expiresAt])
+}
+
+model PlaceProviderAlias {
+  id                     String        @id @default(cuid())
+  placeId                String
+  place                  Place         @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  provider               PlaceProvider
+  providerPlaceId        String
+  providerPayloadVersion String?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  @@unique([provider, providerPlaceId])
+  @@unique([placeId, provider])
+  @@index([placeId])
+}
+
+model PlaceQueryCache {
+  id        String   @id @default(cuid())
+  name      String
+  context   String
+  placeId   String
+  place     Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, context])
+  @@index([placeId])
+  @@index([expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// External API usage ledger (durable cost/latency telemetry)
+// ---------------------------------------------------------------------------
+
+model ExternalApiCall {
+  id                  String              @id @default(cuid())
+  provider            ExternalApiProvider
+  endpoint            String
+  requestHash         String
+  tripId              String?
+  sessionId           String?
+  userId              String?
+  statusCode          Int?
+  success             Boolean
+  latencyMs           Int
+  estimatedCostMicros Int                 @default(0)
+  createdAt           DateTime            @default(now())
+
+  @@index([provider, createdAt])
+  @@index([endpoint, createdAt])
+  @@index([requestHash])
+  @@index([tripId])
+  @@index([sessionId])
+  @@index([userId])
+}
+
+model PlaceImageAsset {
+  id                  String                  @id @default(cuid())
+  placeId             String?
+  queryKey            String
+  provider            ImageSourceProvider
+  providerImageId     String
+  providerPhotoRef    String?
+  url                 String
+  thumbnailUrl        String?
+  width               Int
+  height              Int
+  attributionJson     Json
+  licenseCode         String
+  photographerName    String?
+  status              ImageVerificationStatus
+  deterministicScore  Float
+  llmScore            Float?
+  finalScore          Float
+  reasonCodes         String[]                @default([])
+  verificationVersion String
+  verifiedAt          DateTime
+  expiresAt           DateTime
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  selections PlaceImageSelection[]
+
+  @@unique([provider, providerImageId])
+  @@index([queryKey, status, finalScore(sort: Desc)])
+  @@index([placeId, status, finalScore(sort: Desc)])
+  @@index([expiresAt])
+}
+
+model PlaceImageSelection {
+  id        String              @id @default(cuid())
+  queryKey  String              @unique
+  placeId   String?
+  assetId   String
+  asset     PlaceImageAsset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  provider  ImageSourceProvider
+  expiresAt DateTime
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@index([placeId])
+  @@index([expiresAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -725,13 +857,38 @@ model PlaceCache {
 
 model RateLimitEntry {
   id         String   @id @default(cuid())
-  identifier String        // e.g. IP address or user ID
-  windowKey  String        // e.g. "chat:2026-02-25T12:30" (bucket key)
+  identifier String // e.g. IP address or user ID
+  windowKey  String // e.g. "chat:2026-02-25T12:30" (bucket key)
   count      Int      @default(1)
-  expiresAt  DateTime      // when this window expires
+  expiresAt  DateTime // when this window expires
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   @@unique([identifier, windowKey])
   @@index([expiresAt])
+}
+
+enum ExternalApiProvider {
+  GOOGLE_PLACES
+  GOOGLE_ROUTES
+  UNSPLASH
+  PEXELS
+  WIKIMEDIA_COMMONS
+}
+
+enum PlaceProvider {
+  GOOGLE_PLACES
+}
+
+enum ImageSourceProvider {
+  UNSPLASH
+  PEXELS
+  GOOGLE_PLACES
+  WIKIMEDIA_COMMONS
+}
+
+enum ImageVerificationStatus {
+  VERIFIED
+  REJECTED
+  REVIEW
 }

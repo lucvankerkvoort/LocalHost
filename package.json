@@ -19,6 +19,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
+    "db:status": "prisma migrate status",
     "db:studio": "prisma studio",
     "db:seed": "SYNTHETIC_BOTS_PROFILE=dev-lite npx tsx prisma/seed.ts",
     "db:seed:dev-lite": "SYNTHETIC_BOTS_PROFILE=dev-lite npx tsx prisma/seed.ts",

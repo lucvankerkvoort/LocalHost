@@ -213,15 +213,17 @@ export function extractExplicitLocationHint(input: string): {
 
 export function resolveExplicitLocationContext(input: {
   locationHint: string;
+  dayRegion?: string | null;
   dayCountry: string;
 }): string {
   const location = input.locationHint.trim();
+  const region = input.dayRegion?.trim() || '';
   const country = input.dayCountry.trim();
-  if (!country) return location;
+  if (!country) return [location, region].filter(Boolean).join(', ');
 
-  if (hasCountryHint(location, country)) return location;
+  if (hasCountryHint(location, country)) return [location, region].filter(Boolean).join(', ');
 
-  return `${location}, ${country}`;
+  return [location, region, country].filter(Boolean).join(', ');
 }
 
 export function resolveActivityAnchor(input: {
@@ -235,11 +237,13 @@ export function resolveActivityAnchor(input: {
 
 export function resolveActivityContext(input: {
   dayCity: string;
+  dayRegion?: string | null;
   dayCountry: string;
 }): string {
   const city = input.dayCity.trim();
+  const region = input.dayRegion?.trim() || '';
   const country = input.dayCountry.trim();
-  if (!city) return country;
-  if (!country) return city;
-  return `${city}, ${country}`;
+  
+  const parts = [city, region, country].filter(Boolean);
+  return parts.join(', ');
 }

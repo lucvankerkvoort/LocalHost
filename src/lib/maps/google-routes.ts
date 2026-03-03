@@ -1,3 +1,9 @@
+import { ExternalApiBudgetExceededError } from '@/lib/providers/external-api-gateway';
+import {
+  googleRoutesComputeRoutes,
+  resolveGoogleRoutesApiKey,
+} from '@/lib/providers/google-routes-client';
+
 export type RouteMode = 'flight' | 'train' | 'drive' | 'boat' | 'walk';
 
 export type RoutePoint = {
@@ -96,14 +102,6 @@ function mapRouteMode(mode: RouteMode): 'DRIVE' | 'TRANSIT' | 'WALK' | null {
   }
 }
 
-function resolveGoogleMapsApiKey(): string | null {
-  const key =
-    process.env.GOOGLE_ROUTES_API_KEY ||
-    process.env.GOOGLE_MAPS_API_KEY ||
-    process.env.GOOGLE_PLACES_API_KEY;
-  return key && key.trim().length > 0 ? key.trim() : null;
-}
-
 const MAX_RETRIES = 3;
 const INITIAL_BACKOFF_MS = 500;
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
@@ -147,15 +145,11 @@ async function fetchRoute(
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
-        },
-        cache: 'no-store',
-        body: JSON.stringify(body),
+      const response = await googleRoutesComputeRoutes({
+        apiKey,
+        body,
+        fieldMask: 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
+        retries: 0,
       });
 
       if (!response.ok) {
@@ -188,6 +182,10 @@ async function fetchRoute(
         source: 'google',
       };
     } catch (error) {
+      if (error instanceof ExternalApiBudgetExceededError) {
+        console.warn(`[google-routes] budget exceeded for ${error.provider}`);
+        return null;
+      }
       if (attempt < MAX_RETRIES - 1) {
         const backoff = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
         console.warn(`[google-routes] exception on attempt ${attempt + 1}, retrying in ${backoff}ms`, error);
@@ -212,7 +210,7 @@ export async function computeGoogleRoutePath(
     return buildFallbackPath(from, to);
   }
 
-  const apiKey = resolveGoogleMapsApiKey();
+  const apiKey = resolveGoogleRoutesApiKey();
   if (!apiKey) {
     return buildFallbackPath(from, to);
   }
@@ -231,4 +229,3 @@ export async function computeGoogleRoutePath(
 
   return buildFallbackPath(from, to);
 }
-

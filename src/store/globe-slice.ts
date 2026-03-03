@@ -63,7 +63,7 @@ function applyPlan(state: GlobeState, plan: ItineraryPlan) {
   const { destinations, routes, routeMarkers } = convertPlanToGlobeData(plan);
   state.destinations = destinations;
   state.routes = routes;
-  state.routeMarkers = routeMarkers;
+  state.routeMarkers = deduplicate(routeMarkers);
   state.selectedDestination = destinations[0]?.id ?? null;
   state.visualTarget = null;
   state.placeMarkers = [];

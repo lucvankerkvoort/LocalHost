@@ -1,66 +1,53 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { resolvePlaceTool } from './resolve-place';
+import {
+  __setResolvePlaceLlmResolverForTests,
+  __setResolvePlaceSecondaryResolverForTests,
+  resolvePlaceTool,
+} from './resolve-place';
 
-type GooglePlace = {
-  id?: string;
-  displayName?: { text?: string };
-  formattedAddress?: string;
-  location?: { latitude?: number; longitude?: number };
-  types?: string[];
-  addressComponents?: Array<{
-    longText?: string;
-    shortText?: string;
-    types?: string[];
-  }>;
+type MockCandidate = {
+  id: string;
+  name: string;
+  formattedAddress: string;
+  location: { lat: number; lng: number };
+  category:
+    | 'landmark'
+    | 'museum'
+    | 'restaurant'
+    | 'park'
+    | 'neighborhood'
+    | 'city'
+    | 'country'
+    | 'other';
+  confidence: number;
+  city?: string;
 };
 
-function makeGooglePlace(overrides: Partial<GooglePlace> = {}): GooglePlace {
+function makeCandidate(overrides: Partial<MockCandidate> = {}): MockCandidate {
   return {
-    id: 'test-place-id',
-    displayName: { text: 'Louvre Museum' },
+    id: 'llm-default',
+    name: 'Louvre Museum',
     formattedAddress: 'Louvre Museum, Paris, France',
-    location: { latitude: 48.8606, longitude: 2.3376 },
-    types: ['museum', 'point_of_interest'],
-    addressComponents: [
-      { longText: 'Paris', types: ['locality'] },
-      { longText: 'France', types: ['country'] },
-    ],
+    location: { lat: 48.8606, lng: 2.3376 },
+    category: 'museum',
+    confidence: 0.9,
+    city: 'Paris',
     ...overrides,
   };
 }
 
-function installGoogleFetchMock(
-  handler: (input: URL, init?: RequestInit) => Promise<GooglePlace[]>
-): () => void {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' ? new URL(input) : new URL((input as URL).toString());
-    const places = await handler(url, init);
-    return {
-      ok: true,
-      status: 200,
-      json: async () => ({ places }),
-    } as Response;
-  }) as typeof fetch;
-
-  return () => {
-    globalThis.fetch = originalFetch;
-  };
-}
-
 test(
-  'resolvePlaceTool resolves a place and maps Google category',
+  'resolvePlaceTool resolves a place and maps category',
   { concurrency: false },
   async () => {
-    const previousKey = process.env.GOOGLE_PLACES_API_KEY;
-    process.env.GOOGLE_PLACES_API_KEY = 'test-key';
-    const restoreFetch = installGoogleFetchMock(async () => [makeGooglePlace()]);
+    const uniqueName = `Louvre ${Date.now()}`;
+    __setResolvePlaceLlmResolverForTests(async () => [makeCandidate()]);
 
     try {
       const result = await resolvePlaceTool.handler({
-        name: 'Louvre',
+        name: uniqueName,
         context: 'Paris, France',
       });
 
@@ -69,11 +56,11 @@ test(
 
       assert.equal(result.data.category, 'museum');
       assert.equal(result.data.city, 'Paris');
-      assert.equal(result.data.id, 'gplaces-test-place-id');
+      assert.equal(result.data.id.startsWith('llm-'), true);
       assert.equal(result.data.confidence > 0, true);
     } finally {
-      restoreFetch();
-      process.env.GOOGLE_PLACES_API_KEY = previousKey;
+      __setResolvePlaceLlmResolverForTests(null);
+      __setResolvePlaceSecondaryResolverForTests(null);
     }
   }
 );
@@ -82,24 +69,23 @@ test(
   'resolvePlaceTool prefers candidate nearest to anchor point',
   { concurrency: false },
   async () => {
-    const previousKey = process.env.GOOGLE_PLACES_API_KEY;
-    process.env.GOOGLE_PLACES_API_KEY = 'test-key';
-    const restoreFetch = installGoogleFetchMock(async () => [
-      makeGooglePlace({
+    const uniqueName = `Anchor Test Place ${Date.now()}`;
+    __setResolvePlaceLlmResolverForTests(async () => [
+      makeCandidate({
         id: 'far',
-        displayName: { text: 'Far Candidate' },
-        location: { latitude: 40, longitude: -74 },
+        name: 'Far Candidate',
+        location: { lat: 40, lng: -74 },
       }),
-      makeGooglePlace({
+      makeCandidate({
         id: 'near',
-        displayName: { text: 'Near Candidate' },
-        location: { latitude: 48.8606, longitude: 2.3376 },
+        name: 'Near Candidate',
+        location: { lat: 48.8606, lng: 2.3376 },
       }),
     ]);
 
     try {
       const result = await resolvePlaceTool.handler({
-        name: 'Anchor Test Place',
+        name: uniqueName,
         context: 'Paris',
         anchorPoint: { lat: 48.861, lng: 2.338 },
       });
@@ -107,12 +93,12 @@ test(
       assert.equal(result.success, true);
       if (!result.success) return;
 
-      assert.equal(result.data.id, 'gplaces-near');
+      assert.equal(result.data.name, 'Near Candidate');
       assert.equal(typeof result.data.distanceToAnchor, 'number');
       assert.equal((result.data.distanceToAnchor ?? 0) < 1000, true);
     } finally {
-      restoreFetch();
-      process.env.GOOGLE_PLACES_API_KEY = previousKey;
+      __setResolvePlaceLlmResolverForTests(null);
+      __setResolvePlaceSecondaryResolverForTests(null);
     }
   }
 );
@@ -121,12 +107,10 @@ test(
   'resolvePlaceTool uses cache for repeated queries',
   { concurrency: false },
   async () => {
-    const previousKey = process.env.GOOGLE_PLACES_API_KEY;
-    process.env.GOOGLE_PLACES_API_KEY = 'test-key';
-    let fetchCalls = 0;
-    const restoreFetch = installGoogleFetchMock(async () => {
-      fetchCalls += 1;
-      return [makeGooglePlace({ id: 'cache-hit' })];
+    let resolverCalls = 0;
+    __setResolvePlaceLlmResolverForTests(async () => {
+      resolverCalls += 1;
+      return [makeCandidate({ name: 'Cache Hit' })];
     });
 
     try {
@@ -136,11 +120,75 @@ test(
 
       assert.equal(first.success, true);
       assert.equal(second.success, true);
-      assert.equal(fetchCalls, 1);
+      assert.equal(resolverCalls, 1);
     } finally {
-      restoreFetch();
-      process.env.GOOGLE_PLACES_API_KEY = previousKey;
+      __setResolvePlaceLlmResolverForTests(null);
+      __setResolvePlaceSecondaryResolverForTests(null);
     }
   }
 );
 
+test(
+  'resolvePlaceTool coalesces in-flight duplicate lookups',
+  { concurrency: false },
+  async () => {
+    let resolverCalls = 0;
+    __setResolvePlaceLlmResolverForTests(async () => {
+      resolverCalls += 1;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      return [makeCandidate({ name: 'In Flight Hit' })];
+    });
+
+    try {
+      const uniqueName = `Concurrent Place ${Date.now()}`;
+      const [first, second] = await Promise.all([
+        resolvePlaceTool.handler({ name: uniqueName, context: 'Paris' }),
+        resolvePlaceTool.handler({ name: uniqueName, context: 'Paris' }),
+      ]);
+
+      assert.equal(first.success, true);
+      assert.equal(second.success, true);
+      assert.equal(resolverCalls, 1);
+    } finally {
+      __setResolvePlaceLlmResolverForTests(null);
+      __setResolvePlaceSecondaryResolverForTests(null);
+    }
+  }
+);
+
+test(
+  'resolvePlaceTool falls back to secondary geocoder when LLM has no results',
+  { concurrency: false },
+  async () => {
+    const uniqueName = `Bruges ${Date.now()}`;
+    __setResolvePlaceLlmResolverForTests(async () => []);
+    __setResolvePlaceSecondaryResolverForTests(async () => [
+      makeCandidate({
+        id: 'openmeteo-2800931',
+        name: 'Bruges',
+        formattedAddress: 'Bruges, Flanders, Belgium',
+        location: { lat: 51.20892, lng: 3.22424 },
+        category: 'city',
+        confidence: 0.7,
+        city: 'Bruges',
+      }),
+    ]);
+
+    try {
+      const result = await resolvePlaceTool.handler({
+        name: uniqueName,
+        context: 'Belgium',
+      });
+
+      assert.equal(result.success, true);
+      if (!result.success) return;
+
+      assert.equal(result.data.name, 'Bruges');
+      assert.equal(result.data.category, 'city');
+      assert.equal(result.data.id.startsWith('openmeteo-'), true);
+    } finally {
+      __setResolvePlaceLlmResolverForTests(null);
+      __setResolvePlaceSecondaryResolverForTests(null);
+    }
+  }
+);

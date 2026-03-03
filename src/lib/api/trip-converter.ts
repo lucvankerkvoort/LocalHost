@@ -25,6 +25,7 @@ interface ApiItineraryItem {
   orderIndex: number;
   experience?: {
       hostId: string;
+      photo?: string | null;
   } | null;
   bookings?: ApiBooking[];
 }
@@ -174,7 +175,8 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
                     location: {
                         lat: item.lat ?? primaryLoc.lat,
                         lng: item.lng ?? primaryLoc.lng,
-                    }
+                    },
+                    imageUrl: item.experience?.photo || undefined,
                 }
             } as ItineraryItem;
           });
