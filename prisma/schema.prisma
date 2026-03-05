@@ -871,6 +871,8 @@ model RateLimitEntry {
 enum ExternalApiProvider {
   GOOGLE_PLACES
   GOOGLE_ROUTES
+  OPEN_METEO
+  OSRM
   UNSPLASH
   PEXELS
   WIKIMEDIA_COMMONS

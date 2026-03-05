@@ -161,6 +161,7 @@ const MAX_ANCHOR_DISTANCE_METERS = 300000;
 const DRAFT_DAY_JITTER_DEGREES = 0.01;
 const DRAFT_ACTIVITY_JITTER_DEGREES = 0.004;
 const TOOL_EXECUTION_TIMEOUT_MS = 12000;
+const ENABLE_INTRADAY_ROUTE_HYDRATION = process.env.ENABLE_INTRADAY_ROUTE_HYDRATION === 'true';
 
 function calculateDistanceMeters(
   lat1: number,
@@ -946,6 +947,7 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
     mainCountry: string,
     tripAnchor: { lat: number; lng: number } | null
   ) {
+    const dayStart = performance.now();
     // 1. Determine local context for this day
     const baseDayCity = draftDay.city || mainCity;
     const dayRegion = draftDay.region || mainRegion;
@@ -1160,9 +1162,11 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
       distanceFromAnchor: Math.floor(Math.random() * 500),
     })) || [];
 
-    // D. Generate Navigation between sequential activities using generate_route tool
+    // D. Generate navigation between sequential activities.
+    // Disabled by default because current UI does not render intra-day route polylines,
+    // and route hydration can significantly increase generation latency.
     const navigationEvents = [];
-    if (validActivities.length > 1) {
+    if (ENABLE_INTRADAY_ROUTE_HYDRATION && validActivities.length > 1) {
       const waypoints = validActivities.map(a => ({
         name: a.place.name,
         lat: a.place.location.lat,

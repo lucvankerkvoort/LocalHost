@@ -25,11 +25,29 @@ import {
   searchUnsplashCandidates,
 } from './providers/unsplash-client';
 import { searchWikimediaCommonsCandidates } from './providers/wikimedia-commons-client';
+import { searchWikipediaSightCandidates } from './providers/wikipedia-sights-client';
 
 const IMAGE_ASSET_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const IMAGE_SELECTION_TTL_MS = 1000 * 60 * 60 * 24 * 14;
 const VERIFICATION_VERSION = 'v2-llm-batch';
+const IMAGE_VERIFICATION_ENABLED = (() => {
+  const raw = process.env.IMAGE_VERIFICATION_ENABLED?.trim().toLowerCase();
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return false;
+})();
 const ENABLE_GOOGLE_TEXT_SEARCH = process.env.ENABLE_GOOGLE_TEXT_SEARCH === 'true';
+const IMAGE_FAST_MODE = (() => {
+  const raw = process.env.IMAGE_FAST_MODE?.trim().toLowerCase();
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return true;
+})();
+const IMAGE_FAST_PROVIDER_TIMEOUT_MS = (() => {
+  const raw = Number(process.env.IMAGE_FAST_PROVIDER_TIMEOUT_MS ?? 1800);
+  if (!Number.isFinite(raw) || raw <= 0) return 1800;
+  return Math.floor(raw);
+})();
 const IMAGE_LLM_RERANK_ENABLED = (() => {
   const raw = process.env.IMAGE_LLM_RERANK_ENABLED?.trim().toLowerCase();
   if (raw === 'true') return true;
@@ -39,7 +57,7 @@ const IMAGE_LLM_RERANK_ENABLED = (() => {
 const IMAGE_LLM_MAX_CANDIDATES = 15;
 const DETERMINISTIC_WEIGHT = 0.6;
 const LLM_WEIGHT = 0.4;
-const PRIMARY_PROVIDER_BATCH_SIZE = 3;
+const PRIMARY_PROVIDER_BATCH_SIZE = 4;
 const PRIMARY_PROVIDER_PER_SOURCE_TARGET = 1;
 const IMAGE_LLM_ACCEPT_THRESHOLD = (() => {
   const raw = Number(process.env.IMAGE_LLM_ACCEPT_THRESHOLD ?? 0.72);
@@ -57,6 +75,7 @@ const IMAGE_VERIFICATION_LOG_LIMIT = 12;
 let imagePersistenceEnabled = true;
 let loggedMissingImageTables = false;
 let loggedGoogleTextSearchDisabled = false;
+const backgroundVerificationInFlight = new Set<string>();
 
 export type PlaceImageAttribution = {
   displayName?: string;
@@ -66,6 +85,13 @@ export type PlaceImageAttribution = {
 export type PlaceImageEntry = {
   url: string;
   attribution?: PlaceImageAttribution;
+};
+
+type PrimaryProviderCandidates = {
+  wikipediaCandidates: ProviderImageCandidate[];
+  wikimediaCandidates: ProviderImageCandidate[];
+  pexelsCandidates: ProviderImageCandidate[];
+  unsplashCandidates: ProviderImageCandidate[];
 };
 
 type VerifiedCandidate = {
@@ -130,6 +156,7 @@ function normalizeQueryPart(value?: string): string {
 
 function buildQueryKey(query: ProviderImageQuery): string {
   return [
+    normalizeQueryPart(query.placeId),
     normalizeQueryPart(query.textQuery),
     normalizeQueryPart(query.city),
     normalizeQueryPart(query.country),
@@ -188,6 +215,10 @@ export function __buildVerificationLogRowsForTests(
   candidates: VerificationCandidateForLogs[]
 ): ImageVerificationLogRow[] {
   return buildVerificationLogRows(candidates);
+}
+
+export function isImageFastModeEnabled(): boolean {
+  return IMAGE_FAST_MODE;
 }
 
 function logVerificationRanking(
@@ -300,6 +331,7 @@ async function loadVerifiedAssets(queryKey: string, count: number): Promise<Plac
 
 async function persistCandidate(
   queryKey: string,
+  placeId: string | undefined,
   verifiedCandidate: VerifiedCandidate
 ): Promise<PlaceImageAsset | null> {
   if (!imagePersistenceEnabled) return null;
@@ -316,7 +348,7 @@ async function persistCandidate(
         },
       },
       create: {
-        placeId: null,
+        placeId: placeId ?? null,
         queryKey,
         provider: verifiedCandidate.candidate.provider,
         providerImageId: verifiedCandidate.candidate.providerImageId,
@@ -338,6 +370,7 @@ async function persistCandidate(
         expiresAt,
       },
       update: {
+        ...(placeId ? { placeId } : {}),
         queryKey,
         providerPhotoRef: verifiedCandidate.candidate.providerPhotoRef ?? null,
         url: verifiedCandidate.candidate.url,
@@ -368,7 +401,12 @@ async function persistCandidate(
   }
 }
 
-async function persistSelection(queryKey: string, assetId: string, provider: ProviderImageCandidate['provider']) {
+async function persistSelection(
+  queryKey: string,
+  placeId: string | undefined,
+  assetId: string,
+  provider: ProviderImageCandidate['provider']
+) {
   if (!imagePersistenceEnabled) return;
 
   try {
@@ -376,12 +414,13 @@ async function persistSelection(queryKey: string, assetId: string, provider: Pro
       where: { queryKey },
       create: {
         queryKey,
-        placeId: null,
+        placeId: placeId ?? null,
         assetId,
         provider,
         expiresAt: new Date(Date.now() + IMAGE_SELECTION_TTL_MS),
       },
       update: {
+        ...(placeId ? { placeId } : {}),
         assetId,
         provider,
         expiresAt: new Date(Date.now() + IMAGE_SELECTION_TTL_MS),
@@ -413,12 +452,13 @@ type PersistedCandidate = {
 
 async function persistVerifiedCandidates(
   queryKey: string,
+  placeId: string | undefined,
   verifiedCandidates: VerifiedCandidate[]
 ): Promise<PersistedCandidate[]> {
   return Promise.all(
     verifiedCandidates.map(async (candidate) => ({
       candidate,
-      asset: await persistCandidate(queryKey, candidate),
+      asset: await persistCandidate(queryKey, placeId, candidate),
     }))
   );
 }
@@ -440,15 +480,57 @@ function entryFromCandidate(candidate: VerifiedCandidate): PlaceImageEntry {
   };
 }
 
+function entryFromProviderCandidate(candidate: ProviderImageCandidate): PlaceImageEntry {
+  return {
+    url: candidate.url,
+    attribution:
+      candidate.attribution.displayName || candidate.attribution.uri
+        ? {
+            ...(candidate.attribution.displayName
+              ? { displayName: candidate.attribution.displayName }
+              : null),
+            ...(candidate.attribution.uri
+              ? { uri: candidate.attribution.uri }
+              : null),
+          }
+        : undefined,
+  };
+}
+
+function buildFastPathCandidatePool(
+  sourceCandidates: ProviderImageCandidate[][]
+): ProviderImageCandidate[] {
+  const selected: ProviderImageCandidate[] = [];
+  const seen = new Set<string>();
+
+  sourceCandidates.forEach((source) => {
+    source.forEach((candidate) => {
+      const key = `${candidate.provider}:${candidate.providerImageId}:${candidate.url}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      selected.push(candidate);
+    });
+  });
+
+  return selected;
+}
+
+export function __buildFastPathCandidatePoolForTests(
+  sourceCandidates: ProviderImageCandidate[][]
+): ProviderImageCandidate[] {
+  return buildFastPathCandidatePool(sourceCandidates);
+}
+
 async function finalizeAcceptedCandidates(
   queryKey: string,
+  placeId: string | undefined,
   accepted: PersistedCandidate[]
 ): Promise<PlaceImageEntry[]> {
   if (accepted.length === 0) return [];
 
   const winner = accepted[0];
   if (winner.asset) {
-    await persistSelection(queryKey, winner.asset.id, winner.candidate.candidate.provider);
+    await persistSelection(queryKey, placeId, winner.asset.id, winner.candidate.candidate.provider);
   }
 
   return accepted.map((entry) => {
@@ -457,15 +539,50 @@ async function finalizeAcceptedCandidates(
   });
 }
 
+function toTimeoutError(providerName: string, timeoutMs: number): Error {
+  return new Error(`${providerName} timeout after ${timeoutMs}ms`);
+}
+
+async function withTimeout<T>(
+  promiseFactory: () => Promise<T>,
+  providerName: string,
+  timeoutMs?: number
+): Promise<T> {
+  if (!timeoutMs || timeoutMs <= 0) {
+    return promiseFactory();
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(toTimeoutError(providerName, timeoutMs));
+    }, timeoutMs);
+
+    promiseFactory()
+      .then((result) => {
+        clearTimeout(timeout);
+        resolve(result);
+      })
+      .catch((error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
+}
+
 async function fetchCandidatesFromProvider(
   providerName: string,
-  fetcher: () => Promise<ProviderImageCandidate[]>
+  fetcher: () => Promise<ProviderImageCandidate[]>,
+  timeoutMs?: number
 ): Promise<ProviderImageCandidate[]> {
   try {
-    return await fetcher();
+    return await withTimeout(fetcher, providerName, timeoutMs);
   } catch (error) {
     if (error instanceof ExternalApiBudgetExceededError) {
       console.warn(`[image-selection] ${providerName} skipped due to budget cap`);
+      return [];
+    }
+    if (error instanceof Error && error.message.includes('timeout')) {
+      console.warn(`[image-selection] ${providerName} timed out`);
       return [];
     }
     console.warn(`[image-selection] ${providerName} provider failed`, error);
@@ -494,6 +611,127 @@ function pickPrimaryBatchCandidates(
   });
 
   return selected.slice(0, PRIMARY_PROVIDER_BATCH_SIZE);
+}
+
+const SIGHT_CATEGORY_KEYS = new Set([
+  'landmark',
+  'museum',
+  'park',
+  'neighborhood',
+  'city',
+  'country',
+  'sight',
+]);
+
+const MUSEUM_THEME_TOKENS = ['museum', 'gallery', 'exhibit', 'art', 'paintings'];
+const ARCHITECTURE_THEME_TOKENS = ['architecture', 'city landmark', 'urban skyline', 'design'];
+const OUTDOOR_THEME_TOKENS = ['hiking', 'nature trail', 'mountains', 'national park'];
+const FOOD_THEME_TOKENS = ['food', 'restaurant ambiance', 'dining', 'culinary'];
+const WATER_THEME_TOKENS = ['coastline', 'ocean view', 'lake scenery', 'waterfront'];
+
+function splitTokens(value?: string): string[] {
+  if (!value) return [];
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function normalizedCategory(value?: string): string {
+  return (value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_ -]/g, '')
+    .replace(/\s+/g, '_');
+}
+
+function shouldUseSightSources(query: ProviderImageQuery): boolean {
+  const category = normalizedCategory(query.category);
+  if (SIGHT_CATEGORY_KEYS.has(category)) return true;
+  if (splitTokens(query.name).length >= 2) return true;
+  return false;
+}
+
+function buildSightQueryText(query: ProviderImageQuery): string {
+  const parts = [query.name, query.city, query.country]
+    .map((part) => part?.trim())
+    .filter(Boolean) as string[];
+  if (parts.length > 0) return parts.join(' ');
+  return query.textQuery;
+}
+
+function detectVibeThemeTokens(query: ProviderImageQuery): string[] {
+  const category = normalizedCategory(query.category);
+  const tokens = new Set([
+    ...splitTokens(query.textQuery),
+    ...splitTokens(query.name),
+    ...splitTokens(query.description),
+  ]);
+
+  if (category.includes('museum') || tokens.has('museum') || tokens.has('gallery')) {
+    return MUSEUM_THEME_TOKENS;
+  }
+  if (
+    category.includes('park') ||
+    tokens.has('hike') ||
+    tokens.has('hiking') ||
+    tokens.has('trail') ||
+    tokens.has('yosemite') ||
+    tokens.has('canyon') ||
+    tokens.has('summit') ||
+    tokens.has('falls')
+  ) {
+    return OUTDOOR_THEME_TOKENS;
+  }
+  if (
+    tokens.has('beach') ||
+    tokens.has('coast') ||
+    tokens.has('ocean') ||
+    tokens.has('waterfront') ||
+    tokens.has('lake')
+  ) {
+    return WATER_THEME_TOKENS;
+  }
+  if (category.includes('restaurant') || tokens.has('restaurant') || tokens.has('food')) {
+    return FOOD_THEME_TOKENS;
+  }
+  return ARCHITECTURE_THEME_TOKENS;
+}
+
+function buildVibeQueryText(query: ProviderImageQuery): string {
+  const theme = detectVibeThemeTokens(query).join(' ');
+  const preservePlaceContext = shouldUseSightSources(query);
+  const anchorText = preservePlaceContext
+    ? [query.name?.trim(), query.city?.trim(), query.country?.trim()].filter(Boolean).join(' ')
+    : '';
+  const locality = [query.city, query.country]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(' ');
+  return [anchorText, theme, locality].filter(Boolean).join(' ').trim() || query.textQuery;
+}
+
+function withTextQuery(
+  query: ProviderImageQuery & { sig: number },
+  textQuery: string
+): ProviderImageQuery & { sig: number } {
+  return {
+    ...query,
+    textQuery: textQuery.trim() || query.textQuery,
+  };
+}
+
+export function __resolveProviderQueriesForTests(query: ProviderImageQuery): {
+  useSightSources: boolean;
+  sightTextQuery: string;
+  vibeTextQuery: string;
+} {
+  return {
+    useSightSources: shouldUseSightSources(query),
+    sightTextQuery: buildSightQueryText(query),
+    vibeTextQuery: buildVibeQueryText(query),
+  };
 }
 
 async function rerankCandidatesWithLlm(
@@ -597,16 +835,25 @@ async function scoreAndPersistCandidates(
   providerName: string,
   candidates: ProviderImageCandidate[],
   queryKey: string,
+  placeId: string | undefined,
   context: ImageVerificationContext,
   mode: ScoringMode
 ): Promise<PlaceImageEntry[]> {
   if (candidates.length === 0) return [];
+  if (!IMAGE_VERIFICATION_ENABLED) {
+    if (IMAGE_VERIFICATION_DEBUG) {
+      console.info(
+        `[image-selection] verification disabled; provider=${providerName} query=${queryKey} candidates=${candidates.length}`
+      );
+    }
+    return candidates.map((candidate) => entryFromProviderCandidate(candidate));
+  }
 
   const initialCandidates = verifyCandidates(candidates, context);
   const verifiedCandidates = await rerankCandidatesWithLlm(initialCandidates, queryKey, context);
   logVerificationRanking(providerName, queryKey, context, verifiedCandidates);
 
-  const persisted = await persistVerifiedCandidates(queryKey, verifiedCandidates);
+  const persisted = await persistVerifiedCandidates(queryKey, placeId, verifiedCandidates);
   if (mode === 'llm_threshold') {
     const accepted = persisted
       .filter((entry) => {
@@ -622,7 +869,7 @@ async function scoreAndPersistCandidates(
         `[image-selection] threshold provider=${providerName} threshold=${IMAGE_LLM_ACCEPT_THRESHOLD.toFixed(2)} evaluated=${evaluatedCount} accepted=${accepted.length}`
       );
     }
-    return finalizeAcceptedCandidates(queryKey, accepted);
+    return finalizeAcceptedCandidates(queryKey, placeId, accepted);
   }
 
   const acceptedVerified = persisted
@@ -633,13 +880,14 @@ async function scoreAndPersistCandidates(
     .sort((a, b) => b.candidate.finalScore - a.candidate.finalScore);
   const accepted = acceptedVerified.length > 0 ? acceptedVerified : acceptedReview;
 
-  return finalizeAcceptedCandidates(queryKey, accepted);
+  return finalizeAcceptedCandidates(queryKey, placeId, accepted);
 }
 
 async function fetchVerifiedFromProvider(
   providerName: string,
   fetcher: () => Promise<ProviderImageCandidate[]>,
   queryKey: string,
+  placeId: string | undefined,
   context: ImageVerificationContext
 ): Promise<PlaceImageEntry[]> {
   const candidates = await fetchCandidatesFromProvider(providerName, fetcher);
@@ -647,58 +895,101 @@ async function fetchVerifiedFromProvider(
     providerName,
     candidates,
     queryKey,
+    placeId,
     context,
     'verified_then_review'
   );
 }
 
-export async function resolveVerifiedPlaceImages(query: ProviderImageQuery & { sig: number }): Promise<PlaceImageEntry[]> {
-  const queryKey = buildQueryKey(query);
-
-  const cached = await loadVerifiedAssets(queryKey, query.count);
-  if (cached.length > 0) {
-    return selectWithSeed(cached, query.count, query.sig).map((asset) => toEntry(asset));
-  }
-
-  const context: ImageVerificationContext = {
-    textQuery: query.textQuery,
-    name: query.name,
-    description: query.description,
-    city: query.city,
-    country: query.country,
-    category: query.category,
-    requestedWidth: query.width,
-    requestedHeight: query.height,
-  };
-
-  const wikimediaCandidates = await fetchCandidatesFromProvider(
-    'wikimedia_commons',
-    () => searchWikimediaCommonsCandidates(query)
-  );
+async function fetchPrimaryProviderCandidates(
+  query: ProviderImageQuery & { sig: number },
+  timeoutMs?: number
+): Promise<PrimaryProviderCandidates> {
   const pexelsKey = resolvePexelsApiKey();
-  const pexelsCandidates = pexelsKey
-    ? await fetchCandidatesFromProvider('pexels', () => searchPexelsCandidates(query, pexelsKey))
-    : [];
   const unsplashKey = resolveUnsplashAccessKey();
-  const unsplashCandidates = unsplashKey
-    ? await fetchCandidatesFromProvider('unsplash', () => searchUnsplashCandidates(query, unsplashKey))
-    : [];
+  const useSightSources = shouldUseSightSources(query);
+  const sightQuery = withTextQuery(query, buildSightQueryText(query));
+  const vibeQuery = withTextQuery(query, buildVibeQueryText(query));
 
-  const primaryBatchCandidates = pickPrimaryBatchCandidates([
+  const [wikipediaCandidates, wikimediaCandidates, pexelsCandidates, unsplashCandidates] =
+    await Promise.all([
+      useSightSources
+        ? fetchCandidatesFromProvider(
+            'wikipedia',
+            () => searchWikipediaSightCandidates(sightQuery),
+            timeoutMs
+          )
+        : Promise.resolve([]),
+      useSightSources
+        ? fetchCandidatesFromProvider(
+            'wikimedia_commons',
+            () => searchWikimediaCommonsCandidates(sightQuery),
+            timeoutMs
+          )
+        : Promise.resolve([]),
+      pexelsKey
+        ? fetchCandidatesFromProvider(
+            'pexels',
+            () => searchPexelsCandidates(vibeQuery, pexelsKey),
+            timeoutMs
+          )
+        : Promise.resolve([]),
+      unsplashKey
+        ? fetchCandidatesFromProvider(
+            'unsplash',
+            () => searchUnsplashCandidates(vibeQuery, unsplashKey),
+            timeoutMs
+          )
+        : Promise.resolve([]),
+    ]);
+
+  return {
+    wikipediaCandidates,
     wikimediaCandidates,
     pexelsCandidates,
     unsplashCandidates,
+  };
+}
+
+async function resolveAndPersistVerifiedCandidates(
+  query: ProviderImageQuery & { sig: number },
+  queryKey: string,
+  context: ImageVerificationContext,
+  primaryCandidates: PrimaryProviderCandidates
+): Promise<PlaceImageEntry[]> {
+  const primaryBatchCandidates = pickPrimaryBatchCandidates([
+    primaryCandidates.wikipediaCandidates,
+    primaryCandidates.wikimediaCandidates,
+    primaryCandidates.unsplashCandidates,
+    primaryCandidates.pexelsCandidates,
   ]);
+  const totalPrimaryCandidateCount =
+    primaryCandidates.wikipediaCandidates.length +
+    primaryCandidates.wikimediaCandidates.length +
+    primaryCandidates.unsplashCandidates.length +
+    primaryCandidates.pexelsCandidates.length;
 
   const primaryAccepted = await scoreAndPersistCandidates(
     'primary_batch',
     primaryBatchCandidates,
     queryKey,
+    query.placeId,
     context,
     'llm_threshold'
   );
   if (primaryAccepted.length > 0) {
     return selectWithSeed(primaryAccepted, query.count, query.sig);
+  }
+
+  // Keep Google costs low: only hit Google when non-Google providers
+  // yielded zero candidates, not just "no accepted candidates".
+  if (totalPrimaryCandidateCount > 0) {
+    if (IMAGE_VERIFICATION_DEBUG) {
+      console.info(
+        `[image-selection] skipping Google fallback for query=${queryKey} because primary candidates were available (${totalPrimaryCandidateCount})`
+      );
+    }
+    return [];
   }
 
   if (!ENABLE_GOOGLE_TEXT_SEARCH) {
@@ -715,6 +1006,7 @@ export async function resolveVerifiedPlaceImages(query: ProviderImageQuery & { s
       'google_places',
       () => searchGooglePlacesImageCandidates(query, googleApiKey),
       queryKey,
+      query.placeId,
       context
     );
     if (googleAccepted.length > 0) {
@@ -723,4 +1015,71 @@ export async function resolveVerifiedPlaceImages(query: ProviderImageQuery & { s
   }
 
   return [];
+}
+
+function startBackgroundVerification(
+  query: ProviderImageQuery & { sig: number },
+  queryKey: string,
+  context: ImageVerificationContext,
+  primaryCandidates: PrimaryProviderCandidates
+): void {
+  if (backgroundVerificationInFlight.has(queryKey)) return;
+  backgroundVerificationInFlight.add(queryKey);
+
+  void resolveAndPersistVerifiedCandidates(query, queryKey, context, primaryCandidates)
+    .catch((error) => {
+      console.warn('[image-selection] background verification failed', error);
+    })
+    .finally(() => {
+      backgroundVerificationInFlight.delete(queryKey);
+    });
+}
+
+export async function resolveVerifiedPlaceImages(query: ProviderImageQuery & { sig: number }): Promise<PlaceImageEntry[]> {
+  const queryKey = buildQueryKey(query);
+
+  if (IMAGE_VERIFICATION_ENABLED) {
+    const cached = await loadVerifiedAssets(queryKey, query.count);
+    if (cached.length > 0) {
+      return selectWithSeed(cached, query.count, query.sig).map((asset) => toEntry(asset));
+    }
+  }
+
+  const context: ImageVerificationContext = {
+    textQuery: query.textQuery,
+    name: query.name,
+    description: query.description,
+    city: query.city,
+    country: query.country,
+    category: query.category,
+    requestedWidth: query.width,
+    requestedHeight: query.height,
+  };
+
+  const primaryCandidates = await fetchPrimaryProviderCandidates(
+    query,
+    IMAGE_FAST_MODE ? IMAGE_FAST_PROVIDER_TIMEOUT_MS : undefined
+  );
+
+  if (IMAGE_FAST_MODE) {
+    const fastPathCandidates = buildFastPathCandidatePool([
+      primaryCandidates.wikipediaCandidates,
+      primaryCandidates.wikimediaCandidates,
+      primaryCandidates.unsplashCandidates,
+      primaryCandidates.pexelsCandidates,
+    ]);
+
+    if (IMAGE_VERIFICATION_ENABLED) {
+      startBackgroundVerification(query, queryKey, context, primaryCandidates);
+    }
+
+    if (fastPathCandidates.length > 0) {
+      return selectWithSeed(fastPathCandidates, query.count, query.sig).map((candidate) =>
+        entryFromProviderCandidate(candidate)
+      );
+    }
+    return [];
+  }
+
+  return resolveAndPersistVerifiedCandidates(query, queryKey, context, primaryCandidates);
 }

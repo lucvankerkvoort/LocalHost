@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 import { OPENAI_DEFAULT_MODEL } from '@/lib/ai/model-config';
+import { callExternalApi } from '@/lib/providers/external-api-gateway';
 import { prisma } from '@/lib/prisma';
 import { isObviouslyInvalid, validateCoordinate } from '../validation/geo-validator';
 import { createTool, ToolResult } from './tool-registry';
@@ -213,6 +214,25 @@ type OpenMeteoGeocodingResponse = {
 type OpenMeteoCandidate = NonNullable<OpenMeteoGeocodingResponse['results']>[number];
 
 const SECONDARY_GEOCODER_TIMEOUT_MS = 5000;
+type ExternalApiCaller = typeof callExternalApi;
+let externalApiCaller: ExternalApiCaller = callExternalApi;
+
+function parsePositiveInt(raw: string | undefined, fallback: number): number {
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return Math.floor(parsed);
+}
+
+function resolveOpenMeteoSearchCostMicros(): number {
+  return parsePositiveInt(process.env.OPEN_METEO_GEOCODING_SEARCH_COST_MICROS, 0);
+}
+
+export function __setResolvePlaceExternalApiCallerForTests(
+  caller: ExternalApiCaller | null
+): void {
+  externalApiCaller = caller ?? callExternalApi;
+}
 
 function mapOpenMeteoFeatureToCategory(
   featureCode?: string
@@ -278,14 +298,16 @@ async function defaultSecondaryPlaceResolver(
     format: 'json',
   });
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), SECONDARY_GEOCODER_TIMEOUT_MS);
-
   try {
-    const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params.toString()}`, {
+    const response = await externalApiCaller({
+      provider: 'OPEN_METEO',
+      endpoint: 'openMeteo.geocodingSearch',
+      url: `https://geocoding-api.open-meteo.com/v1/search?${params.toString()}`,
       method: 'GET',
       headers: { Accept: 'application/json' },
-      signal: controller.signal,
+      timeoutMs: SECONDARY_GEOCODER_TIMEOUT_MS,
+      retries: 0,
+      estimatedCostMicros: resolveOpenMeteoSearchCostMicros(),
     });
     if (!response.ok) return [];
 
@@ -305,19 +327,12 @@ async function defaultSecondaryPlaceResolver(
 
     return Array.from(deduped.values());
   } catch (error) {
-    if (
-      typeof error === 'object' &&
-      error !== null &&
-      'name' in error &&
-      (error as { name?: string }).name === 'AbortError'
-    ) {
+    if (error instanceof Error && error.message.includes('timed out')) {
       console.warn('[resolve_place] Secondary geocoder timed out');
       return [];
     }
     console.warn('[resolve_place] Secondary geocoder failed', error);
     return [];
-  } finally {
-    clearTimeout(timeout);
   }
 }
 

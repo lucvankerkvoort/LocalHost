@@ -9,6 +9,7 @@ export type ImageAttribution = {
 
 export type ProviderImageQuery = {
   textQuery: string;
+  placeId?: string;
   name?: string;
   description?: string;
   city?: string;

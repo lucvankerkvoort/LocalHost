@@ -45,6 +45,7 @@ const cleanImageryProvider = new UrlTemplateImageryProvider({
 const MARKER_DEPTH_TEST_DISTANCE = 2500000;
 const ROUTE_MARKER_COLOR = '#64748b';
 const ROUTE_MARKER_MAX_DISTANCE_METERS = 120000;
+const COMPUTABLE_ROUTE_MODES = new Set<TravelRoute['mode']>(['drive', 'train', 'walk']);
 const PLACE_MARKER_DEFAULT_COLOR = '#94a3b8';
 const PLACE_MARKER_COLORS: Record<string, string> = {
   landmark: '#ffb703',
@@ -327,6 +328,24 @@ type RoutePathPayload = {
   source?: 'google' | 'fallback';
 };
 
+function isComputableRouteMode(mode: TravelRoute['mode']): boolean {
+  return COMPUTABLE_ROUTE_MODES.has(mode);
+}
+
+function roundCoord(value: number): string {
+  return value.toFixed(5);
+}
+
+function buildRouteComputeKey(route: TravelRoute): string {
+  return [
+    route.mode,
+    roundCoord(route.fromLat),
+    roundCoord(route.fromLng),
+    roundCoord(route.toLat),
+    roundCoord(route.toLng),
+  ].join('|');
+}
+
 type ItemPreviewPopperProps = {
   itemPreview: NonNullable<CesiumGlobeProps['itemPreview']>;
   previewPosition: { x: number; y: number };
@@ -480,6 +499,8 @@ export default function CesiumGlobe({
   const initialFlightRef = useRef(false);
   const skipNextSelectionFlyRef = useRef(false);
   const [routePathsById, setRoutePathsById] = useState<Record<string, RoutePathPayload>>({});
+  const routePathCacheRef = useRef<Map<string, RoutePathPayload>>(new Map());
+  const routeComputeInFlightRef = useRef<Set<string>>(new Set());
 
   const cityMarkersKey = useMemo(
     () => cityMarkers.map((marker) => `${marker.id}:${marker.lat}:${marker.lng}`).join('|'),
@@ -516,78 +537,118 @@ export default function CesiumGlobe({
   }, [cityMarkersKey]);
 
   useEffect(() => {
+    const cachedRoutePayloadsById: Record<string, RoutePathPayload> = {};
+
     const unresolvedRoutes = routes.filter((route) => {
+      if (!isComputableRouteMode(route.mode)) return false;
       if (Array.isArray(route.path) && route.path.length >= 2) return false;
-      return !routePathsById[route.id];
+      if (routePathsById[route.id]) return false;
+
+      const computeKey = buildRouteComputeKey(route);
+      const cachedPayload = routePathCacheRef.current.get(computeKey);
+      if (cachedPayload) {
+        cachedRoutePayloadsById[route.id] = cachedPayload;
+        return false;
+      }
+
+      if (routeComputeInFlightRef.current.has(computeKey)) {
+        return false;
+      }
+
+      return true;
     });
+
+    if (Object.keys(cachedRoutePayloadsById).length > 0) {
+      setRoutePathsById((previous) => ({
+        ...previous,
+        ...cachedRoutePayloadsById,
+      }));
+    }
 
     if (unresolvedRoutes.length === 0) return;
 
     let cancelled = false;
 
     const resolveRoutePaths = async () => {
-      const settled = await Promise.all(
-        unresolvedRoutes.map(async (route) => {
-          try {
-            const response = await fetch('/api/routes/compute', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                fromLat: route.fromLat,
-                fromLng: route.fromLng,
-                toLat: route.toLat,
-                toLng: route.toLng,
-                mode: route.mode,
-              }),
-            });
+      const routesByKey = new Map<string, TravelRoute[]>();
+      unresolvedRoutes.forEach((route) => {
+        const computeKey = buildRouteComputeKey(route);
+        const existing = routesByKey.get(computeKey);
+        if (existing) {
+          existing.push(route);
+        } else {
+          routesByKey.set(computeKey, [route]);
+        }
+      });
 
-            if (!response.ok) {
-              return {
-                routeId: route.id,
-                payload: {
-                  points: [
-                    { lat: route.fromLat, lng: route.fromLng },
-                    { lat: route.toLat, lng: route.toLng },
-                  ],
-                  source: 'fallback',
-                } satisfies RoutePathPayload,
-              };
-            }
+      const settled: Array<{ routeId: string; payload: RoutePathPayload }> = [];
 
-            const payload = (await response.json()) as RoutePathPayload;
+      for (const [computeKey, groupedRoutes] of routesByKey.entries()) {
+        const route = groupedRoutes[0];
+        routeComputeInFlightRef.current.add(computeKey);
+
+        let payload: RoutePathPayload;
+        try {
+          const response = await fetch('/api/routes/compute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fromLat: route.fromLat,
+              fromLng: route.fromLng,
+              toLat: route.toLat,
+              toLng: route.toLng,
+              mode: route.mode,
+            }),
+          });
+
+          if (!response.ok) {
+            payload = {
+              points: [
+                { lat: route.fromLat, lng: route.fromLng },
+                { lat: route.toLat, lng: route.toLng },
+              ],
+              source: 'fallback',
+            } satisfies RoutePathPayload;
+          } else {
+            const responsePayload = (await response.json()) as RoutePathPayload;
             const points =
-              Array.isArray(payload.points) && payload.points.length >= 2
-                ? payload.points
+              Array.isArray(responsePayload.points) && responsePayload.points.length >= 2
+                ? responsePayload.points
                 : [
                     { lat: route.fromLat, lng: route.fromLng },
                     { lat: route.toLat, lng: route.toLng },
                   ];
 
-            return {
-              routeId: route.id,
-              payload: {
-                points,
-                distanceMeters:
-                  typeof payload.distanceMeters === 'number' ? payload.distanceMeters : null,
-                durationSeconds:
-                  typeof payload.durationSeconds === 'number' ? payload.durationSeconds : null,
-                source: payload.source === 'google' ? 'google' : 'fallback',
-              } satisfies RoutePathPayload,
-            };
-          } catch {
-            return {
-              routeId: route.id,
-              payload: {
-                points: [
-                  { lat: route.fromLat, lng: route.fromLng },
-                  { lat: route.toLat, lng: route.toLng },
-                ],
-                source: 'fallback',
-              } satisfies RoutePathPayload,
-            };
+            payload = {
+              points,
+              distanceMeters:
+                typeof responsePayload.distanceMeters === 'number'
+                  ? responsePayload.distanceMeters
+                  : null,
+              durationSeconds:
+                typeof responsePayload.durationSeconds === 'number'
+                  ? responsePayload.durationSeconds
+                  : null,
+              source: responsePayload.source === 'google' ? 'google' : 'fallback',
+            } satisfies RoutePathPayload;
           }
-        })
-      );
+        } catch {
+          payload = {
+            points: [
+              { lat: route.fromLat, lng: route.fromLng },
+              { lat: route.toLat, lng: route.toLng },
+            ],
+            source: 'fallback',
+          } satisfies RoutePathPayload;
+        } finally {
+          routeComputeInFlightRef.current.delete(computeKey);
+        }
+
+        routePathCacheRef.current.set(computeKey, payload);
+        groupedRoutes.forEach((groupedRoute) => {
+          settled.push({ routeId: groupedRoute.id, payload });
+        });
+      }
 
       if (cancelled) return;
 

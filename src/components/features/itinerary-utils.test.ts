@@ -6,6 +6,7 @@ import {
   isHostedExperienceItem,
   resolveItineraryDayCaption,
   resolveItineraryDayHeadline,
+  resolveItineraryItemImageUrl,
 } from './itinerary-utils';
 
 import type { ItineraryItem } from '@/types/itinerary';
@@ -73,11 +74,36 @@ test('resolveItineraryDayCaption switches to city when title is promoted', () =>
   assert.equal(resolveItineraryDayCaption('not-a-date', '  ', 'Amsterdam', 2), 'Amsterdam');
   assert.equal(resolveItineraryDayCaption(undefined, '  ', undefined, 3), 'Day 3');
 
-  const expected = new Date('2026-02-11T12:00:00').toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
   assert.equal(resolveItineraryDayCaption('2026-02-11T12:00:00', "Vienna's elegant sights", 'Vienna', 4), "Vienna's elegant sights");
   assert.equal(resolveItineraryDayCaption('2026-02-11T12:00:00', '  ', 'Vienna', 5), 'Day 5');
+});
+
+test('resolveItineraryItemImageUrl returns hydrated url for non-hosted items', () => {
+  const item: ItineraryItem = {
+    id: 'item-plain',
+    type: 'SIGHT',
+    title: 'Museum stop',
+    position: 1,
+  };
+
+  const result = resolveItineraryItemImageUrl(item, 'https://cdn.example.com/image.jpg', '/globe.svg');
+  assert.equal(result, 'https://cdn.example.com/image.jpg');
+});
+
+test('resolveItineraryItemImageUrl keeps hosted experiences off the place image pipeline', () => {
+  const hosted: ItineraryItem = {
+    id: 'item-hosted',
+    type: 'EXPERIENCE',
+    title: 'Hosted class',
+    hostId: 'host-1',
+    experienceId: 'exp-1',
+    position: 1,
+  };
+
+  const result = resolveItineraryItemImageUrl(
+    hosted,
+    'https://cdn.example.com/image.jpg',
+    '/globe.svg'
+  );
+  assert.equal(result, undefined);
 });

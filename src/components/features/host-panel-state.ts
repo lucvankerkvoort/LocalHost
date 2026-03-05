@@ -1,4 +1,4 @@
-import type { ItineraryItem } from '@/types/itinerary';
+import { ItineraryItem } from '@/types/itinerary';
 
 export type HostExperienceCtaState = 'ADD' | 'REMOVE' | 'BOOKED';
 

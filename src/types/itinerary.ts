@@ -43,6 +43,7 @@ export interface ItineraryItem {
     category?: string;
     address?: string;
     city?: string;
+    country?: string;
     description?: string;
     confidence?: number;
     geoValidation?: 'EXACT' | 'APPROXIMATE' | 'CITY_FALLBACK' | 'FAILED';

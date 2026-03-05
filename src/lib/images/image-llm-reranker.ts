@@ -2,7 +2,7 @@ import { openai } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 
-import { OPENAI_DEFAULT_MODEL } from '@/lib/ai/model-config';
+import { OPENAI_IMAGE_RERANK_MODEL } from '@/lib/ai/model-config';
 
 type PhotoCandidate = {
   providerImageId?: string;
@@ -189,7 +189,7 @@ async function defaultBatchRerankExecutor(
     });
 
     const { object } = await generateObject({
-      model: openai(OPENAI_DEFAULT_MODEL),
+      model: openai(OPENAI_IMAGE_RERANK_MODEL),
       schema: LlmRerankResponseSchema,
       messages: [
         {

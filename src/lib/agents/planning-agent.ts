@@ -68,6 +68,7 @@ STYLE RULES (STRICT):
 const PLANNER_ONBOARDING_START_TOKEN = 'ACTION:START_PLANNER';
 const DEBUG_ORCHESTRATOR_PROGRESS =
   process.env.DEBUG_ORCHESTRATOR_PROGRESS === '1' || process.env.DEBUG_ORCHESTRATOR_JOBS === '1';
+const ENABLE_INTRADAY_ROUTE_HYDRATION = process.env.ENABLE_INTRADAY_ROUTE_HYDRATION === 'true';
 
 function logPlannerProgressDebug(event: string, payload: Record<string, unknown>) {
   if (!DEBUG_ORCHESTRATOR_PROGRESS) return;
@@ -470,7 +471,9 @@ function getHydrationTotals(draft: DraftItinerary): HydrationTotals {
   // Since we can't perfectly predict the fallback, we use activities + 1 as a baseline
   // and ensure the progress bar completes even if the exact number varies slightly.
   const geocodes = draft.days.reduce((sum, day) => sum + day.activities.length + 1, 0);
-  const routes = draft.days.filter((day) => day.activities.length > 1).length;
+  const routes = ENABLE_INTRADAY_ROUTE_HYDRATION
+    ? draft.days.filter((day) => day.activities.length > 1).length
+    : 0;
   const hosts = draft.days.length;
   return { geocodes, routes, hosts };
 }

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  __setResolvePlaceExternalApiCallerForTests,
   __setResolvePlaceLlmResolverForTests,
   __setResolvePlaceSecondaryResolverForTests,
   resolvePlaceTool,
@@ -187,6 +188,63 @@ test(
       assert.equal(result.data.category, 'city');
       assert.equal(result.data.id.startsWith('openmeteo-'), true);
     } finally {
+      __setResolvePlaceLlmResolverForTests(null);
+      __setResolvePlaceSecondaryResolverForTests(null);
+    }
+  }
+);
+
+test(
+  'resolvePlaceTool default secondary geocoder uses external API gateway',
+  { concurrency: false },
+  async () => {
+    const uniqueName = `Bruges gateway ${Date.now()}`;
+    let capturedProvider: string | null = null;
+    let capturedEndpoint: string | null = null;
+
+    __setResolvePlaceLlmResolverForTests(async () => []);
+    __setResolvePlaceSecondaryResolverForTests(null);
+    __setResolvePlaceExternalApiCallerForTests(async (options) => {
+      const meta = options as Record<string, unknown>;
+      capturedProvider = typeof meta.provider === 'string' ? meta.provider : null;
+      capturedEndpoint = typeof meta.endpoint === 'string' ? meta.endpoint : null;
+      return new Response(
+        JSON.stringify({
+          results: [
+            {
+              id: 2800931,
+              name: 'Bruges',
+              latitude: 51.20892,
+              longitude: 3.22424,
+              country: 'Belgium',
+              admin1: 'Flanders',
+              feature_code: 'PPLA',
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    });
+
+    try {
+      const result = await resolvePlaceTool.handler({
+        name: uniqueName,
+        context: 'Belgium',
+      });
+
+      assert.equal(result.success, true);
+      if (!result.success) return;
+
+      assert.equal(result.data.name, 'Bruges');
+      assert.equal(result.data.category, 'city');
+      assert.equal(result.data.id, 'openmeteo-2800931');
+      assert.equal(capturedProvider, 'OPEN_METEO');
+      assert.equal(capturedEndpoint, 'openMeteo.geocodingSearch');
+    } finally {
+      __setResolvePlaceExternalApiCallerForTests(null);
       __setResolvePlaceLlmResolverForTests(null);
       __setResolvePlaceSecondaryResolverForTests(null);
     }

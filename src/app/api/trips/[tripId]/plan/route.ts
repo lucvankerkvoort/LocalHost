@@ -2,6 +2,41 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 
+const VALID_ANCHOR_TYPES = new Set(['CITY', 'REGION', 'ROAD_TRIP', 'TRAIL']);
+const VALID_ITEM_TYPES = new Set([
+  'SIGHT',
+  'EXPERIENCE',
+  'MEAL',
+  'FREE_TIME',
+  'TRANSPORT',
+  'NOTE',
+  'LODGING',
+]);
+
+function toValidDateOrNull(raw: unknown): Date | null {
+  if (typeof raw !== 'string' || raw.trim().length === 0) return null;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function normalizeAnchorType(raw: unknown): 'CITY' | 'REGION' | 'ROAD_TRIP' | 'TRAIL' {
+  if (typeof raw !== 'string') return 'CITY';
+  const value = raw.trim().toUpperCase();
+  return VALID_ANCHOR_TYPES.has(value)
+    ? (value as 'CITY' | 'REGION' | 'ROAD_TRIP' | 'TRAIL')
+    : 'CITY';
+}
+
+function normalizeItemType(
+  raw: unknown
+): 'SIGHT' | 'EXPERIENCE' | 'MEAL' | 'FREE_TIME' | 'TRANSPORT' | 'NOTE' | 'LODGING' {
+  if (typeof raw !== 'string') return 'SIGHT';
+  const value = raw.trim().toUpperCase();
+  return VALID_ITEM_TYPES.has(value)
+    ? (value as 'SIGHT' | 'EXPERIENCE' | 'MEAL' | 'FREE_TIME' | 'TRANSPORT' | 'NOTE' | 'LODGING')
+    : 'SIGHT';
+}
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ tripId: string }> }
@@ -59,10 +94,48 @@ export async function POST(
     const dayIdMap: Record<number, string> = {};
 
     await prisma.$transaction(async (tx) => {
+        const requestedExperienceIds = stops.flatMap((stop: { days?: Array<{ items?: Array<{ experienceId?: string | null }> }> }) =>
+          Array.isArray(stop.days)
+            ? stop.days.flatMap((day) =>
+                Array.isArray(day.items)
+                  ? day.items
+                      .map((item) => item.experienceId)
+                      .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+                  : []
+              )
+            : []
+        );
+
+        const validExperienceIdSet = new Set<string>();
+        if (requestedExperienceIds.length > 0) {
+          const validExperiences = await tx.experience.findMany({
+            where: { id: { in: Array.from(new Set(requestedExperienceIds)) } },
+            select: { id: true },
+          });
+          validExperiences.forEach((experience) => {
+            validExperienceIdSet.add(experience.id);
+          });
+        }
+
         // Clear old plan
         await tx.tripAnchor.deleteMany({
             where: { tripId: tripId }
         });
+
+        const pendingItems: Array<{
+          dayId: string;
+          type: 'SIGHT' | 'EXPERIENCE' | 'MEAL' | 'FREE_TIME' | 'TRANSPORT' | 'NOTE' | 'LODGING';
+          title: string;
+          description: string | null | undefined;
+          startTime: Date | null;
+          endTime: Date | null;
+          locationName: string | null | undefined;
+          lat: number | null | undefined;
+          lng: number | null | undefined;
+          experienceId: string | null;
+          orderIndex: number;
+          createdByAI: boolean;
+        }> = [];
 
         // Insert new plan
         for (const stop of stops) {
@@ -78,7 +151,7 @@ export async function POST(
                 data: {
                     tripId: tripId,
                     title: stop.title || stop.city || 'Stop',
-                    type: stop.type || 'CITY',
+                    type: normalizeAnchorType(stop.type),
                     locations: locationArray,
                     order: stop.order,
                 }
@@ -90,7 +163,7 @@ export async function POST(
                         data: {
                             tripAnchorId: createdAnchor.id,
                             dayIndex: day.dayIndex,
-                            date: day.date ? new Date(day.date) : null,
+                            date: toValidDateOrNull(day.date),
                             title: day.title,
                             suggestedHosts: day.suggestedHosts ?? [],
                         }
@@ -101,26 +174,34 @@ export async function POST(
 
                     if (day.items && Array.isArray(day.items)) {
                         for (const item of day.items) {
-                            await tx.itineraryItem.create({
-                                data: {
-                                    dayId: createdDay.id,
-                                    type: item.type, // Ensure enum matches
-                                    title: item.title,
-                                    description: item.description,
-                                    startTime: item.startTime ? new Date(item.startTime) : null,
-                                    endTime: item.endTime ? new Date(item.endTime) : null,
-                                    locationName: item.locationName,
-                                    lat: item.lat,
-                                    lng: item.lng,
-                                    experienceId: item.experienceId,
-                                    orderIndex: item.orderIndex,
-                                    createdByAI: item.createdByAI ?? true,
-                                }
-                            });
+                          pendingItems.push({
+                            dayId: createdDay.id,
+                            type: normalizeItemType(item.type),
+                            title: item.title,
+                            description: item.description,
+                            startTime: toValidDateOrNull(item.startTime),
+                            endTime: toValidDateOrNull(item.endTime),
+                            locationName: item.locationName,
+                            lat: item.lat,
+                            lng: item.lng,
+                            experienceId:
+                              typeof item.experienceId === 'string' &&
+                              validExperienceIdSet.has(item.experienceId)
+                                ? item.experienceId
+                                : null,
+                            orderIndex: item.orderIndex,
+                            createdByAI: item.createdByAI ?? true,
+                          });
                         }
                     }
                 }
             }
+        }
+
+        if (pendingItems.length > 0) {
+          await tx.itineraryItem.createMany({
+            data: pendingItems,
+          });
         }
         
         // Update Trip status if needed
@@ -139,6 +220,11 @@ export async function POST(
               preferences: nextPreferences ?? {},
             }
         });
+    }, {
+      // Prisma Accelerate currently caps interactive transaction timeout at 15s.
+      // Requesting higher values causes the transaction to fail immediately.
+      maxWait: 10_000,
+      timeout: 12_000,
     });
 
     return NextResponse.json({ success: true, dayIdMap });

@@ -3,6 +3,16 @@ const DEFAULT_HEIGHT = 400;
 
 export const PLACE_IMAGE_FALLBACK = '/globe.svg';
 
+function parseEnabledFlag(raw: string | undefined): boolean {
+  if (!raw) return false;
+  const normalized = raw.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
+
+export function isPlaceImagesEnabled(): boolean {
+  return parseEnabledFlag(process.env.NEXT_PUBLIC_ENABLE_PLACE_IMAGES);
+}
+
 function hashString(value: string): number {
   let hash = 0;
   for (let i = 0; i < value.length; i += 1) {
@@ -33,16 +43,20 @@ function compactDescription(value?: string): string | undefined {
 }
 
 export function buildPlaceImageUrl(params: {
+  placeId?: string;
   name?: string;
   description?: string;
   city?: string;
+  country?: string;
   category?: string;
   width?: number;
   height?: number;
 }): string | undefined {
+  if (!isPlaceImagesEnabled()) return undefined;
   const query = buildQuery([
     params.name,
     params.city,
+    params.country,
     params.category,
     compactDescription(params.description),
   ]);
@@ -56,26 +70,32 @@ export function buildPlaceImageUrl(params: {
     h: String(height),
     sig: String(sig),
   });
+  if (params.placeId) searchParams.set('placeId', params.placeId);
   if (params.name) searchParams.set('name', params.name);
   const compactedDescription = compactDescription(params.description);
   if (compactedDescription) searchParams.set('description', compactedDescription);
   if (params.city) searchParams.set('city', params.city);
+  if (params.country) searchParams.set('country', params.country);
   if (params.category) searchParams.set('category', params.category);
   return `/api/images/places?${searchParams.toString()}`;
 }
 
 export function buildPlaceImageListUrl(params: {
+  placeId?: string;
   name?: string;
   description?: string;
   city?: string;
+  country?: string;
   category?: string;
   count?: number;
   width?: number;
   height?: number;
 }): string | undefined {
+  if (!isPlaceImagesEnabled()) return undefined;
   const query = buildQuery([
     params.name,
     params.city,
+    params.country,
     params.category,
     compactDescription(params.description),
   ]);
@@ -90,10 +110,12 @@ export function buildPlaceImageListUrl(params: {
     sig: String(sig),
     count: String(params.count ?? 5),
   });
+  if (params.placeId) searchParams.set('placeId', params.placeId);
   if (params.name) searchParams.set('name', params.name);
   const compactedDescription = compactDescription(params.description);
   if (compactedDescription) searchParams.set('description', compactedDescription);
   if (params.city) searchParams.set('city', params.city);
+  if (params.country) searchParams.set('country', params.country);
   if (params.category) searchParams.set('category', params.category);
   return `/api/images/places/list?${searchParams.toString()}`;
 }

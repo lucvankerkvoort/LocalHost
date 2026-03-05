@@ -199,9 +199,11 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
 
         const placeImageUrl = act.place.imageUrl
           ?? buildPlaceImageUrl({
+            placeId: act.place.id,
             name: act.place.name,
             description: act.notes ?? act.place.description,
             city: currentCity ?? act.place.city,
+            country: day.country,
             category: cat ?? type,
           });
 
@@ -212,6 +214,9 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
             id: act.place.id || `place-${idx}`,
             name: act.place.name,
             location: act.place.location,
+            city: currentCity ?? act.place.city,
+            country: day.country,
+            description: act.place.description,
             imageUrl: placeImageUrl,
           },
           category: act.place.category, // Use place category

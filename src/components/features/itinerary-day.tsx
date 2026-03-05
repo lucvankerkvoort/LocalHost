@@ -90,9 +90,11 @@ export function ItineraryDayColumn({
             const imageUrl = isHostedExperience
               ? undefined
               : ((resolveItemImageUrl?.(item)) ?? buildPlaceImageUrl({
+                  placeId: item.place?.id,
                   name: item.place?.name ?? item.title,
                   description: item.place?.description ?? item.description,
                   city: item.place?.city,
+                  country: item.place?.country,
                   category: item.category ?? item.type,
                 }) ?? item.place?.imageUrl);
             

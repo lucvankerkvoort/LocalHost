@@ -13,7 +13,11 @@ import {
 } from '@/types/globe';
 import { ItineraryItem } from '@/types/itinerary';
 import type { PlannerExperience } from '@/types/planner-experiences';
-import { buildPlaceImageListUrl, PLACE_IMAGE_FALLBACK } from '@/lib/images/places';
+import {
+  buildPlaceImageListUrl,
+  isPlaceImagesEnabled,
+  PLACE_IMAGE_FALLBACK,
+} from '@/lib/images/places';
 
 import { BookingDialog } from './booking-dialog';
 import { PaymentModal } from './payment/payment-modal';
@@ -21,6 +25,10 @@ import { ItineraryDayColumn } from './itinerary-day';
 import { HostPanel } from './host-panel';
 import { buildAddedExperienceIds, buildBookedExperienceIds } from './host-panel-state';
 import { buildPlannerExperienceStopMarkers } from './globe-itinerary-utils';
+import {
+  isHostedExperienceItem,
+  resolveItineraryItemImageUrl,
+} from './itinerary-utils';
 import { OrchestratorJobStatus } from './orchestrator-job-status';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
@@ -166,6 +174,7 @@ type GlobeItineraryProps = {
 
 export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryProps) {
   const dispatch = useAppDispatch();
+  const placeImagesEnabled = isPlaceImagesEnabled();
   const destinations = useAppSelector((state) => state.globe.destinations);
   const routes = useAppSelector((state) => state.globe.routes);
   const routeMarkers = useAppSelector((state) => state.globe.routeMarkers);
@@ -180,11 +189,16 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   const hoveredItemId = useAppSelector((state) => state.globe.hoveredItemId);
   const selectedHostId = useAppSelector((state) => state.globe.selectedHostId);
   const selectedExperienceId = useAppSelector((state) => state.globe.selectedExperienceId);
+  const hasActiveOrchestratorJob = useAppSelector(
+    (state) => state.orchestrator.activeJobId !== null
+  );
   const showTimeline = useAppSelector((state) => state.ui.showTimeline);
   const isCollapsed = useAppSelector((state) => state.ui.isItineraryCollapsed);
   const itineraryPanelTab = useAppSelector((state) => state.ui.itineraryPanelTab);
   const [itemPreview, setItemPreview] = useState<ItineraryItemPreview | null>(null);
   const imageCacheRef = useRef<Map<string, ItemPreviewImage[]>>(new Map());
+  const [listItemImageUrls, setListItemImageUrls] = useState<Record<string, string>>({});
+  const listImageFetchInFlightRef = useRef<Set<string>>(new Set());
   const [tourState, setTourState] = useState<'idle' | 'playing' | 'paused'>('idle');
   const [tourIndex, setTourIndex] = useState(0);
   const tourTimerRef = useRef<number | null>(null);
@@ -1018,6 +1032,113 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     return tertiary || undefined;
   }, []);
 
+  const resolveItemImageUrl = useCallback((item: ItineraryItem): string | undefined => {
+    return resolveItineraryItemImageUrl(
+      item,
+      listItemImageUrls[item.id],
+      PLACE_IMAGE_FALLBACK
+    );
+  }, [listItemImageUrls]);
+
+  useEffect(() => {
+    if (!placeImagesEnabled) return;
+    if (hasActiveOrchestratorJob) return;
+    if (orderedDestinations.length === 0) return;
+
+    const queue = orderedDestinations.flatMap((day) =>
+      day.activities
+        .filter((item) => !isHostedExperienceItem(item))
+        .filter((item) => !listItemImageUrls[item.id])
+        .filter((item) => !listImageFetchInFlightRef.current.has(item.id))
+        .map((item) => ({ item, dayCity: day.city }))
+    );
+
+    if (queue.length === 0) return;
+
+    let cancelled = false;
+    let cursor = 0;
+    let active = 0;
+    const maxConcurrency = 3;
+
+    const startNext = () => {
+      if (cancelled) return;
+      while (active < maxConcurrency && cursor < queue.length) {
+        const { item, dayCity } = queue[cursor++];
+        active += 1;
+        listImageFetchInFlightRef.current.add(item.id);
+
+        const listUrl = buildPlaceImageListUrl({
+          placeId: item.place?.id,
+          name: item.place?.name ?? item.title,
+          description: resolveItemDescription(item),
+          city: item.place?.city ?? dayCity,
+          country: item.place?.country,
+          category: item.category ?? item.type,
+          count: 1,
+        });
+
+        if (!listUrl) {
+          if (!cancelled) {
+            setListItemImageUrls((prev) =>
+              prev[item.id]
+                ? prev
+                : { ...prev, [item.id]: PLACE_IMAGE_FALLBACK }
+            );
+          }
+          listImageFetchInFlightRef.current.delete(item.id);
+          active -= 1;
+          continue;
+        }
+
+        void fetch(listUrl)
+          .then(async (response) => {
+            const data = (await response.json()) as { images?: ItemPreviewImage[] };
+            const backendImages = Array.isArray(data.images) ? data.images : [];
+            const url = backendImages[0]?.url ?? PLACE_IMAGE_FALLBACK;
+
+            if (cancelled) return;
+
+            setListItemImageUrls((prev) =>
+              prev[item.id] === url
+                ? prev
+                : { ...prev, [item.id]: url }
+            );
+
+            if (!url.includes('globe.svg')) {
+              imageCacheRef.current.set(item.id, [{ url }]);
+            }
+          })
+          .catch((error) => {
+            if (!cancelled) {
+              console.warn('[GlobeItinerary] Background item image hydration failed', error);
+              setListItemImageUrls((prev) =>
+                prev[item.id]
+                  ? prev
+                  : { ...prev, [item.id]: PLACE_IMAGE_FALLBACK }
+              );
+            }
+          })
+          .finally(() => {
+            listImageFetchInFlightRef.current.delete(item.id);
+            active -= 1;
+            startNext();
+          });
+      }
+    };
+
+    startNext();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    placeImagesEnabled,
+    hasActiveOrchestratorJob,
+    listItemImageUrls,
+    orderedDestinations,
+    resolveItemDescription,
+  ]);
+
   const handleItemClick = useCallback(async (item: ItineraryItem, dayId: string, source: 'user' | 'tour' = 'user') => {
     if (tourState === 'playing' && source === 'user') {
       pauseTour();
@@ -1036,21 +1157,35 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
       dispatch(setVisualTarget({ lat, lng, height: 5000 }));
 
       const cachedImages = imageCacheRef.current.get(item.id);
+      const hydratedListImageUrl = listItemImageUrls[item.id];
+      const initialImages =
+        placeImagesEnabled
+          ? (cachedImages ??
+            (hydratedListImageUrl
+              ? [{ url: hydratedListImageUrl }]
+              : []))
+          : [{ url: PLACE_IMAGE_FALLBACK }];
       setItemPreview({
         itemId: item.id,
         title: item.title,
         description: resolveItemDescription(item),
         lat,
         lng,
-        images: cachedImages ?? [],
-        isLoading: !cachedImages,
+        images: initialImages,
+        isLoading: placeImagesEnabled && !cachedImages && !hydratedListImageUrl,
       });
+
+      if (!placeImagesEnabled) {
+        return;
+      }
 
       if (!cachedImages) {
         const listUrl = buildPlaceImageListUrl({
+          placeId: item.place?.id,
           name: item.place?.name ?? item.title,
           description: resolveItemDescription(item),
           city: item.place?.city,
+          country: item.place?.country,
           category: item.category ?? item.type,
           count: 5,
         });
@@ -1094,7 +1229,15 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     } else {
       setItemPreview(null);
     }
-  }, [dispatch, pauseTour, resolveItemDescription, selectedDestination, tourState]);
+  }, [
+    dispatch,
+    listItemImageUrls,
+    placeImagesEnabled,
+    pauseTour,
+    resolveItemDescription,
+    selectedDestination,
+    tourState,
+  ]);
 
   const findItemByMarkerId = useCallback((markerId: string) => {
     for (const destination of destinations) {
@@ -1365,6 +1508,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                         handleItemClick(item, day.id, 'user')
                       }
                       onItemHover={(itemId) => handleItemHover(itemId)}
+                      resolveItemImageUrl={resolveItemImageUrl}
                       onBookItem={(item) => handleBookItem(day.id, item)}
                     />
                   ))

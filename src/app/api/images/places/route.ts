@@ -7,9 +7,17 @@ import {
 } from './utils';
 import { rateLimit } from '@/lib/api/rate-limit';
 import { authorizeImageRequest } from '@/lib/images/request-auth';
-import { resolveVerifiedPlaceImages } from '@/lib/images/image-selection-service';
+import {
+  isImageFastModeEnabled,
+  resolveVerifiedPlaceImages,
+} from '@/lib/images/image-selection-service';
+import { isPlaceImagesEnabled } from '@/lib/images/places';
 
-const CACHE_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
+const STANDARD_CACHE_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
+const FAST_MODE_CACHE_TTL_MS = 1000 * 30; // 30 seconds
+const CACHE_TTL_MS = isImageFastModeEnabled()
+  ? FAST_MODE_CACHE_TTL_MS
+  : STANDARD_CACHE_TTL_MS;
 const MAX_CACHE_ENTRIES = 500;
 const placesImageIpLimiter = rateLimit({
   prefix: 'places-image-ip',
@@ -34,9 +42,10 @@ function getCacheKey(
   width: number,
   height: number,
   sig: number,
+  placeId?: string | null,
   country?: string | null
 ) {
-  return `${query}|${width}x${height}|${sig}|${country ?? ''}`;
+  return `${query}|${width}x${height}|${sig}|${placeId ?? ''}|${country ?? ''}`;
 }
 
 function pruneCache() {
@@ -50,6 +59,10 @@ function pruneCache() {
 }
 
 export async function GET(request: Request) {
+  if (!isPlaceImagesEnabled()) {
+    return NextResponse.redirect(fallbackImageUrl(request));
+  }
+
   const authorization = await authorizeImageRequest(request);
   if (!authorization.authorized) {
     return NextResponse.redirect(fallbackImageUrl(request));
@@ -70,6 +83,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const rawQuery = searchParams.get('query') || searchParams.get('q');
   const name = searchParams.get('name');
+  const placeId = searchParams.get('placeId');
   const description = searchParams.get('description');
   const city = searchParams.get('city');
   const country = searchParams.get('country');
@@ -82,7 +96,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(fallbackImageUrl(request));
   }
 
-  const cacheKey = getCacheKey(textQuery, width, height, sig, country);
+  const cacheKey = getCacheKey(textQuery, width, height, sig, placeId, country);
   const cached = responseCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return NextResponse.redirect(cached.url);
@@ -91,6 +105,7 @@ export async function GET(request: Request) {
   try {
     const images = await resolveVerifiedPlaceImages({
       textQuery,
+      placeId: placeId ?? undefined,
       name: name ?? undefined,
       description: description ?? undefined,
       city: city ?? undefined,

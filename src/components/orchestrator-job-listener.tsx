@@ -12,7 +12,7 @@ import { getTripIdFromPath } from '@/components/features/chat-widget-handshake';
 
 const POLL_INTERVAL_MS = 1500;
 const DEBUG_ORCHESTRATOR_LISTENER = process.env.NEXT_PUBLIC_DEBUG_ORCHESTRATOR_PROGRESS === '1';
-const TRACE = true; // temporary trace for debugging
+const TRACE = DEBUG_ORCHESTRATOR_LISTENER;
 
 function logOrchestratorListenerDebug(event: string, payload: Record<string, unknown>) {
   if (!DEBUG_ORCHESTRATOR_LISTENER) return;
@@ -233,35 +233,72 @@ export function OrchestratorJobListener() {
             pollState.timer = undefined;
             return;
           }
-          logOrchestratorListenerDebug('apply.complete-plan', {
-            jobId,
-            generationId: jobGenerationId,
-            tripId: jobTripId ?? null,
-          });
-          completeAppliedRef.current[jobId] = jobGenerationId;
-          dispatch(jobCompleted({ id: jobId }));
-          recordToolResult(dispatch, {
-            toolName: 'generateItinerary',
-            result: {
-              success: true,
-              jobId,
-              plan: job.plan,
-              hostMarkers: job.hostMarkers ?? [],
-              tripId: jobTripId,
-              generationId: jobGenerationId,
-            },
-            source: 'orchestrator',
-          });
-          if (jobTripId) {
-            logOrchestratorListenerDebug('persist.trip-plan.dispatch', {
+          try {
+            logOrchestratorListenerDebug('apply.complete-plan', {
               jobId,
               generationId: jobGenerationId,
-              tripId: jobTripId,
+              tripId: jobTripId ?? null,
             });
-            dispatch(saveTripPlanForTrip({ tripId: jobTripId, plan: job.plan as ItineraryPlan }));
+
+            // Keep the orchestrator job active while persisting so background
+            // image hydration cannot compete with critical trip save.
+            dispatch(
+              jobProgress({
+                id: jobId,
+                stage: 'final',
+                message: 'Saving trip...',
+              })
+            );
+
+            recordToolResult(dispatch, {
+              toolName: 'generateItinerary',
+              result: {
+                success: true,
+                jobId,
+                plan: job.plan,
+                hostMarkers: job.hostMarkers ?? [],
+                tripId: jobTripId,
+                generationId: jobGenerationId,
+              },
+              source: 'orchestrator',
+            });
+
+            if (jobTripId) {
+              logOrchestratorListenerDebug('persist.trip-plan.dispatch', {
+                jobId,
+                generationId: jobGenerationId,
+                tripId: jobTripId,
+              });
+
+              const saveAction = await dispatch(
+                saveTripPlanForTrip({ tripId: jobTripId, plan: job.plan as ItineraryPlan })
+              );
+              if (saveTripPlanForTrip.rejected.match(saveAction)) {
+                throw new Error('Failed to save trip plan');
+              }
+            }
+
+            completeAppliedRef.current[jobId] = jobGenerationId;
+            dispatch(jobCompleted({ id: jobId }));
+          } catch (saveError) {
+            const errorMessage =
+              saveError instanceof Error ? saveError.message : 'Failed to save trip plan';
+
+            // Avoid retry storms for the same completed generation when persistence fails.
+            // The user can still trigger a fresh generation to retry.
+            completeAppliedRef.current[jobId] = jobGenerationId;
+
+            logOrchestratorListenerDebug('persist.trip-plan.error', {
+              jobId,
+              generationId: jobGenerationId,
+              tripId: jobTripId ?? null,
+              error: errorMessage,
+            });
+            dispatch(jobFailed({ id: jobId, error: errorMessage }));
+          } finally {
+            window.clearInterval(intervalId);
+            pollState.timer = undefined;
           }
-          window.clearInterval(intervalId);
-          pollState.timer = undefined;
           return;
         }
 
