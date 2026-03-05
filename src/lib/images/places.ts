@@ -81,6 +81,7 @@ export function buildPlaceImageUrl(params: {
 }
 
 export function buildPlaceImageListUrl(params: {
+  itemId?: string;
   placeId?: string;
   name?: string;
   description?: string;
@@ -110,6 +111,7 @@ export function buildPlaceImageListUrl(params: {
     sig: String(sig),
     count: String(params.count ?? 5),
   });
+  if (params.itemId) searchParams.set('itemId', params.itemId);
   if (params.placeId) searchParams.set('placeId', params.placeId);
   if (params.name) searchParams.set('name', params.name);
   const compactedDescription = compactDescription(params.description);

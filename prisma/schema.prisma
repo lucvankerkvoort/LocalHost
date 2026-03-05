@@ -276,11 +276,30 @@ model ItineraryItem {
   isDeleted   Boolean @default(false)
 
   bookings Booking[] @relation("ItemBookings")
+  images   ItineraryItemImage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([dayId, orderIndex])
+}
+
+model ItineraryItemImage {
+  id              String        @id @default(cuid())
+  itineraryItemId String
+  itineraryItem   ItineraryItem @relation(fields: [itineraryItemId], references: [id], onDelete: Cascade)
+  position        Int
+  assetId         String?
+  asset           PlaceImageAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  url             String
+  attributionJson Json?
+  provider        ImageSourceProvider?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([itineraryItemId, position])
+  @@index([itineraryItemId])
+  @@index([assetId])
 }
 
 enum TripStatus {
@@ -829,6 +848,7 @@ model PlaceImageAsset {
   updatedAt           DateTime                @updatedAt
 
   selections PlaceImageSelection[]
+  itineraryItemImages ItineraryItemImage[]
 
   @@unique([provider, providerImageId])
   @@index([queryKey, status, finalScore(sort: Desc)])

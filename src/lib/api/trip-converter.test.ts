@@ -361,6 +361,85 @@ test('convertTripToGlobeDestinations falls back to stop city and coordinates whe
   assert.equal(itemPlace?.location.lng, 135.7681);
 });
 
+test('convertTripToGlobeDestinations maps persisted item images and uses first persisted image as primary imageUrl', () => {
+  const trip: ApiTrip = {
+    id: 'trip-images',
+    userId: 'user-1',
+    title: 'Image trip',
+    stops: [
+      {
+        id: 'stop-1',
+        title: 'Amsterdam',
+        type: 'CITY',
+        locations: [{ name: 'Amsterdam', lat: 52.3676, lng: 4.9041 }],
+        days: [
+          {
+            id: 'day-1',
+            dayIndex: 1,
+            title: 'Day 1',
+            items: [
+              {
+                id: 'item-1',
+                type: 'SIGHT',
+                title: 'Rijksmuseum',
+                description: null,
+                experienceId: null,
+                hostId: null,
+                locationName: 'Rijksmuseum',
+                lat: 52.3599,
+                lng: 4.8852,
+                orderIndex: 0,
+                experience: {
+                  hostId: 'host-image',
+                  photo: 'https://example.com/experience-photo.jpg',
+                },
+                images: [
+                  {
+                    id: 'img-b',
+                    position: 2,
+                    url: 'https://example.com/image-b.jpg',
+                    attributionJson: { displayName: 'Photographer B' },
+                  },
+                  {
+                    id: 'img-a',
+                    position: 0,
+                    url: 'https://example.com/image-a.jpg',
+                    attributionJson: { displayName: 'Photographer A', uri: 'https://example.com/a' },
+                  },
+                  {
+                    id: 'img-c',
+                    position: 1,
+                    url: 'https://example.com/image-c.jpg',
+                    attributionJson: null,
+                  },
+                ],
+              },
+            ],
+            suggestedHosts: [],
+          },
+        ],
+      },
+    ],
+  };
+
+  const destinations = convertTripToGlobeDestinations(trip);
+  const place = destinations[0].activities[0].place;
+
+  assert.equal(place?.imageUrl, 'https://example.com/image-a.jpg');
+  assert.deepEqual(
+    place?.images?.map((image) => image.url),
+    [
+      'https://example.com/image-a.jpg',
+      'https://example.com/image-c.jpg',
+      'https://example.com/image-b.jpg',
+    ]
+  );
+  assert.deepEqual(place?.images?.[0]?.attribution, {
+    displayName: 'Photographer A',
+    uri: 'https://example.com/a',
+  });
+});
+
 test('convertGlobeDestinationsToApiPayload sorts by day and groups stops by city transitions', () => {
   const destinations = [
     {

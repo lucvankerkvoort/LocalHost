@@ -84,6 +84,8 @@ export type PlaceImageAttribution = {
 
 export type PlaceImageEntry = {
   url: string;
+  assetId?: string;
+  provider?: ProviderImageCandidate['provider'];
   attribution?: PlaceImageAttribution;
 };
 
@@ -256,7 +258,9 @@ function selectWithSeed<T>(items: T[], count: number, sig: number): T[] {
   return selected;
 }
 
-function toEntry(asset: Pick<PlaceImageAsset, 'url' | 'attributionJson'>): PlaceImageEntry {
+function toEntry(
+  asset: Pick<PlaceImageAsset, 'id' | 'provider' | 'url' | 'attributionJson'>
+): PlaceImageEntry {
   const attributionSource =
     typeof asset.attributionJson === 'object' && asset.attributionJson !== null
       ? (asset.attributionJson as Record<string, unknown>)
@@ -270,7 +274,7 @@ function toEntry(asset: Pick<PlaceImageAsset, 'url' | 'attributionJson'>): Place
     attribution.uri = attributionSource.uri;
   }
 
-  const entry: PlaceImageEntry = { url: asset.url };
+  const entry: PlaceImageEntry = { url: asset.url, assetId: asset.id, provider: asset.provider };
   if (attribution.displayName || attribution.uri) {
     entry.attribution = attribution;
   }
@@ -465,6 +469,8 @@ async function persistVerifiedCandidates(
 
 function entryFromCandidate(candidate: VerifiedCandidate): PlaceImageEntry {
   return {
+    assetId: undefined,
+    provider: candidate.candidate.provider,
     url: candidate.candidate.url,
     attribution:
       candidate.candidate.attribution.displayName || candidate.candidate.attribution.uri
@@ -482,6 +488,8 @@ function entryFromCandidate(candidate: VerifiedCandidate): PlaceImageEntry {
 
 function entryFromProviderCandidate(candidate: ProviderImageCandidate): PlaceImageEntry {
   return {
+    assetId: undefined,
+    provider: candidate.provider,
     url: candidate.url,
     attribution:
       candidate.attribution.displayName || candidate.attribution.uri

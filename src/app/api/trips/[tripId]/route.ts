@@ -27,6 +27,9 @@ export async function GET(
                                     orderBy: { orderIndex: 'asc' },
                                     include: {
                                         experience: true, // Include experience details if needed
+                                        images: {
+                                            orderBy: { position: 'asc' }
+                                        },
                                         bookings: {
                                             orderBy: { updatedAt: 'desc' },
                                             select: {

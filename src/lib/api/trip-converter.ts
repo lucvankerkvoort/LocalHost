@@ -27,6 +27,14 @@ interface ApiItineraryItem {
       hostId: string;
       photo?: string | null;
   } | null;
+  images?: Array<{
+      id: string;
+      position: number;
+      assetId?: string | null;
+      url: string;
+      attributionJson?: unknown;
+      provider?: string | null;
+  }>;
   bookings?: ApiBooking[];
 }
 
@@ -118,6 +126,17 @@ function deriveCandidateId(item: ApiItineraryItem): string | undefined {
   return activeTentative?.id;
 }
 
+function parseImageAttribution(
+  raw: unknown
+): { displayName?: string; uri?: string } | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const source = raw as Record<string, unknown>;
+  const attribution: { displayName?: string; uri?: string } = {};
+  if (typeof source.displayName === 'string') attribution.displayName = source.displayName;
+  if (typeof source.uri === 'string') attribution.uri = source.uri;
+  return attribution.displayName || attribution.uri ? attribution : undefined;
+}
+
 export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[] {
   const destinations: GlobeDestination[] = [];
   let fallbackItemCoordinateCount = 0;
@@ -137,63 +156,75 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
     const primaryLoc = stop.locations?.[0] || { lat: 0, lng: 0, name: 'Unknown' };
 
     for (const day of stop.days) {
-        const activities: ItineraryItem[] = day.items
-            .sort((a, b) => a.orderIndex - b.orderIndex)
-            .map(item => {
-                if (typeof item.lat !== 'number' || typeof item.lng !== 'number') {
-                  fallbackItemCoordinateCount += 1;
-                  if (fallbackSamples.length < 5) {
-                    fallbackSamples.push({
-                      stopTitle: stop.title,
-                      dayIndex: day.dayIndex,
-                      itemId: item.id,
-                      itemTitle: item.title,
-                      anchorLat: primaryLoc.lat,
-                      anchorLng: primaryLoc.lng,
-                      itemLat: item.lat,
-                      itemLng: item.lng,
-                    });
-                  }
-                }
+      const activities: ItineraryItem[] = day.items
+        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .map((item) => {
+          if (typeof item.lat !== 'number' || typeof item.lng !== 'number') {
+            fallbackItemCoordinateCount += 1;
+            if (fallbackSamples.length < 5) {
+              fallbackSamples.push({
+                stopTitle: stop.title,
+                dayIndex: day.dayIndex,
+                itemId: item.id,
+                itemTitle: item.title,
+                anchorLat: primaryLoc.lat,
+                anchorLng: primaryLoc.lng,
+                itemLat: item.lat,
+                itemLng: item.lng,
+              });
+            }
+          }
 
-                return {
-                id: item.id,
-                type: normalizeItineraryType(item.type), 
-                category: item.type.toLowerCase(), 
-                title: item.title,
-                hostId: item.experience?.hostId || item.hostId || undefined, 
-                experienceId: item.experienceId,
-                status: deriveItineraryItemStatus(item),
-                candidateId: deriveCandidateId(item),
-                position: item.orderIndex,
-                timeSlot: 'Flexible', 
-                description: item.description || '',
-                price: undefined,
-                place: {
-                    id: item.locationName ? `loc-${item.id}` : 'unknown',
-                    name: item.locationName || primaryLoc.name,
-                    location: {
-                        lat: item.lat ?? primaryLoc.lat,
-                        lng: item.lng ?? primaryLoc.lng,
-                    },
-                    imageUrl: item.experience?.photo || undefined,
-                }
-            } as ItineraryItem;
-          });
+          const persistedImages = (item.images ?? [])
+            .sort((a, b) => a.position - b.position)
+            .map((image) => {
+              const attribution = parseImageAttribution(image.attributionJson);
+              return {
+                url: image.url,
+                ...(attribution ? { attribution } : {}),
+              };
+            });
 
-        destinations.push({
-            id: day.id, 
-            name: day.title || stop.title,
-            lat: primaryLoc.lat,
-            lng: primaryLoc.lng,
-            type: stop.type || 'CITY',
-            locations: stop.locations,
-            day: day.dayIndex, 
-            activities,
-            color: getColorForDay(day.dayIndex),
-            city: primaryLoc.name, // Legacy fallback
-            suggestedHosts: day.suggestedHosts || [],
+          return {
+            id: item.id,
+            type: normalizeItineraryType(item.type),
+            category: item.type.toLowerCase(),
+            title: item.title,
+            hostId: item.experience?.hostId || item.hostId || undefined,
+            experienceId: item.experienceId,
+            status: deriveItineraryItemStatus(item),
+            candidateId: deriveCandidateId(item),
+            position: item.orderIndex,
+            timeSlot: 'Flexible',
+            description: item.description || '',
+            price: undefined,
+            place: {
+              id: item.locationName ? `loc-${item.id}` : 'unknown',
+              name: item.locationName || primaryLoc.name,
+              location: {
+                lat: item.lat ?? primaryLoc.lat,
+                lng: item.lng ?? primaryLoc.lng,
+              },
+              city: primaryLoc.name,
+              images: persistedImages.length > 0 ? persistedImages : undefined,
+              imageUrl: persistedImages[0]?.url || item.experience?.photo || undefined,
+            },
+          } as ItineraryItem;
         });
+
+      destinations.push({
+        id: day.id,
+        name: day.title || stop.title,
+        lat: primaryLoc.lat,
+        lng: primaryLoc.lng,
+        type: stop.type || 'CITY',
+        locations: stop.locations,
+        day: day.dayIndex,
+        activities,
+        color: getColorForDay(day.dayIndex),
+        city: primaryLoc.name, // Legacy fallback
+        suggestedHosts: day.suggestedHosts || [],
+      });
     }
   }
 

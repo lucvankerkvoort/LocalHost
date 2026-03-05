@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 
 import {
   buildTextQuery,
@@ -7,6 +8,7 @@ import {
   parseDimensions,
 } from '../utils';
 import { rateLimit } from '@/lib/api/rate-limit';
+import { prisma } from '@/lib/prisma';
 import { authorizeImageRequest } from '@/lib/images/request-auth';
 import {
   isImageFastModeEnabled,
@@ -38,6 +40,7 @@ type CacheEntry = {
 };
 
 const responseCache = new Map<string, CacheEntry>();
+const MAX_PERSISTED_ITEM_IMAGES = 3;
 
 function getCacheKey(
   query: string,
@@ -59,6 +62,58 @@ function pruneCache() {
   for (const [key] of toRemove) {
     responseCache.delete(key);
   }
+}
+
+function isFallbackUrl(url: string): boolean {
+  return url.includes('/globe.svg');
+}
+
+async function persistItineraryItemImages(options: {
+  itemId: string;
+  userId: string;
+  images: PlaceImageEntry[];
+}): Promise<void> {
+  const normalized = options.images
+    .filter((image) => typeof image.url === 'string' && image.url.length > 0)
+    .filter((image) => !isFallbackUrl(image.url))
+    .slice(0, MAX_PERSISTED_ITEM_IMAGES);
+
+  if (normalized.length === 0) return;
+
+  const ownedItem = await prisma.itineraryItem.findFirst({
+    where: {
+      id: options.itemId,
+      day: {
+        tripAnchor: {
+          trip: {
+            userId: options.userId,
+          },
+        },
+      },
+    },
+    select: { id: true },
+  });
+
+  if (!ownedItem) return;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.itineraryItemImage.deleteMany({
+      where: { itineraryItemId: options.itemId },
+    });
+
+    await tx.itineraryItemImage.createMany({
+      data: normalized.map((image, position) => ({
+        itineraryItemId: options.itemId,
+        position,
+        assetId: image.assetId ?? null,
+        url: image.url,
+        attributionJson: image.attribution
+          ? (image.attribution as Prisma.InputJsonValue)
+          : undefined,
+        provider: image.provider ?? null,
+      })),
+    });
+  });
 }
 
 export async function GET(request: Request) {
@@ -86,6 +141,7 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const rawQuery = searchParams.get('query') || searchParams.get('q');
+  const itemId = searchParams.get('itemId');
   const name = searchParams.get('name');
   const placeId = searchParams.get('placeId');
   const description = searchParams.get('description');
@@ -104,6 +160,17 @@ export async function GET(request: Request) {
   const cacheKey = getCacheKey(textQuery, width, height, sig, count, placeId, country);
   const cached = responseCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
+    if (itemId && authorization.userId) {
+      try {
+        await persistItineraryItemImages({
+          itemId,
+          userId: authorization.userId,
+          images: cached.images,
+        });
+      } catch (error) {
+        console.warn('[places] failed to persist itinerary item images from cache', error);
+      }
+    }
     return NextResponse.json({ images: cached.images });
   }
 
@@ -126,6 +193,18 @@ export async function GET(request: Request) {
 
     const finalImages =
       images.length > 0 ? images : [{ url: fallbackImageUrl(request) }];
+
+    if (itemId && authorization.userId) {
+      try {
+        await persistItineraryItemImages({
+          itemId,
+          userId: authorization.userId,
+          images: finalImages,
+        });
+      } catch (error) {
+        console.warn('[places] failed to persist itinerary item images', error);
+      }
+    }
 
     responseCache.set(cacheKey, {
       images: finalImages,

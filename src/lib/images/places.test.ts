@@ -65,3 +65,20 @@ test('buildPlaceImageListUrl returns undefined when place images are disabled', 
   assert.equal(url, undefined);
 });
 
+test('buildPlaceImageListUrl includes itemId and count when place images are enabled', () => {
+  const url = withPlaceImagesEnv('true', () =>
+    buildPlaceImageListUrl({
+      itemId: 'item-123',
+      name: 'Rijksmuseum',
+      city: 'Amsterdam',
+      count: 3,
+    })
+  );
+
+  assert.ok(url);
+  const parsed = new URL(url!, 'https://app.example.com');
+  assert.equal(parsed.pathname, '/api/images/places/list');
+  assert.equal(parsed.searchParams.get('itemId'), 'item-123');
+  assert.equal(parsed.searchParams.get('count'), '3');
+  assert.ok(parsed.searchParams.get('sig'));
+});
