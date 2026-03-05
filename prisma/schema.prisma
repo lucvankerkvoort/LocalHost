@@ -2,11 +2,13 @@
 // https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider   = "postgresql"
+  extensions = [vector]
 }
 
 // ============================================
@@ -148,6 +150,8 @@ model Experience {
   // Stats
   rating      Float @default(0)
   reviewCount Int   @default(0)
+  engagementScore Float @default(1.0)
+  embedding   Unsupported("vector(1536)")? // Requires text-embedding-3-small
 
   // Status
   isActive Boolean @default(true)
@@ -195,16 +199,36 @@ model Trip {
   title       String
   status      TripStatus @default(DRAFT)
   preferences Json       @default("{}")
+  currentVersion Int     @default(0)
   startDate   DateTime?
   endDate     DateTime?
 
-  stops    TripAnchor[]
-  bookings Booking[]
+  stops       TripAnchor[]
+  revisions   TripRevision[]
+  bookings    Booking[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+model TripRevision {
+  id                  String   @id @default(cuid())
+  tripId              String
+  trip                Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  version             Int
+  payload             Json
+  source              String
+  actor               String
+  reason              String?
+  jobId               String?
+  generationId        String?
+  restoredFromVersion Int?
+  createdAt           DateTime @default(now())
+
+  @@unique([tripId, version])
+  @@index([tripId, createdAt(sort: Desc)])
 }
 
 model TripAnchor {
@@ -264,6 +288,7 @@ model ItineraryItem {
   startTime    DateTime?
   endTime      DateTime?
   locationName String?
+  placeId      String?
   lat          Float?
   lng          Float?
 
@@ -282,6 +307,7 @@ model ItineraryItem {
   updatedAt DateTime @updatedAt
 
   @@unique([dayId, orderIndex])
+  @@index([placeId])
 }
 
 model ItineraryItemImage {
@@ -886,6 +912,63 @@ model RateLimitEntry {
 
   @@unique([identifier, windowKey])
   @@index([expiresAt])
+}
+
+// ============================================
+// ACTIVITY INTELLIGENCE LAYER (RAG MOAT)
+// ============================================
+
+model City {
+  id              String   @id @default(cuid())
+  name            String
+  country         String
+  tier            Int      @default(3) // 1 = High volume, 2 = Core, 3 = Long-tail
+
+  // Enrichment state tracking
+  lastEnrichedAt  DateTime? // When we last hit Google Places API
+  enrichmentScore Float    @default(0) // Internal metric for coverage quality
+  activityCount   Int      @default(0) // Denormalized count to avoid runtime COUNT()
+
+  activities      Activity[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([name, country])
+  @@index([tier])
+}
+
+model Activity {
+  id               String   @id @default(cuid())
+  cityId           String
+  city             City     @relation(fields: [cityId], references: [id], onDelete: Cascade)
+
+  source           String   @default("google") // google | user | curated
+  externalId       String?  @unique // e.g., Google Place ID
+
+  name             String
+  category         String   // e.g., 'Landmark', 'Restaurant'
+  rating           Float?
+  priceLevel       Int?     // 1 to 4
+
+  // Location
+  lat              Float
+  lng              Float
+  formattedAddress String?
+  photos           String[] @default([])
+
+  // Semantic Search Payload
+  metadataJson     Json?    @default("{}") // Extracted review keywords, vibe tags
+  engagementScore  Float    @default(1.0) // Drops if AI picks it but user removes it
+  embedding        Unsupported("vector(1536)")? // For text-embedding-3-small
+
+  lastVerifiedAt   DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([cityId])
+  @@index([category])
+  @@index([engagementScore])
 }
 
 enum ExternalApiProvider {

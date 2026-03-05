@@ -1,4 +1,4 @@
-import { updateOrchestratorJob, type OrchestratorJob } from './orchestrator-jobs';
+import { updateOrchestratorJob, type OrchestratorJobUpdateResult } from './orchestrator-jobs';
 
 type JobUpdate = Parameters<typeof updateOrchestratorJob>[1];
 
@@ -33,7 +33,7 @@ class JobWriteQueue {
    * Returns a promise that resolves only when the final write lands.
    * This guarantees no stale writes can arrive after the returned promise resolves.
    */
-  async flush(jobId: string, finalUpdate: JobUpdate): Promise<OrchestratorJob | null> {
+  async flush(jobId: string, finalUpdate: JobUpdate): Promise<OrchestratorJobUpdateResult> {
     // Wait for any in-flight write to finish
     await this.waitForDrain(jobId);
 

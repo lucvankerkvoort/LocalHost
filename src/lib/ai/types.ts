@@ -16,6 +16,7 @@ export const PlaceSchema = z.object({
   city: z.string().optional(),
   category: z.enum(['landmark', 'museum', 'restaurant', 'park', 'neighborhood', 'city', 'other']).optional(),
   imageUrl: z.string().optional(),
+  imageUrls: z.array(z.string()).optional(),
   // resolve_place metadata — source of truth for geocoding quality
   confidence: z.number().optional().describe('Geocoding confidence score 0-1 from resolve_place'),
   geoValidation: z.enum(['HIGH', 'MEDIUM', 'LOW', 'FAILED']).optional().describe('Coordinate validation level'),

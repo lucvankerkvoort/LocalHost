@@ -20,8 +20,12 @@ import reducer, {
   setActiveItemId,
   setFocusedItemId,
   setItineraryData,
+  setItineraryFromPlan,
   setPlannerHosts,
   setPlannerHostsStatus,
+  setPlaceMarkers,
+  setRouteMarkers,
+  setHostMarkers,
   setTripId,
   setCameraHeight,
   setVisualTarget,
@@ -89,6 +93,23 @@ test('addHostMarkers appends new markers and skips duplicate ids', () => {
   assert.deepEqual(
     next.hostMarkers.map((host) => host.id),
     ['h-1', 'h-2', 'h-3']
+  );
+});
+
+test('setHostMarkers deduplicates markers by id', () => {
+  const state = reducer(
+    getInitialState(),
+    setHostMarkers([
+      { id: 'h-1', name: 'Host 1', lat: 1, lng: 1 },
+      { id: 'h-1', name: 'Host 1 duplicate', lat: 2, lng: 2 },
+      { id: 'h-2', name: 'Host 2', lat: 3, lng: 3 },
+    ])
+  );
+
+  assert.equal(state.hostMarkers.length, 2);
+  assert.deepEqual(
+    state.hostMarkers.map((host) => host.id),
+    ['h-1', 'h-2']
   );
 });
 
@@ -178,6 +199,40 @@ test('addPlaceMarker replaces marker with same id', () => {
     lng: 2,
     confidence: 0.8,
   });
+});
+
+test('setPlaceMarkers deduplicates markers by id', () => {
+  const state = reducer(
+    getInitialState(),
+    setPlaceMarkers([
+      { id: 'p-1', name: 'Place 1', lat: 1, lng: 1, confidence: 1 },
+      { id: 'p-1', name: 'Place 1 duplicate', lat: 2, lng: 2, confidence: 0.9 },
+      { id: 'p-2', name: 'Place 2', lat: 3, lng: 3, confidence: 1 },
+    ])
+  );
+
+  assert.equal(state.placeMarkers.length, 2);
+  assert.deepEqual(
+    state.placeMarkers.map((marker) => marker.id),
+    ['p-1', 'p-2']
+  );
+});
+
+test('setRouteMarkers deduplicates route markers by id', () => {
+  const state = reducer(
+    getInitialState(),
+    setRouteMarkers([
+      { id: 'rm-1', routeId: 'r-1', kind: 'start', lat: 10, lng: 10 },
+      { id: 'rm-1', routeId: 'r-1', kind: 'start', lat: 20, lng: 20 },
+      { id: 'rm-2', routeId: 'r-2', kind: 'end', lat: 30, lng: 30 },
+    ])
+  );
+
+  assert.equal(state.routeMarkers.length, 2);
+  assert.deepEqual(
+    state.routeMarkers.map((marker) => marker.id),
+    ['rm-1', 'rm-2']
+  );
 });
 
 test('clearItinerary clears destinations, routes, markers and selected destination', () => {
@@ -493,4 +548,53 @@ test('hydrateGlobeState deduplicates routeMarkers based on id', () => {
   assert.equal(state.routeMarkers.length, 2);
   assert.equal(state.routeMarkers[0].id, 'rm-1');
   assert.equal(state.routeMarkers[1].id, 'rm-2');
+});
+
+test('setItineraryFromPlan deduplicates route markers from converter output', () => {
+  const state = reducer(
+    getInitialState(),
+    setItineraryFromPlan({
+      id: 'plan-dup',
+      title: 'Duplicate marker plan',
+      request: 'test',
+      summary: 'summary',
+      days: [
+        {
+          dayNumber: 1,
+          title: 'Day 1',
+          city: 'Amsterdam',
+          country: 'Netherlands',
+          anchorLocation: {
+            id: 'anchor-1',
+            name: 'Amsterdam',
+            location: { lat: 52.3676, lng: 4.9041 },
+          },
+          activities: [
+            {
+              id: 'act-1',
+              timeSlot: 'morning',
+              place: {
+                id: 'shared-place',
+                name: 'Shared Place',
+                location: { lat: 52.37, lng: 4.9 },
+              },
+            },
+            {
+              id: 'act-2',
+              timeSlot: 'afternoon',
+              place: {
+                id: 'shared-place',
+                name: 'Shared Place Repeat',
+                location: { lat: 52.371, lng: 4.901 },
+              },
+            },
+          ],
+          suggestedHosts: [],
+        },
+      ],
+    })
+  );
+
+  assert.equal(state.routeMarkers.length, 1);
+  assert.equal(state.routeMarkers[0].id, 'shared-place');
 });

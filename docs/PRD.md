@@ -1,11 +1,17 @@
 # Localhost Platform - Product Requirements Document
 
+**Current Status Tracker (as of 2026-02-01)**
+See [PRD Progress](#prd-progress) section at the bottom for implementation status.
+
+---
+
 ## Executive Summary
 
-**Localhost** is a peer-to-peer platform that connects travelers with authentic, small-scale local experiences hosted by verified community members. The platform enables travelers to join clearly defined activities—like a home-cooked dinner, a neighborhood walking tour, or a pottery class—hosted by locals who want to share their culture, skills, or community.
+**Localhost** is a **host-first** travel platform where itineraries are built around real local people and their experiences, not generic internet recommendations. 
 
-### Core Mission
-Enable authentic human connection through structured, safe, and meaningful local experiences while traveling.
+The AI generates itineraries by prioritizing host-led experiences and supplementing them with essential landmarks to preserve traveler confidence and avoid fear of missing out (FOMO). Travelers can then book, rearrange, or refine their itinerary through interaction with the AI.
+
+Localhost is not about showing travelers everything — it is about showing them the right moments to meet real people, framed within a familiar city structure.
 
 ### What Localhost is NOT
 - ❌ A dating app - all interactions are activity-focused, not person-focused
@@ -14,35 +20,52 @@ Enable authentic human connection through structured, safe, and meaningful local
 
 ---
 
-## Core Principles
+## Core Product Philosophy (Host-First Itinerary Model)
 
-### 1. Safety First
-- Comprehensive host verification (identity, background, reviews)
-- Clear experience definitions with set times, locations, and participant limits
-- In-app messaging and check-in systems
-- Community reporting and trust scores
+### Hosts First, Landmarks Never Lost
+- Host-led experiences are the primary building blocks of itineraries.
+- Canonical landmarks (e.g. Empire State Building, Eiffel Tower) are included as contextual anchors, not the core offering.
+- The AI actively attempts to associate landmarks with relevant hosts.
+- When no host exists, landmarks are still shown to avoid FOMO, but clearly labeled as self-guided or contextual.
 
-### 2. Clarity Over Ambiguity
-- Every experience must have explicit: what, when, where, how long, how many, how much
-- No vague meetups - only structured activities
-- Transparent pricing with no hidden fees
+This ensures:
+- Travelers feel oriented and confident
+- Hosts feel central, not optional
+- The platform never degrades into a generic travel guide
 
-### 3. Authentic Human Connection
-- Small group sizes (typically 1-6 guests)
-- Hosts share genuine parts of their lives/skills
-- Focus on cultural exchange, not transactional tourism
+---
 
-### 4. Host Empowerment
-- Easy experience creation tools
-- Fair pricing set by hosts
-- Host protection policies and support
+## Itinerary Model
+
+### Anchor vs Context Stops
+
+Each itinerary item is one of two types:
+
+1. **Anchor Experience (Host-Led)**
+   - Backed by a verified local host
+   - Bookable
+   - Time-bound (e.g. "Afternoon", "Evening")
+   - The primary reason a traveler engages with the platform
+
+2. **Context Stop (Landmark / Free Exploration)**
+   - Non-bookable
+   - Provides narrative flow, orientation, and pacing
+   - Included to preserve traveler expectations and city completeness
+   - Can surround or lead into an Anchor Experience
+
+### AI Itinerary Generation Flow
+1. **City Skeleton**: AI identifies essential landmarks, neighborhoods, and city rhythm.
+2. **Host Matching**: AI searches for hosts that occur near landmarks, naturally fit time-of-day blocks, and represent cultural depth. Hosts replace or enrich parts of the skeleton where possible.
+3. **Hybrid Assembly**: Final itinerary contains Anchor Experiences as focal points and Context Stops only where hosts are unavailable/unnecessary. 
+4. **Prefill, Not Finalize**: The generated itinerary is a starting point, not a commitment. The user can book hosts, rearrange items, remove landmarks, or ask the AI to refine.
+
+The itinerary evolves through conversation, not resets.
 
 ---
 
 ## User Personas
 
 ### Traveler (Guest)
-**Who**: Solo travelers, couples, or small groups seeking authentic local experiences
 **Needs**: 
 - Discover unique, off-the-beaten-path activities
 - Feel safe meeting strangers in a new place
@@ -50,7 +73,6 @@ Enable authentic human connection through structured, safe, and meaningful local
 - Easy booking and clear expectations
 
 ### Local Host
-**Who**: Locals with skills, knowledge, or spaces to share
 **Needs**:
 - Monetize their expertise or hospitality
 - Meet interesting people from around the world
@@ -59,129 +81,43 @@ Enable authentic human connection through structured, safe, and meaningful local
 
 ---
 
-## Feature Requirements
+## Feature Requirements (Phase 1: MVP)
 
-### Phase 1: MVP (Core Platform)
+### 1.1 User Authentication & Profiles
+- Email/password and social auth (Google, Apple)
+- Profile creation with photo, bio, languages, interests
+- Identity verification flow (ID check)
+- Trust badges and verification indicators
 
-#### 1.1 User Authentication & Profiles
-- [ ] Email/password and social auth (Google, Apple)
-- [ ] Profile creation with photo, bio, languages, interests
-- [ ] Identity verification flow (ID check)
-- [ ] Trust badges and verification indicators
+### 1.2 Experience Management (Hosts)
+- Create experience with structured fields (Title, Category, Location, Duration, Size, Price, What's included, Photos)
+- Set availability calendar
+- Manage bookings (accept/decline)
+- Cancel/reschedule with policies
 
-#### 1.2 Experience Management (Hosts)
-- [ ] Create experience with structured fields:
-  - Title and description
-  - Category (Food, Culture, Adventure, Arts, Wellness, etc.)
-  - Location (neighborhood-level, exact address after booking)
-  - Duration
-  - Group size (min/max)
-  - Price per person
-  - What's included/excluded
-  - Photos (min 3)
-- [ ] Set availability calendar
-- [ ] Manage bookings (accept/decline)
-- [ ] Cancel/reschedule with policies
+### 1.3 Trip Planning (Travelers)
+- AI-generated host-first itinerary
+- Explicit labeling of hosted vs self-guided stops
+- Ability to rearrange items, remove context stops, or request AI refinements
+- Book hosts directly from the itinerary
 
-#### 1.3 Discovery & Search (Travelers)
-- [ ] Browse experiences by location
-- [ ] Filter by: category, date, price, group size, language
-- [ ] Sort by: relevance, rating, price, distance
-- [ ] Experience detail page with full info + host profile
-- [ ] Save/wishlist experiences
+### 1.4 Booking Flow
+- Select date/time from availability
+- Guest count selection
+- Secure payment processing
+- Booking confirmation with details
+- Pre-experience messaging between host and guest
 
-#### 1.4 Booking Flow
-- [ ] Select date/time from availability
-- [ ] Guest count selection
-- [ ] Secure payment processing
-- [ ] Booking confirmation with details
-- [ ] Pre-experience messaging between host and guest
+### 1.5 Reviews & Trust
+- Two-way reviews (host reviews guest, guest reviews experience)
+- Star rating + written review
+- Review moderation
+- Trust score calculation
 
-#### 1.5 Reviews & Trust
-- [ ] Two-way reviews (host reviews guest, guest reviews experience)
-- [ ] Star rating + written review
-- [ ] Review moderation
-- [ ] Trust score calculation
-
-#### 1.6 Messaging
-- [ ] In-app messaging (no external contact sharing until confirmed)
-- [ ] Message templates for common questions
-- [ ] Notification system (push, email)
-
-#### 1.7 Safety Features
-- [ ] Share trip details with emergency contact
-- [ ] Check-in/out system during experience
-- [ ] Report user/experience functionality
-- [ ] 24/7 safety team contact
-
----
-
-### Phase 2: Enhanced Features
-
-#### 2.1 Advanced Discovery
-- [ ] AI-powered recommendations
-- [ ] "Surprise me" random experience feature
-- [ ] Collections/curated lists
-- [ ] Map-based browsing
-
-#### 2.2 Social Features
-- [ ] Follow hosts
-- [ ] Share experiences to social media
-- [ ] Invite friends to join booking
-
-#### 2.3 Host Tools
-- [ ] Analytics dashboard
-- [ ] Dynamic pricing suggestions
-- [ ] Multi-experience management
-- [ ] Co-hosting support
-
-#### 2.4 Traveler Tools
-- [ ] Trip planning (itinerary builder)
-- [ ] Group booking management
-- [ ] Loyalty/rewards program
-
----
-
-## Technical Requirements
-
-### Platform
-- **Web**: Responsive web app (mobile-first design)
-- **Mobile**: Progressive Web App (PWA) initially, native apps in Phase 2
-
-### Tech Stack (Recommended)
-- **Frontend**: React/Next.js with TypeScript
-- **Styling**: TailwindCSS or modern CSS
-- **Backend**: Node.js/Express or Next.js API routes
-- **Database**: PostgreSQL with Prisma ORM
-- **Auth**: NextAuth.js or Clerk
-- **Payments**: Stripe Connect (for marketplace)
-- **File Storage**: Cloudflare R2 or AWS S3
-- **Search**: Algolia or Meilisearch
-- **Maps**: Mapbox or Google Maps
-
-### Non-Functional Requirements
-- **Performance**: <3s page load, <100ms API response
-- **Availability**: 99.9% uptime
-- **Security**: SOC 2 compliance path, GDPR compliant
-- **Scalability**: Handle 10k concurrent users initially
-
----
-
-## Design Guidelines
-
-### Visual Identity
-- **Tone**: Warm, welcoming, trustworthy, adventurous
-- **Colors**: Earth tones with vibrant accents (think: sunset orange, ocean blue, forest green)
-- **Typography**: Modern, readable, friendly sans-serif
-- **Imagery**: Real people, real moments, diverse representation
-
-### UX Principles
-- Mobile-first responsive design
-- Maximum 3 clicks to book
-- Clear CTAs and intuitive navigation
-- Accessibility (WCAG 2.1 AA)
-- Skeleton loading states
-- Optimistic UI updates
+### 1.6 Messaging
+- In-app messaging (no external contact sharing until confirmed)
+- Message templates for common questions
+- Notification system (push, email)
 
 ---
 
@@ -191,49 +127,72 @@ Enable authentic human connection through structured, safe, and meaningful local
 **Completed Experiences** - Number of experiences successfully completed per month
 
 ### Supporting Metrics
-- Monthly Active Users (MAU)
+- % of itineraries containing ≥1 booked host experience
+- Host exposure per itinerary
+- Conversion rate from context stop → host booking
+- User edits per itinerary (signals engagement, not friction)
 - Booking conversion rate
 - Host activation rate (% of signups who create experience)
-- Guest return rate
-- Average review score
-- Time to first booking
-- Host earnings
+
+### Strategic Guardrails
+- The platform must never generate a trip with zero hosts unless explicitly requested
+- Landmarks without hosts must never visually overpower host-led experiences
+- Hosts should feel like protagonists, not ads or upsells
+- The AI must explain why a host fits into a day, not just place them there
 
 ---
 
-## Timeline
+## Technical Requirements (Recommended Stack)
 
-| Phase | Duration | Focus |
-|-------|----------|-------|
-| Phase 1a | 4 weeks | Core auth, profiles, experience creation |
-| Phase 1b | 4 weeks | Discovery, booking, payments |
-| Phase 1c | 3 weeks | Reviews, messaging, safety |
-| Phase 2 | Ongoing | Enhanced features based on user feedback |
-
----
-
-## Open Questions / Decisions Needed
-
-1. **Geographic scope**: Start with one city or multiple?
-2. **Pricing model**: Commission percentage? Subscription for hosts?
-3. **Verification level**: How strict for MVP? ID only or background check?
-4. **Insurance**: Provide host liability insurance?
-5. **Dispute resolution**: Manual review or automated first?
+- **Frontend**: React/Next.js with TypeScript (Mobile-first PWA)
+- **Styling**: TailwindCSS
+- **Backend**: Next.js API routes
+- **Database**: PostgreSQL with Prisma ORM
+- **Auth**: NextAuth.js
+- **Payments**: Stripe Connect
 
 ---
 
-## Appendix
+## PRD Progress 
 
-### Experience Categories
-1. **Food & Drink** - Home cooking, market tours, wine tasting
-2. **Arts & Culture** - Crafts, music, dance, local traditions
-3. **Outdoor & Adventure** - Hiking, biking, water sports
-4. **Wellness** - Yoga, meditation, spa experiences
-5. **Learning** - Language, photography, local skills
-6. **Nightlife & Social** - Bar crawls, live music, local hangouts
-7. **Family** - Kid-friendly activities
+*Snapshot via Codebase Inspection (2026-02-01)*
 
-### Safety Tiers
-- **Tier 1 (Basic)**: Email verification, profile photo
-- **Tier 2 (Verified)**: ID verification, phone verification
-- **Tier 3 (Trusted)**: Background check, 10+ positive reviews
+### Phase 1: MVP (Core Platform)
+
+#### 1.1 User Authentication & Profiles — Partial
+- Email/password + Google auth: **Implemented** (`src/auth.ts`)
+- Apple auth: **Not started**
+- Profile creation with photo/bio/languages: **Partial** (UI placeholder, no edit flow)
+- Identity verification flow: **Not started**
+- Trust badges/verification indicators: **Partial** (UI display only)
+
+#### 1.2 Experience Management (Hosts) — Partial
+- Create experience fields: **Partial** (draft + publish flow, limited schema)
+- Availability calendar: **Partial** (implemented but time-slot oriented; needs date-only alignment)
+- Manage bookings (accept/decline): **Not started**
+- Cancel/reschedule with policies: **Not started**
+
+#### 1.3 Discovery & Trip Planning — Partial
+- AI trip planning (itinerary builder): **Partial/strong** (`globe-itinerary.tsx`)
+- Browse experiences by location: **Partial** (map/globe only, no browse page)
+- Search Sort/Filters: **Not started** (components exist, not wired)
+- Experience detail page with host profile: **Not started**
+
+#### 1.4 Booking Flow — Partial
+- Select date/time from availability: **Not started** (availability not connected to booking)
+- Guest count selection: **Partial** (booking widget only)
+- Secure payment processing: **Partial** (Stripe Connect wired, not stable)
+- Booking confirmation with details: **Partial**
+- Pre-experience messaging: **Partial** (`p2p-chat-slice.ts`)
+
+#### 1.5 Reviews & Trust — Not started / UI only
+- Two-way reviews: **Not started** (schema present, no flow)
+- Star rating + written review UI: **Partial** (component only)
+
+#### 1.6 Messaging — Partial
+- In-app messaging: **Partial** (booking-based messaging exists)
+
+#### Notes / Known Gaps
+- Availability is currently time-slot oriented but product direction is date-only.
+- Stripe Connect is wired but currently failing (reported). Needs investigation.
+- Traveler-facing experience detail and browse pages are missing.

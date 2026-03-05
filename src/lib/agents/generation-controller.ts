@@ -20,6 +20,7 @@ type GenerationRecord<TSnapshot extends PlannerSnapshot> = {
   state: GenerationState;
   activeJobId: string | null;
   currentGenerationId: string | null;
+  nextGenerationId: string | null;
   inFlightAbortController: AbortController | null;
   currentSnapshot: TSnapshot | null;
   pendingSnapshot: TSnapshot | null;
@@ -47,6 +48,7 @@ type GenerationControllerOptions<TSnapshot extends PlannerSnapshot> = {
   onQueued?: (params: {
     key: string;
     jobId: string;
+    generationId: string | null;
     snapshot: TSnapshot;
     mode: GenerationMode;
   }) => void | Promise<void>;
@@ -60,6 +62,7 @@ function createRecord<TSnapshot extends PlannerSnapshot>(): GenerationRecord<TSn
     state: 'IDLE',
     activeJobId: null,
     currentGenerationId: null,
+    nextGenerationId: null,
     inFlightAbortController: null,
     currentSnapshot: null,
     pendingSnapshot: null,
@@ -104,21 +107,36 @@ export class GenerationController<TSnapshot extends PlannerSnapshot> {
 
       record.pendingSnapshot = snapshot;
       record.state = 'REFINING';
+      record.nextGenerationId = crypto.randomUUID();
+
+      if (record.activeJobId) {
+        void this.options.onQueued?.({
+          key,
+          jobId: record.activeJobId,
+          generationId: record.nextGenerationId,
+          snapshot,
+          mode: 'refine',
+        });
+      }
+
       this.scheduleRefinementDebounce(key, record);
-      return this.toResult(record, mode, true, record.currentGenerationId);
+      return this.toResult(record, mode, true, record.nextGenerationId);
     }
 
     record.pendingSnapshot = snapshot;
+    record.nextGenerationId = crypto.randomUUID();
+
     if (record.activeJobId) {
       void this.options.onQueued?.({
         key,
         jobId: record.activeJobId,
+        generationId: record.nextGenerationId,
         snapshot,
         mode: 'refine',
       });
     }
 
-    return this.toResult(record, 'refine', true, record.currentGenerationId);
+    return this.toResult(record, 'refine', true, record.nextGenerationId);
   }
 
   getState(key: string) {
@@ -146,6 +164,7 @@ export class GenerationController<TSnapshot extends PlannerSnapshot> {
       record.inFlightAbortController = null;
     }
     record.currentGenerationId = null;
+    record.nextGenerationId = null;
     record.pendingSnapshot = null;
     record.state = 'IDLE';
   }
@@ -192,7 +211,9 @@ export class GenerationController<TSnapshot extends PlannerSnapshot> {
         return;
       }
       record.pendingSnapshot = null;
-      this.startGenerationNow(key, record, snapshot, 'refine');
+      const genId = record.nextGenerationId ?? undefined;
+      record.nextGenerationId = null;
+      this.startGenerationNow(key, record, snapshot, 'refine', undefined, genId);
     }, this.refineDebounceMs);
   }
 

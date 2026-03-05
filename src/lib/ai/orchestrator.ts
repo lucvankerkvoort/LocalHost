@@ -14,6 +14,14 @@ import {
   resolveExplicitLocationContext,
 } from './orchestrator-helpers';
 import { buildHostMarkersFromPlan } from './host-markers';
+import { searchActivitiesSemantic, type ActivitySearchResult } from '@/lib/db/activity-search';
+import { ensureCityEnriched } from '@/lib/activity-enrichment';
+import {
+  type DraftInventoryScope,
+  extractRequestedDurationDays,
+  minimumInventoryCountForStrictDraft,
+  shouldEnforceStrictInventoryDraft,
+} from './inventory-draft-policy';
 import { getDefaultRegistry, ToolRegistry } from './tools';
 import { 
   TripSession, 
@@ -25,18 +33,19 @@ import {
 } from './trip-session';
 import { validatePacing } from './validation/pacing-validator';
 import { OPENAI_ORCHESTRATOR_MODEL } from './model-config';
+import { prisma } from '@/lib/prisma';
 
 // Define the shape of the initial draft from the LLM - simpler than proper schema to give it freedom before hydration
 const DraftItinerarySchema = z.object({
   title: z.string(),
   country: z.string().describe('The main country for this trip, e.g. "Netherlands"'),
-  region: z.string().nullable().describe('The main state or region for this trip, e.g. "California". Null if not applicable.'),
+  state: z.string().nullable().describe('State, province, or region. REQUIRED for US locations (e.g. "Utah" or "CA") to ensure accurate geocoding. Otherwise optional.'),
   city: z.string().describe('The main city for this trip, e.g. "Amsterdam"'),
   days: z.array(z.object({
     dayNumber: z.number(),
     title: z.string(),
     city: z.string().nullable().describe('City for this specific day, if different from main trip city; otherwise null'),
-    region: z.string().nullable().describe('State/Region for this day, if different from main trip region; otherwise null'),
+    state: z.string().nullable().describe('State or region for this specific day, REQUIRED for US locations; otherwise null'),
     country: z.string().nullable().describe('Country for this specific day, if different from main trip country; otherwise null'),
     anchorArea: z.string().describe('Neighborhood or area name, e.g. "Jordaan"'),
     interCityTransportToNext: z
@@ -45,6 +54,7 @@ const DraftItinerarySchema = z.object({
       .describe('Transport mode to the next day city; null if last day or no inter-city travel'),
     activities: z.array(z.object({
       name: z.string().describe('Name of the place/activity'),
+      placeId: z.string().nullable().describe('The ID of the place FROM THE AVAILABLE INVENTORY. Use null only if absolutely necessary.'),
       timeSlot: z.enum(['morning', 'afternoon', 'evening']),
       notes: z.string().nullable().describe('Optional notes about this activity'),
     })),
@@ -77,6 +87,46 @@ type DraftDayAnchor = {
 
 type PlaceCategory = Place['category'];
 
+type DraftInventorySeed = {
+  city: string | null;
+  country: string | null;
+  scope: DraftInventoryScope;
+  destinations: Array<{ city: string; country: string }>;
+};
+
+type DraftInventorySelection = {
+  inventory: ActivitySearchResult[];
+  enforceInventoryOnly: boolean;
+  seed: DraftInventorySeed;
+  reason:
+    | 'single_city_strict'
+    | 'multi_city_segmented_optional'
+    | 'non_single_city_scope'
+    | 'multi_city_no_destinations'
+    | 'missing_seed_city'
+    | 'city_not_in_inventory_db'
+    | 'insufficient_coverage';
+  durationDays: number | null;
+  minRequiredInventory: number;
+};
+
+type PrismaCityDelegate = {
+  findFirst: (args: {
+    where: { name: string; country: string };
+    select: { id: true };
+  }) => Promise<{ id: string } | null>;
+};
+
+function getPrismaCityDelegate(): PrismaCityDelegate | null {
+  const candidate = (prisma as unknown as { city?: unknown }).city as
+    | { findFirst?: unknown }
+    | undefined;
+  if (!candidate || typeof candidate.findFirst !== 'function') {
+    return null;
+  }
+  return candidate as unknown as PrismaCityDelegate;
+}
+
 function normalizePlaceCategory(category?: string): PlaceCategory {
   switch (category) {
     case 'landmark':
@@ -89,6 +139,42 @@ function normalizePlaceCategory(category?: string): PlaceCategory {
       return category;
     default:
       return 'other';
+  }
+}
+
+function isPersistablePlaceId(value: string | undefined): value is string {
+  if (!value || value.trim().length === 0) return false;
+  const id = value.trim();
+  if (id === 'unknown') return false;
+  if (id.startsWith('fallback-') || id.startsWith('place-') || id.startsWith('loc-')) return false;
+  return true;
+}
+
+async function getActivityPhotoMapForPlaceIds(placeIds: string[]): Promise<Map<string, string[]>> {
+  if (placeIds.length === 0) return new Map();
+
+  try {
+    const rows = await prisma.activity.findMany({
+      where: {
+        OR: [{ id: { in: placeIds } }, { externalId: { in: placeIds } }],
+      },
+      select: { id: true, externalId: true, photos: true },
+    });
+
+    const map = new Map<string, string[]>();
+    rows.forEach((row) => {
+      if (!Array.isArray(row.photos) || row.photos.length === 0) return;
+      const urls = row.photos.filter((url) => typeof url === 'string');
+      if (urls.length === 0) return;
+      map.set(row.id, urls);
+      if (row.externalId) {
+        map.set(row.externalId, urls);
+      }
+    });
+    return map;
+  } catch (error) {
+    console.warn('[Orchestrator] Failed to load Activity photos for hydrated places', error);
+    return new Map();
   }
 }
 
@@ -161,7 +247,6 @@ const MAX_ANCHOR_DISTANCE_METERS = 300000;
 const DRAFT_DAY_JITTER_DEGREES = 0.01;
 const DRAFT_ACTIVITY_JITTER_DEGREES = 0.004;
 const TOOL_EXECUTION_TIMEOUT_MS = 12000;
-const ENABLE_INTRADAY_ROUTE_HYDRATION = process.env.ENABLE_INTRADAY_ROUTE_HYDRATION === 'true';
 
 function calculateDistanceMeters(
   lat1: number,
@@ -614,18 +699,251 @@ export class ItineraryOrchestrator {
   }
 
   /**
+   * Quick LLM classification to extract the destination from the prompt before drafting,
+   * so we can trigger the RAG data enrichment pipeline.
+   */
+  private async extractDraftInventorySeed(prompt: string): Promise<DraftInventorySeed> {
+    try {
+      const { object } = await generateObject({
+        model: this.model,
+        schema: z.object({
+          city: z.string().nullable(),
+          country: z.string().nullable(),
+          scope: z.enum(['single_city', 'multi_city', 'region_or_country', 'unknown']),
+          destinations: z
+            .array(
+              z.object({
+                city: z.string(),
+                country: z.string(),
+              })
+            )
+            .describe('Explicit city destinations in order, only when the prompt clearly names them. Empty array otherwise.'),
+        }),
+        prompt: `
+          Extract a destination seed for inventory retrieval from this travel request: "${prompt}".
+          
+          Return:
+          - city: primary city only when the request is clearly centered on a single city
+          - country: country for that city when available
+          - destinations: explicit city/country destinations in order when the user names multiple cities (empty array otherwise)
+          - scope:
+            - "single_city" if the trip is clearly centered on one city
+            - "multi_city" if multiple cities/destinations are requested
+            - "region_or_country" if the user asks for a country/region/continent trip (e.g. Europe, Italy, Southeast Asia)
+            - "unknown" if ambiguous
+
+          If scope is not "single_city", return null for city and country.
+          Only include destinations when the user explicitly names cities/places.
+        `,
+      });
+      return object;
+    } catch (e) {
+      console.error('[Orchestrator] Inventory seed extraction failed:', e);
+      return { city: null, country: null, scope: 'unknown', destinations: [] };
+    }
+  }
+
+  private async prepareDraftInventory(prompt: string): Promise<DraftInventorySelection> {
+    const seed = await this.extractDraftInventorySeed(prompt);
+    const durationDays = extractRequestedDurationDays(prompt);
+    const minRequiredInventory = minimumInventoryCountForStrictDraft(durationDays);
+    const cityDelegate = getPrismaCityDelegate();
+
+    if (seed.scope === 'multi_city') {
+      if (!seed.destinations.length) {
+        console.log(
+          '[Orchestrator] Inventory strict draft disabled (scope=multi_city, no explicit city list); using non-RAG draft mode.'
+        );
+        return {
+          inventory: [],
+          enforceInventoryOnly: false,
+          seed,
+          reason: 'multi_city_no_destinations',
+          durationDays,
+          minRequiredInventory,
+        };
+      }
+
+      if (!cityDelegate) {
+        console.warn(
+          '[Orchestrator] Prisma city delegate unavailable; skipping segmented inventory lookup and using non-RAG draft mode.'
+        );
+        return {
+          inventory: [],
+          enforceInventoryOnly: false,
+          seed,
+          reason: 'multi_city_segmented_optional',
+          durationDays,
+          minRequiredInventory,
+        };
+      }
+
+      const uniqueDestinations = Array.from(
+        new Map(
+          seed.destinations.map((d) => [
+            `${d.city.toLowerCase()}|${d.country.toLowerCase()}`,
+            { city: d.city, country: d.country },
+          ])
+        ).values()
+      );
+
+      const perCityLimit = Math.max(8, Math.min(20, Math.ceil(50 / Math.max(uniqueDestinations.length, 1))));
+      const inventoryChunks = await Promise.all(
+        uniqueDestinations.map(async (destination) => {
+          const cityRow = await cityDelegate.findFirst({
+            where: { name: destination.city, country: destination.country },
+            select: { id: true },
+          });
+          if (!cityRow?.id) {
+            console.warn(
+              `[Orchestrator] No city inventory row found for multi-city destination ${destination.city}, ${destination.country}`
+            );
+            return [] as ActivitySearchResult[];
+          }
+          return searchActivitiesSemantic(`${destination.city}, ${destination.country}. ${prompt}`, {
+            cityId: cityRow.id,
+            limit: perCityLimit,
+          });
+        })
+      );
+
+      const dedupedInventory = Array.from(
+        new Map(inventoryChunks.flat().map((item) => [item.id, item])).values()
+      );
+
+      console.log(
+        `[Orchestrator] Multi-city segmented inventory prepared (cities=${uniqueDestinations.length}, items=${dedupedInventory.length}, perCityLimit=${perCityLimit})`
+      );
+
+      return {
+        inventory: dedupedInventory,
+        // Keep optional mode for multi-city until per-day partition enforcement is implemented.
+        enforceInventoryOnly: false,
+        seed,
+        reason: 'multi_city_segmented_optional',
+        durationDays,
+        minRequiredInventory,
+      };
+    }
+
+    if (seed.scope !== 'single_city') {
+      console.log(
+        `[Orchestrator] Inventory strict draft disabled (scope=${seed.scope}); using non-RAG draft mode for this prompt.`
+      );
+      return {
+        inventory: [],
+        enforceInventoryOnly: false,
+        seed,
+        reason: 'non_single_city_scope',
+        durationDays,
+        minRequiredInventory,
+      };
+    }
+
+    if (!seed.city || !seed.country) {
+      console.warn('[Orchestrator] Inventory strict draft disabled: single-city scope without city/country seed.');
+      return {
+        inventory: [],
+        enforceInventoryOnly: false,
+        seed,
+        reason: 'missing_seed_city',
+        durationDays,
+        minRequiredInventory,
+      };
+    }
+
+    try {
+      console.log(`[Orchestrator] Pre-enriching RAG inventory for ${seed.city}, ${seed.country}...`);
+      // We use Tier 2 as a default; ensureCityEnriched throttles itself when coverage is already good.
+      await ensureCityEnriched(seed.city, seed.country, 2);
+    } catch (e) {
+      console.error('[Orchestrator] Pre-enrichment failed (continuing without strict inventory):', e);
+    }
+
+    if (!cityDelegate) {
+      console.warn(
+        '[Orchestrator] Prisma city delegate unavailable; disabling strict inventory draft for single-city prompt.'
+      );
+      return {
+        inventory: [],
+        enforceInventoryOnly: false,
+        seed,
+        reason: 'city_not_in_inventory_db',
+        durationDays,
+        minRequiredInventory,
+      };
+    }
+
+    const cityRow = await cityDelegate.findFirst({
+      where: { name: seed.city, country: seed.country },
+      select: { id: true },
+    });
+
+    if (!cityRow?.id) {
+      console.warn(
+        `[Orchestrator] Inventory strict draft disabled: city row not found for ${seed.city}, ${seed.country}`
+      );
+      return {
+        inventory: [],
+        enforceInventoryOnly: false,
+        seed,
+        reason: 'city_not_in_inventory_db',
+        durationDays,
+        minRequiredInventory,
+      };
+    }
+
+    const inventory = await searchActivitiesSemantic(prompt, { limit: 50, cityId: cityRow.id });
+    const enforceInventoryOnly = shouldEnforceStrictInventoryDraft({
+      scope: seed.scope,
+      inventoryCount: inventory.length,
+      durationDays,
+    });
+
+    if (!enforceInventoryOnly) {
+      console.warn(
+        `[Orchestrator] Inventory strict draft disabled: insufficient coverage for ${seed.city}, ${seed.country} (inventory=${inventory.length}, min=${minRequiredInventory}, days=${durationDays ?? 'unknown'})`
+      );
+      return {
+        inventory: [],
+        enforceInventoryOnly: false,
+        seed,
+        reason: 'insufficient_coverage',
+        durationDays,
+        minRequiredInventory,
+      };
+    }
+
+    console.log(
+      `[Orchestrator] Inventory strict draft enabled for ${seed.city}, ${seed.country} (inventory=${inventory.length}, min=${minRequiredInventory})`
+    );
+
+    return {
+      inventory,
+      enforceInventoryOnly: true,
+      seed,
+      reason: 'single_city_strict',
+      durationDays,
+      minRequiredInventory,
+    };
+  }
+
+  /**
    * Main entry point: Plan a trip based on user instructions.
    */
   async planTrip(userPrompt: string): Promise<ItineraryPlan> {
     console.log(`[Orchestrator] Starting plan for: "${userPrompt}"`);
+    const draftInventory = await this.prepareDraftInventory(userPrompt);
 
     // Step 1: Draft the high-level structure
-    const draft = await this.draftItinerary(userPrompt);
+    const draft = await this.draftItinerary(userPrompt, draftInventory.inventory, {
+      enforceInventoryOnly: draftInventory.enforceInventoryOnly,
+    });
     console.log(`[Orchestrator] Drafted ${draft.days.length} days.`);
     this.callbacks.onDraftComplete?.(draft);
 
     const tripAnchor = await this.resolveTripAnchor(draft);
-    const finalPlan = await this.planTripFromDraft(userPrompt, draft, tripAnchor);
+    const finalPlan = await this.planTripFromDraft(userPrompt, draft, tripAnchor, draftInventory.inventory);
 
     console.log(`[Orchestrator] Plan generated successfully.`);
     return finalPlan;
@@ -637,11 +955,14 @@ export class ItineraryOrchestrator {
    */
   async planTripDraft(userPrompt: string): Promise<{
     plan: ItineraryPlan | null;
-    context: { draft: DraftItinerary; tripAnchor: GeoPoint | null };
+    context: { draft: DraftItinerary; tripAnchor: GeoPoint | null; inventory: ActivitySearchResult[] };
   }> {
     console.log(`[Orchestrator] Drafting plan for: "${userPrompt}"`);
-    
-    const draft = await this.draftItinerary(userPrompt);
+    const draftInventory = await this.prepareDraftInventory(userPrompt);
+
+    const draft = await this.draftItinerary(userPrompt, draftInventory.inventory, {
+      enforceInventoryOnly: draftInventory.enforceInventoryOnly,
+    });
     this.callbacks.onDraftComplete?.(draft);
 
     let tripAnchor: GeoPoint | null = await this.resolveTripAnchor(draft);
@@ -651,15 +972,14 @@ export class ItineraryOrchestrator {
     if (!tripAnchor && draft.days.length > 0) {
       const firstDay = draft.days[0];
       const fallbackCity = firstDay.city || draft.city;
-      const fallbackRegion = firstDay.region || draft.region;
       const fallbackCountry = firstDay.country || draft.country;
       
-      console.log(`[Orchestrator] Main anchor failed. Trying fallback to Day 1: ${fallbackCity}, ${fallbackRegion}, ${fallbackCountry}`);
+      console.log(`[Orchestrator] Main anchor failed. Trying fallback to Day 1: ${fallbackCity}, ${fallbackCountry}`);
       
       const cityResult = await rateLimiter.schedule(() =>
         this.executeTool<{
           location: { lat: number; lng: number };
-        }>('resolve_place', { name: fallbackCity, context: [fallbackRegion, fallbackCountry].filter(Boolean).join(', ') })
+        }>('resolve_place', { name: fallbackCity, context: fallbackCountry })
       );
       
       tripAnchor = cityResult?.location ?? null;
@@ -696,7 +1016,7 @@ export class ItineraryOrchestrator {
 
     return {
       plan,
-      context: { draft, tripAnchor },
+      context: { draft, tripAnchor, inventory: draftInventory.inventory },
     };
   }
 
@@ -706,11 +1026,12 @@ export class ItineraryOrchestrator {
   async planTripFromDraft(
     userPrompt: string,
     draft: DraftItinerary,
-    tripAnchor: GeoPoint | null
+    tripAnchor: GeoPoint | null,
+    inventory: ActivitySearchResult[]
   ): Promise<ItineraryPlan> {
     const hydratedDays = await Promise.all(
       draft.days.map((day, idx) => {
-        return this.processDay(day, draft.city, draft.region, draft.country, tripAnchor).then(result => {
+        return this.processDay(day, draft.city, draft.state, draft.country, tripAnchor, inventory).then(result => {
           this.callbacks.onDayProcessed?.(idx + 1, draft.days.length);
           return result;
         });
@@ -727,7 +1048,7 @@ export class ItineraryOrchestrator {
   }
 
   private async resolveTripAnchor(draft: DraftItinerary): Promise<GeoPoint | null> {
-    const tripLocation = [draft.city, draft.region, draft.country].filter(Boolean).join(', ');
+    const tripLocation = [draft.city, draft.state, draft.country].filter(Boolean).join(', ');
     console.log(`[Orchestrator] Establishing trip anchor for: ${tripLocation}...`);
 
     const cityResult = await rateLimiter.schedule(() =>
@@ -736,7 +1057,7 @@ export class ItineraryOrchestrator {
         name: string;
         location: { lat: number; lng: number };
         formattedAddress: string;
-      }>('resolve_place', { name: draft.city, context: [draft.region, draft.country].filter(Boolean).join(', ') })
+      }>('resolve_place', { name: draft.city, context: [draft.state, draft.country].filter(Boolean).join(', ') })
     );
 
     const tripAnchor = cityResult?.location ?? null;
@@ -762,11 +1083,11 @@ export class ItineraryOrchestrator {
 
     for (const day of draft.days) {
       const dayCity = (day.city || draft.city || '').trim();
-      const dayRegion = (day.region || draft.region || '').trim();
+      const dayState = (day.state || draft.state || '').trim();
       const dayCountry = (day.country || draft.country || '').trim();
       if (!dayCity) continue;
 
-      const key = `${dayCity}|${dayRegion}|${dayCountry}`.toLowerCase();
+      const key = `${dayCity}|${dayState}|${dayCountry}`.toLowerCase();
       let resolved = cache.get(key);
 
       if (resolved === undefined) {
@@ -780,7 +1101,7 @@ export class ItineraryOrchestrator {
             city?: string;
           }>('resolve_place', {
             name: dayCity,
-            context: [dayRegion, dayCountry].filter(Boolean).join(', ') || undefined,
+            context: [dayState, dayCountry].filter(Boolean).join(', ') || undefined,
           })
         );
 
@@ -835,10 +1156,12 @@ export class ItineraryOrchestrator {
           const activitySeed = daySeed + index + 1;
           const activityLocation = jitterPoint(anchorLocation, activitySeed, DRAFT_ACTIVITY_JITTER_DEGREES);
 
+          // Attempt to map back to inventory if a placeId was provided
+          // Wait, for draft plan, we just return the basic info. ProcessDay does the deep hydrate.
           return {
             id: crypto.randomUUID(),
             place: {
-              id: `draft-place-${crypto.randomUUID()}`,
+              id: activity.placeId || `draft-place-${crypto.randomUUID()}`,
               name: activity.name,
               location: activityLocation,
               category: 'other' as const,
@@ -906,11 +1229,59 @@ export class ItineraryOrchestrator {
   /**
  * Step 1: Ask LLM to structure the days and activities using known POIs.
  * @param prompt - User's travel request
- * @param constraints - Optional constraints from regeneration loop (e.g., "Day 3 MUST NOT be at origin")
+ * @param inventory - The RAG inventory to select from
+ * @param constraints - Optional constraints from regeneration loop
  */
-private async draftItinerary(prompt: string, constraints?: string[]): Promise<DraftItinerary> {
+private async draftItinerary(
+  prompt: string,
+  inventory: ActivitySearchResult[],
+  options?: {
+    enforceInventoryOnly?: boolean;
+    constraints?: string[];
+  }
+): Promise<DraftItinerary> {
+  const enforceInventoryOnly = options?.enforceInventoryOnly ?? false;
+  const constraints = options?.constraints;
   const constraintText = constraints?.length
     ? `\n\nIMPORTANT CONSTRAINTS (you MUST follow these):\n${constraints.map(c => `- ${c}`).join('\n')}`
+    : '';
+
+  const inventoryJson = inventory.map(item => ({
+    id: item.id,
+    name: item.name,
+    city: item.cityName ?? null,
+    country: item.country ?? null,
+    category: item.category,
+    rating: item.rating,
+    budget: item.priceLevel,
+    description: item.formattedAddress
+  }));
+
+  const distinctInventoryCities = new Set(
+    inventoryJson
+      .map((item) => (item.city && item.country ? `${item.city}||${item.country}` : null))
+      .filter((v): v is string => Boolean(v))
+  ).size;
+  const isMultiCityInventory = distinctInventoryCities > 1;
+
+  const inventoryRulesText = enforceInventoryOnly
+    ? `
+      - **CRITICAL**: You MUST pick locations exlusively from the \`AVAILABLE INVENTORY\` list provided below. DO NOT make up places that are not on the list.
+      - Provide the \`placeId\` for any activity you select from the inventory.
+    `
+    : `
+      - Use real places that fit the user's request and each day's city.
+      - If an \`AVAILABLE INVENTORY\` list is provided, treat it as optional hints only. Use it only when entries clearly match the correct day city/country.
+      - Set \`placeId\` only when a stop is selected from the provided inventory. Otherwise use null.
+      ${isMultiCityInventory ? '- The inventory list may include places from multiple cities. Only use entries whose city/country match each day.' : ''}
+    `;
+
+  const inventoryBlock = inventoryJson.length > 0
+    ? `
+
+      AVAILABLE INVENTORY:
+      ${JSON.stringify(inventoryJson, null, 2)}
+    `
     : '';
 
   const { object } = await generateObject({
@@ -922,37 +1293,38 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
       Rules:
       - IMPORTANT: Include the country and main city for this trip.
       - Each day must represent a CITY day (not a travel day). If multi-city, set the day city explicitly.
-      - For each day except the last, set interCityTransportToNext to the best option to reach the next day's city (flight, train, drive, boat). Use null for the last day or if there is no inter-city travel.
+      - For each day except the last, set interCityTransportToNext to the best option to reach the next day's city. Use null for the last day or if there is no inter-city travel.
       - Anchor area must be a real neighborhood or district within the day city.
       - Ensure 1-3 main stops per day.
-      - Stops must be real, physical locations (museums, parks, restaurants, landmarks).
+      ${inventoryRulesText}
       - Pick a logical flow (places near each other).
       - Do NOT include transit, travel, or "drive to/arrive in" as stops. Travel is implied between day anchors.
       - Stop names should be short titles (place name only). No journaling in names.
       - Notes must be a single factual sentence (tickets, hours, or why it’s notable).
       - Assign a general "anchor area" for the day (e.g. the neighborhood center).
       ${constraintText}
+      ${inventoryBlock}
     `,
   });
   return object;
 }
   /**
-   * Process a single day: Resolve places, find anchor, get hosts, add navigation.
-   * Now uses tool registry for all operations.
+   * Process a single day: Map inventory places to coordinates, find anchor, get hosts, add navigation.
    */
   private async processDay(
     draftDay: DraftItinerary['days'][0], 
     mainCity: string, 
-    mainRegion: string | null,
+    mainState: string | null,
     mainCountry: string,
-    tripAnchor: { lat: number; lng: number } | null
+    tripAnchor: { lat: number; lng: number } | null,
+    inventory: ActivitySearchResult[]
   ) {
-    const dayStart = performance.now();
+    void inventory; // Reserved for inventory-first hydration (P1-1); currently unused in this branch state.
     // 1. Determine local context for this day
     const baseDayCity = draftDay.city || mainCity;
-    const dayRegion = draftDay.region || mainRegion;
+    const baseDayState = draftDay.state || mainState;
     const dayCountry = draftDay.country || mainCountry;
-    const dayContext = resolveActivityContext({ dayCity: baseDayCity, dayRegion, dayCountry });
+    const dayContext = resolveActivityContext({ dayCity: baseDayCity, dayState: baseDayState, dayCountry });
     
     // Only use the global trip anchor as a bias when the day city was explicitly set
     // and it matches the main city. This avoids forcing multi-city days back to origin.
@@ -991,7 +1363,7 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
           city?: string;
         }>('resolve_place', {
           name: baseDayCity,
-          context: [dayRegion, dayCountry].filter(Boolean).join(', '),
+          context: [baseDayState, dayCountry].filter(Boolean).join(', ') || undefined,
         })
       );
 
@@ -1020,7 +1392,8 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
     if (!finalAnchorLocation && isMainCity && tripAnchor) {
       finalAnchorLocation = tripAnchor;
     }
-    const activityContext = resolveActivityContext({ dayCity, dayCountry });
+    const dayState = baseDayState;
+    const activityContext = resolveActivityContext({ dayCity, dayState, dayCountry });
     const activityAnchor = resolveActivityAnchor({
       dayAnchor: finalAnchorLocation,
       tripAnchor,
@@ -1049,8 +1422,7 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
         const explicitContext = explicitLocation.locationHint
           ? resolveExplicitLocationContext({
               locationHint: explicitLocation.locationHint,
-              dayRegion,
-              dayCountry,
+              dayCountry, // we might be okay without adding state here since they explicitly hinted a location
             })
           : activityContext;
         const anchorPoint = explicitLocation.locationHint ? undefined : activityAnchor ?? undefined;
@@ -1118,6 +1490,8 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
             confidence: placeResult?.confidence,
             geoValidation: placeResult?.geoValidation,
             distanceToAnchor: placeResult?.distanceToAnchor,
+            imageUrl: undefined as string | undefined,
+            imageUrls: undefined as string[] | undefined,
           },
           timeSlot: act.timeSlot,
           notes: act.notes ?? undefined,
@@ -1127,6 +1501,28 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
 
     // Filter out completely failed items (no geocode + no anchor)
     const validActivities = resolvedActivities.filter(a => a !== null) as NonNullable<typeof resolvedActivities[0]>[];
+
+    // Enrich hydrated places with persisted photos when available.
+    const placeIds = Array.from(
+      new Set(
+        validActivities
+          .map((activity) => activity.place.id)
+          .filter((placeId): placeId is string => isPersistablePlaceId(placeId))
+      )
+    );
+    const activityPhotoMap = await getActivityPhotoMapForPlaceIds(placeIds);
+    const activitiesWithPhotos = validActivities.map((activity) => {
+      const photos = activityPhotoMap.get(activity.place.id);
+      if (!photos || photos.length === 0) return activity;
+      return {
+        ...activity,
+        place: {
+          ...activity.place,
+          imageUrl: activity.place.imageUrl ?? photos[0],
+          imageUrls: activity.place.imageUrls ?? photos,
+        },
+      };
+    });
 
 
     // C. Find Hosts near the anchor using search_localhosts tool
@@ -1162,11 +1558,9 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
       distanceFromAnchor: Math.floor(Math.random() * 500),
     })) || [];
 
-    // D. Generate navigation between sequential activities.
-    // Disabled by default because current UI does not render intra-day route polylines,
-    // and route hydration can significantly increase generation latency.
+    // D. Generate Navigation between sequential activities using generate_route tool
     const navigationEvents = [];
-    if (ENABLE_INTRADAY_ROUTE_HYDRATION && validActivities.length > 1) {
+    if (validActivities.length > 1) {
       const waypoints = validActivities.map(a => ({
         name: a.place.name,
         lat: a.place.location.lat,
@@ -1205,7 +1599,7 @@ private async draftItinerary(prompt: string, constraints?: string[]): Promise<Dr
       city: dayCity,
       country: dayCountry,
       anchorLocation: anchorPlace,
-      activities: validActivities,
+      activities: activitiesWithPhotos,
       interCityTransportToNext: draftDay.interCityTransportToNext ?? null,
       navigationEvents,
       suggestedHosts,

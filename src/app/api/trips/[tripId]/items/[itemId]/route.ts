@@ -17,24 +17,30 @@ export async function DELETE(
     // Verify ownership via nested relation
     const item = await prisma.itineraryItem.findUnique({
         where: { id: itemId },
-        include: {
+        select: {
+            id: true,
             day: {
-                include: {
+                select: {
                     tripAnchor: {
-                        include: {
-                            trip: true
-                        }
-                    }
-                }
-            }
-        }
+                        select: {
+                            trip: {
+                                select: {
+                                    id: true,
+                                    userId: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
     });
 
     if (!item || item.day.tripAnchor.trip.id !== tripId || item.day.tripAnchor.trip.userId !== session.user.id) {
          return new NextResponse('Forbidden or Not Found', { status: 403 });
     }
 
-    await prisma.itineraryItem.delete({
+    await prisma.itineraryItem.deleteMany({
         where: { id: itemId }
     });
 

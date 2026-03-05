@@ -98,6 +98,25 @@ function getToolPartResult(part: ToolPartLike) {
   return undefined;
 }
 
+function shouldAttachTripId(toolName: string): boolean {
+  return toolName === 'generateItinerary' || toolName === 'updateItinerary';
+}
+
+function attachTripIdIfMissing(
+  toolName: string,
+  result: unknown,
+  context?: { tripId?: string | null }
+) {
+  if (!shouldAttachTripId(toolName)) return result;
+  if (!context?.tripId) return result;
+  if (!result || typeof result !== 'object') return result;
+  const record = result as Record<string, unknown>;
+  if (typeof record.tripId === 'string' && record.tripId.trim().length > 0) {
+    return result;
+  }
+  return { ...record, tripId: context.tripId };
+}
+
 export function ingestToolInvocations(
   dispatch: AppDispatch,
   toolInvocations: ToolInvocationLike[] | undefined,
@@ -122,15 +141,7 @@ export function ingestToolInvocations(
       result: tool.result,
     });
 
-    let result = tool.result;
-    if (
-      tool.toolName === 'generateItinerary' &&
-      context?.tripId &&
-      result &&
-      typeof result === 'object'
-    ) {
-      result = { ...(result as Record<string, unknown>), tripId: context.tripId };
-    }
+    const result = attachTripIdIfMissing(tool.toolName, tool.result, context);
 
     dispatch(
       toolCallReceived({
@@ -205,15 +216,7 @@ export function ingestToolParts(
       seen.add(key);
     }
 
-    let result = getToolPartResult(part);
-    if (
-      toolName === 'generateItinerary' &&
-      context?.tripId &&
-      result &&
-      typeof result === 'object'
-    ) {
-      result = { ...(result as Record<string, unknown>), tripId: context.tripId };
-    }
+    const result = attachTripIdIfMissing(toolName, getToolPartResult(part), context);
 
     console.log(`[ingestToolParts] Dispatching tool:`, {
       toolName,

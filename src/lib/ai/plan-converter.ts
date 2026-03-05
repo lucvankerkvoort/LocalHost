@@ -205,6 +205,7 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
             city: currentCity ?? act.place.city,
             country: day.country,
             category: cat ?? type,
+            placeId: act.place.id,
           });
 
         return createItem(type, act.place.name, idx, {
@@ -218,6 +219,7 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
             country: day.country,
             description: act.place.description,
             imageUrl: placeImageUrl,
+            imageUrls: act.place.imageUrls,
           },
           category: act.place.category, // Use place category
           hostId, // Assign the host

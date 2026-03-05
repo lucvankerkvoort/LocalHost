@@ -4,6 +4,7 @@ export type OrchestratorProgressUi = {
   label: string;
   percent: number | null;
   indeterminate: boolean;
+  displayState: 'planning' | 'visual_ready_syncing' | 'complete' | 'error';
 };
 
 type StageBand = {
@@ -39,7 +40,8 @@ function hasValidCounters(job: OrchestratorJobState): boolean {
 
 export function deriveOrchestratorProgressUi(
   job: OrchestratorJobState,
-  previousPercent?: number | null
+  previousPercent?: number | null,
+  hasVisualDraft: boolean = false
 ): OrchestratorProgressUi {
   if (job.status === 'error') {
     return {
@@ -49,6 +51,7 @@ export function deriveOrchestratorProgressUi(
           ? clampPercent(previousPercent)
           : null,
       indeterminate: false,
+      displayState: 'error',
     };
   }
 
@@ -57,6 +60,7 @@ export function deriveOrchestratorProgressUi(
       label: 'Trip plan ready',
       percent: 100,
       indeterminate: false,
+      displayState: 'complete',
     };
   }
 
@@ -74,9 +78,10 @@ export function deriveOrchestratorProgressUi(
   }
 
   return {
-    label: band.label,
+    label: hasVisualDraft ? 'Optimizing routes and hosts...' : band.label,
     percent: nextPercent,
     indeterminate: !countersValid,
+    displayState: hasVisualDraft ? 'visual_ready_syncing' : 'planning',
   };
 }
 

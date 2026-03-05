@@ -23,7 +23,6 @@ interface ItineraryDayProps {
   onSelect?: () => void;
   onItemClick?: (item: ItineraryItemType) => void;
   onItemHover?: (itemId: string | null) => void;
-  resolveItemImageUrl?: (item: ItineraryItemType) => string | undefined;
   onEditItem?: (item: ItineraryItemType) => void;
   onDeleteItem?: (itemId: string) => void;
   onBookItem?: (item: ItineraryItemType) => void;
@@ -42,7 +41,6 @@ export function ItineraryDayColumn({
   onSelect,
   onItemClick,
   onItemHover,
-  resolveItemImageUrl,
   onEditItem,
   onDeleteItem,
   onBookItem,
@@ -89,14 +87,12 @@ export function ItineraryDayColumn({
             const showCategory = Boolean(item.category) && (item.type !== 'EXPERIENCE' || isHostedExperience);
             const imageUrl = isHostedExperience
               ? undefined
-              : ((resolveItemImageUrl?.(item)) ?? buildPlaceImageUrl({
-                  placeId: item.place?.id,
+              : (item.place?.imageUrl ?? buildPlaceImageUrl({
                   name: item.place?.name ?? item.title,
-                  description: item.place?.description ?? item.description,
                   city: item.place?.city,
-                  country: item.place?.country,
                   category: item.category ?? item.type,
-                }) ?? item.place?.imageUrl);
+                  placeId: item.place?.id,
+                }));
             
             return (
             <div 
