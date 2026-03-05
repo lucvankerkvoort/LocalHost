@@ -10,15 +10,6 @@ function logTripConverterDebug(event: string, payload: Record<string, unknown>) 
   console.warn(`[trip-converter] ${event}`, payload);
 }
 
-function toTitleCase(value: string): string {
-  if (!value) return '';
-  return value
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
 // Define partial types matching the Prisma response we expect
 interface ApiItineraryItem {
   id: string;
@@ -35,7 +26,16 @@ interface ApiItineraryItem {
   orderIndex: number;
   experience?: {
       hostId: string;
+      photo?: string | null;
   } | null;
+  images?: Array<{
+      id: string;
+      position: number;
+      assetId?: string | null;
+      url: string;
+      attributionJson?: unknown;
+      provider?: string | null;
+  }>;
   bookings?: ApiBooking[];
 }
 
@@ -127,18 +127,25 @@ function deriveCandidateId(item: ApiItineraryItem): string | undefined {
   return activeTentative?.id;
 }
 
-function normalizePlaceIdForPersistence(placeId: string | undefined): string | undefined {
-  if (!placeId || placeId.trim().length === 0) return undefined;
-  const normalized = placeId.trim();
-  if (
-    normalized === 'unknown' ||
-    normalized.startsWith('fallback-') ||
-    normalized.startsWith('place-') ||
-    normalized.startsWith('loc-')
-  ) {
-    return undefined;
-  }
-  return normalized;
+function parseImageAttribution(
+  raw: unknown
+): { displayName?: string; uri?: string } | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const source = raw as Record<string, unknown>;
+  const attribution: { displayName?: string; uri?: string } = {};
+  if (typeof source.displayName === 'string') attribution.displayName = source.displayName;
+  if (typeof source.uri === 'string') attribution.uri = source.uri;
+  return attribution.displayName || attribution.uri ? attribution : undefined;
+}
+
+function normalizePersistedPlaceId(value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith('loc-')) return undefined;
+  if (trimmed.startsWith('fallback-')) return undefined;
+  if (trimmed === 'unknown') return undefined;
+  return trimmed;
 }
 
 export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[] {
@@ -160,62 +167,77 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
     const primaryLoc = stop.locations?.[0] || { lat: 0, lng: 0, name: 'Unknown' };
 
     for (const day of stop.days) {
-        const activities: ItineraryItem[] = day.items
-            .sort((a, b) => a.orderIndex - b.orderIndex)
-            .map(item => {
-                if (typeof item.lat !== 'number' || typeof item.lng !== 'number') {
-                  fallbackItemCoordinateCount += 1;
-                  if (fallbackSamples.length < 5) {
-                    fallbackSamples.push({
-                      stopTitle: stop.title,
-                      dayIndex: day.dayIndex,
-                      itemId: item.id,
-                      itemTitle: item.title,
-                      anchorLat: primaryLoc.lat,
-                      anchorLng: primaryLoc.lng,
-                      itemLat: item.lat,
-                      itemLng: item.lng,
-                    });
-                  }
-                }
+      const activities: ItineraryItem[] = day.items
+        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .map((item) => {
+          if (typeof item.lat !== 'number' || typeof item.lng !== 'number') {
+            fallbackItemCoordinateCount += 1;
+            if (fallbackSamples.length < 5) {
+              fallbackSamples.push({
+                stopTitle: stop.title,
+                dayIndex: day.dayIndex,
+                itemId: item.id,
+                itemTitle: item.title,
+                anchorLat: primaryLoc.lat,
+                anchorLng: primaryLoc.lng,
+                itemLat: item.lat,
+                itemLng: item.lng,
+              });
+            }
+          }
 
-                return {
-                id: item.id,
-                type: normalizeItineraryType(item.type), 
-                category: item.type.toLowerCase(), 
-                title: toTitleCase(item.title),
-                hostId: item.experience?.hostId || item.hostId || undefined, 
-                experienceId: item.experienceId,
-                status: deriveItineraryItemStatus(item),
-                candidateId: deriveCandidateId(item),
-                position: item.orderIndex,
-                timeSlot: 'Flexible', 
-                description: item.description || '',
-                price: undefined,
-                place: {
-                    id: item.placeId || (item.locationName ? `loc-${item.id}` : 'unknown'),
-                    name: toTitleCase(item.locationName || primaryLoc.name),
-                    location: {
-                        lat: item.lat ?? primaryLoc.lat,
-                        lng: item.lng ?? primaryLoc.lng,
-                    }
-                }
-            } as ItineraryItem;
-          });
+          const persistedImages = (item.images ?? [])
+            .sort((a, b) => a.position - b.position)
+            .map((image) => {
+              const attribution = parseImageAttribution(image.attributionJson);
+              return {
+                url: image.url,
+                ...(attribution ? { attribution } : {}),
+              };
+            });
 
-        destinations.push({
-            id: day.id, 
-            name: day.title || stop.title,
-            lat: primaryLoc.lat,
-            lng: primaryLoc.lng,
-            type: stop.type || 'CITY',
-            locations: stop.locations,
-            day: day.dayIndex, 
-            activities,
-            color: getColorForDay(day.dayIndex),
-            city: primaryLoc.name, // Legacy fallback
-            suggestedHosts: day.suggestedHosts || [],
+          return {
+            id: item.id,
+            type: normalizeItineraryType(item.type),
+            category: item.type.toLowerCase(),
+            title: item.title,
+            hostId: item.experience?.hostId || item.hostId || undefined,
+            experienceId: item.experienceId,
+            status: deriveItineraryItemStatus(item),
+            candidateId: deriveCandidateId(item),
+            position: item.orderIndex,
+            timeSlot: 'Flexible',
+            description: item.description || '',
+            price: undefined,
+            place: {
+              id:
+                normalizePersistedPlaceId(item.placeId) ??
+                (item.locationName ? `loc-${item.id}` : 'unknown'),
+              name: item.locationName || primaryLoc.name,
+              location: {
+                lat: item.lat ?? primaryLoc.lat,
+                lng: item.lng ?? primaryLoc.lng,
+              },
+              city: primaryLoc.name,
+              images: persistedImages.length > 0 ? persistedImages : undefined,
+              imageUrl: persistedImages[0]?.url || item.experience?.photo || undefined,
+            },
+          } as ItineraryItem;
         });
+
+      destinations.push({
+        id: day.id,
+        name: day.title || stop.title,
+        lat: primaryLoc.lat,
+        lng: primaryLoc.lng,
+        type: stop.type || 'CITY',
+        locations: stop.locations,
+        day: day.dayIndex,
+        activities,
+        color: getColorForDay(day.dayIndex),
+        city: primaryLoc.name, // Legacy fallback
+        suggestedHosts: day.suggestedHosts || [],
+      });
     }
   }
 
@@ -304,22 +326,19 @@ export function convertGlobeDestinationsToApiPayload(destinations: GlobeDestinat
       title: dest.name,
       suggestedHosts: dest.suggestedHosts || [],
       // date: computed? we don't track absolute dates in GlobeDestination yet, usually relative
-      items: dest.activities.map((item, idx) => {
-        const placeId = normalizePlaceIdForPersistence(item.place?.id);
-        return {
-          type: mapItemType(item.type),
-          title: item.title,
-          description: item.description,
-          startTime: null, // item.timeSlot? we need mapping
-          experienceId: item.experienceId,
-          locationName: item.place?.name || item.location || dest.city || dest.name,
-          ...(placeId ? { placeId } : {}),
-          lat: item.place?.location?.lat,
-          lng: item.place?.location?.lng,
-          orderIndex: idx,
-          createdByAI: true // Assumed
-        };
-      })
+      items: dest.activities.map((item, idx) => ({
+        type: mapItemType(item.type),
+        title: item.title,
+        description: item.description,
+        startTime: null, // item.timeSlot? we need mapping
+        experienceId: item.experienceId,
+        locationName: item.place?.name || item.location || dest.city || dest.name,
+        placeId: normalizePersistedPlaceId(item.place?.id),
+        lat: item.place?.location?.lat,
+        lng: item.place?.location?.lng,
+        orderIndex: idx,
+        createdByAI: true // Assumed
+      }))
     });
   }
 

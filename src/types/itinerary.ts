@@ -43,7 +43,15 @@ export interface ItineraryItem {
     category?: string;
     address?: string;
     city?: string;
+    country?: string;
     description?: string;
+    images?: Array<{
+      url: string;
+      attribution?: {
+        displayName?: string;
+        uri?: string;
+      };
+    }>;
     confidence?: number;
     geoValidation?: 'EXACT' | 'APPROXIMATE' | 'CITY_FALLBACK' | 'FAILED';
     imageUrl?: string;

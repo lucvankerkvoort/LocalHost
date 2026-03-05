@@ -9,6 +9,7 @@ import { createItem, ItineraryItem, ItineraryItemType } from '@/types/itinerary'
 import type { ItineraryPlan as OrchestratorPlan } from '@/lib/ai/types';
 import { isObviouslyInvalid } from '@/lib/ai/validation/geo-validator';
 import { buildPlaceImageUrl } from '@/lib/images/places';
+import { getCityCoordinates } from '@/lib/data/city-coordinates';
 
 const TRANSPORT_OVERRIDE_PATTERN = /transport between cities:\s*([^.\n]+)/i;
 const MIN_INTERCITY_ROUTE_DISTANCE_METERS = 30000;
@@ -115,13 +116,63 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
     return undefined;
   };
 
+  const resolveDayAnchor = (
+    day: OrchestratorPlan['days'][number]
+  ): { name: string; location: { lat: number; lng: number } } | null => {
+    const directAnchor = day.anchorLocation?.location;
+    if (
+      directAnchor &&
+      isValidCoordinate(directAnchor.lat, directAnchor.lng)
+    ) {
+      return {
+        name: day.anchorLocation?.name || day.city || day.title,
+        location: directAnchor,
+      };
+    }
+
+    const firstActivityLocation = day.activities.find((activity) => {
+      const location = activity.place?.location;
+      return (
+        location &&
+        isValidCoordinate(location.lat, location.lng)
+      );
+    })?.place?.location;
+
+    if (firstActivityLocation) {
+      return {
+        name: day.city || day.title,
+        location: firstActivityLocation,
+      };
+    }
+
+    const cityCoordinates = day.city ? getCityCoordinates(day.city) : null;
+    if (
+      cityCoordinates &&
+      isValidCoordinate(cityCoordinates.lat, cityCoordinates.lng)
+    ) {
+      return {
+        name: day.city ?? day.title,
+        location: cityCoordinates,
+      };
+    }
+
+    return null;
+  };
+
   // Process each day
   for (const day of plan.days) {
-    // Skip days without valid anchor location
-    if (!day.anchorLocation?.location) {
+    const resolvedAnchor = resolveDayAnchor(day);
+    if (!resolvedAnchor) {
       continue;
     }
-    const anchorLocation = day.anchorLocation;
+    const anchorLocation = day.anchorLocation ?? {
+      id: `fallback-anchor-${day.dayNumber}`,
+      name: resolvedAnchor.name ?? day.city ?? day.title,
+      location: resolvedAnchor.location,
+      category: 'city' as const,
+      description: day.city ? `${day.city}${day.country ? `, ${day.country}` : ''}` : day.title,
+      city: day.city,
+    };
     // Prefer explicit city from AI, fallback to extraction
     const currentCity = day.city || extractCityName(anchorLocation);
 
@@ -148,10 +199,12 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
 
         const placeImageUrl = act.place.imageUrl
           ?? buildPlaceImageUrl({
-            name: act.place.name,
-            city: currentCity ?? act.place.city,
-            category: cat ?? type,
             placeId: act.place.id,
+            name: act.place.name,
+            description: act.notes ?? act.place.description,
+            city: currentCity ?? act.place.city,
+            country: day.country,
+            category: cat ?? type,
           });
 
         return createItem(type, act.place.name, idx, {
@@ -161,6 +214,9 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
             id: act.place.id || `place-${idx}`,
             name: act.place.name,
             location: act.place.location,
+            city: currentCity ?? act.place.city,
+            country: day.country,
+            description: act.place.description,
             imageUrl: placeImageUrl,
             imageUrls: act.place.imageUrls,
           },
@@ -177,13 +233,13 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
     const destination: GlobeDestination = {
       id: generateId(),
       name: day.title,
-      lat: anchorLocation.location.lat,
-      lng: anchorLocation.location.lng,
+      lat: resolvedAnchor.location.lat,
+      lng: resolvedAnchor.location.lng,
       type: 'CITY',
       locations: [{
-        name: currentCity || anchorLocation.name,
-        lat: anchorLocation.location.lat,
-        lng: anchorLocation.location.lng
+        name: currentCity || resolvedAnchor.name,
+        lat: resolvedAnchor.location.lat,
+        lng: resolvedAnchor.location.lng
       }],
       day: day.dayNumber,
       date: undefined, // Plan doesn't inherently have dates yet
@@ -200,7 +256,8 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
         const { lat, lng } = item.place.location;
         if (isValidCoordinate(lat, lng)) {
             routeMarkers.push({
-              id: item.place.id || item.id, // Prefer resolve_place OSM ID
+              // Use itinerary item ID to guarantee marker identity is unique per stop.
+              id: item.id,
               routeId: `full-day-${day.dayNumber}`,
               kind: 'end',
               lat,
@@ -223,14 +280,13 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
   for (let i = 0; i < plan.days.length - 1; i++) {
     const currentDay = plan.days[i];
     const nextDay = plan.days[i + 1];
-    
-    // Skip if either day lacks anchor location
-    if (!currentDay.anchorLocation?.location || !nextDay.anchorLocation?.location) {
+
+    const currentAnchor = resolveDayAnchor(currentDay);
+    const nextAnchor = resolveDayAnchor(nextDay);
+    if (!currentAnchor || !nextAnchor) {
       continue;
     }
-    
-    const currentAnchor = currentDay.anchorLocation;
-    const nextAnchor = nextDay.anchorLocation;
+
     const currentCityKey = normalizeCityKey(currentDay.city);
     const nextCityKey = normalizeCityKey(nextDay.city);
     const anchorDistance = calculateDistanceMeters(
@@ -339,7 +395,8 @@ export function generateMarkersFromDestinations(destinations: GlobeDestination[]
         const { lat, lng } = act.place.location;
         if (isValidCoordinate(lat, lng)) {
           routeMarkers.push({
-            id: act.place.id || act.id, // Same ID scheme as convertPlanToGlobeData for hover sync
+            // Keep marker IDs aligned with list item IDs for stable hover/click sync.
+            id: act.id,
             routeId: `route-${dest.id}`, // grouping by day/destination
             kind: 'end',
             lat,

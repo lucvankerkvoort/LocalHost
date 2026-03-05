@@ -1,7 +1,18 @@
-import type { ItineraryItem } from '@/types/itinerary';
+import { ItineraryItem } from '@/types/itinerary';
 
 export function isHostedExperienceItem(item: ItineraryItem): boolean {
   return item.type === 'EXPERIENCE' && Boolean(item.hostId) && Boolean(item.experienceId);
+}
+
+export function resolveItineraryItemImageUrl(
+  item: ItineraryItem,
+  hydratedImageUrl: string | undefined,
+  fallbackImageUrl: string
+): string | undefined {
+  if (isHostedExperienceItem(item)) return undefined;
+  const hydrated = hydratedImageUrl?.trim();
+  if (hydrated) return hydrated;
+  return fallbackImageUrl;
 }
 
 export function formatItineraryDayDate(dateString?: string): string | null {

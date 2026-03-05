@@ -1,5 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 import { withAccelerate } from '@prisma/extension-accelerate';
+import { config as loadDotenv } from 'dotenv';
+
+if (!process.env.DATABASE_URL) {
+  loadDotenv({ quiet: true });
+}
 
 // Prevent multiple instances of Prisma Client in development
 const globalForPrisma = globalThis as unknown as {

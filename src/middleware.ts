@@ -7,12 +7,17 @@ const { auth } = NextAuth(authConfig);
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const isOnProtectedRoute = req.nextUrl.pathname.startsWith("/profile") ||
+    req.nextUrl.pathname.startsWith("/trips") ||
+    req.nextUrl.pathname.startsWith("/become-host") ||
     req.nextUrl.pathname.startsWith("/bookings") ||
     req.nextUrl.pathname.startsWith("/host/dashboard") ||
     req.nextUrl.pathname.startsWith("/messages");
 
   if (isOnProtectedRoute && !isLoggedIn) {
-    return NextResponse.redirect(new URL("/auth/signin", req.url));
+    const signInUrl = new URL("/auth/signin", req.url);
+    const callbackUrl = `${req.nextUrl.pathname}${req.nextUrl.search}`;
+    signInUrl.searchParams.set("callbackUrl", callbackUrl);
+    return NextResponse.redirect(signInUrl);
   }
 
   return NextResponse.next();

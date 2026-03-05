@@ -87,6 +87,8 @@ const GENERIC_TERMS = new Set([
   'check in',
   'check out',
   'free time',
+  'free',
+  'time',
   'relax',
   'rest',
   'walk',
@@ -134,6 +136,7 @@ function sanitizeQuery(value: string): string {
 
 function isGenericName(name: string) {
   if (!name) return true;
+  if (GENERIC_TERMS.has(name)) return true;
   const tokens = name.split(' ').filter(Boolean);
   return tokens.length === 0 || tokens.every((token) => GENERIC_TERMS.has(token));
 }
@@ -141,6 +144,7 @@ function isGenericName(name: string) {
 export function buildTextQuery(input: {
   rawQuery?: string | null;
   name?: string | null;
+  description?: string | null;
   city?: string | null;
   category?: string | null;
 }) {
@@ -148,17 +152,18 @@ export function buildTextQuery(input: {
   if (rawQuery) return rawQuery;
 
   const name = sanitizeQuery(input.name ?? '');
+  const description = sanitizeQuery(input.description ?? '');
   const city = sanitizeQuery(input.city ?? '');
   const category = sanitizeQuery(input.category ?? '');
 
   if (!isGenericName(name)) {
-    return [name, city].filter(Boolean).join(' ').trim();
+    return [name, city, description].filter(Boolean).join(' ').trim();
   }
   if (category) {
-    return [category, city].filter(Boolean).join(' ').trim();
+    return [category, city, description].filter(Boolean).join(' ').trim();
   }
-  if (city) return city;
-  return name || category;
+  if (city) return [city, description].filter(Boolean).join(' ').trim();
+  return [name || category, description].filter(Boolean).join(' ').trim();
 }
 
 export function fallbackImageUrl(request: Request) {

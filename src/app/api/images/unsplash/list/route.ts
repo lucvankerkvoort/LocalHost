@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { callExternalApi } from '@/lib/providers/external-api-gateway';
+
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=600&h=400&q=80';
 const CACHE_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
@@ -11,6 +13,29 @@ type CacheEntry = {
 };
 
 const responseCache = new Map<string, CacheEntry>();
+type ExternalApiCaller = typeof callExternalApi;
+let externalApiCaller: ExternalApiCaller = callExternalApi;
+
+function parsePositiveInt(raw: string | undefined, fallback: number): number {
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return Math.floor(parsed);
+}
+
+function resolveUnsplashSearchCostMicros(): number {
+  return parsePositiveInt(process.env.UNSPLASH_SEARCH_COST_MICROS, 4_000);
+}
+
+export function __setUnsplashListRouteExternalApiCallerForTests(
+  caller: ExternalApiCaller | null
+): void {
+  externalApiCaller = caller ?? callExternalApi;
+}
+
+export function __clearUnsplashListRouteCacheForTests(): void {
+  responseCache.clear();
+}
 
 function clampDimension(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;
@@ -106,11 +131,18 @@ async function searchUnsplash(query: string, accessKey: string, page: number) {
   apiUrl.searchParams.set('content_filter', 'high');
 
   try {
-    const response = await fetch(apiUrl.toString(), {
+    const response = await externalApiCaller({
+      provider: 'UNSPLASH',
+      endpoint: 'unsplash.searchPhotos.list',
+      url: apiUrl.toString(),
+      method: 'GET',
       headers: {
         Authorization: `Client-ID ${accessKey}`,
         'Accept-Version': 'v1',
       },
+      timeoutMs: 7000,
+      retries: 0,
+      estimatedCostMicros: resolveUnsplashSearchCostMicros(),
     });
 
     if (!response.ok) {

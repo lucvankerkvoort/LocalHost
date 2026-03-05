@@ -394,7 +394,7 @@ export async function failOrchestratorJob(id: string, error: string, expectedGen
   return result.row;
 }
 
-const STALE_JOB_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+const STALE_JOB_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
 
 export async function getOrchestratorJob(id: string): Promise<OrchestratorJob | null> {
   const row = await prisma.orchestratorJob.findUnique({ where: { id } });

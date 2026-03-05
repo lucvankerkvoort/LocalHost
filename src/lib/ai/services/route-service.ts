@@ -5,6 +5,8 @@
  * Used to verify that road trip waypoints stay within the expected route corridor.
  */
 
+import { callExternalApi } from '@/lib/providers/external-api-gateway';
+
 import type { GeoPoint } from '../types';
 
 // ============================================================================
@@ -40,6 +42,26 @@ function getCacheKey(origin: GeoPoint, terminus: GeoPoint): string {
 // ============================================================================
 
 const OSRM_BASE_URL = 'https://router.project-osrm.org/route/v1/driving';
+const OSRM_TIMEOUT_MS = 7000;
+type ExternalApiCaller = typeof callExternalApi;
+let externalApiCaller: ExternalApiCaller = callExternalApi;
+
+function parsePositiveInt(raw: string | undefined, fallback: number): number {
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return Math.floor(parsed);
+}
+
+function resolveOsrmRouteCostMicros(): number {
+  return parsePositiveInt(process.env.OSRM_ROUTE_COST_MICROS, 0);
+}
+
+export function __setRouteServiceExternalApiCallerForTests(
+  caller: ExternalApiCaller | null
+): void {
+  externalApiCaller = caller ?? callExternalApi;
+}
 
 interface OSRMResponse {
   code: string;
@@ -79,10 +101,17 @@ export async function fetchRoutePolyline(
     
     console.log(`[RouteService] Fetching route from OSRM...`);
     
-    const response = await fetch(url, {
+    const response = await externalApiCaller({
+      provider: 'OSRM',
+      endpoint: 'osrm.route',
+      url,
+      method: 'GET',
       headers: {
         'User-Agent': 'LocalhostTravelApp/1.0',
       },
+      timeoutMs: OSRM_TIMEOUT_MS,
+      retries: 0,
+      estimatedCostMicros: resolveOsrmRouteCostMicros(),
     });
 
     if (!response.ok) {
@@ -146,10 +175,17 @@ export async function fetchRouteWithWaypoints(
     
     console.log(`[RouteService] Fetching multi-waypoint route (${waypoints.length} points)...`);
     
-    const response = await fetch(url, {
+    const response = await externalApiCaller({
+      provider: 'OSRM',
+      endpoint: 'osrm.routeWithWaypoints',
+      url,
+      method: 'GET',
       headers: {
         'User-Agent': 'LocalhostTravelApp/1.0',
       },
+      timeoutMs: OSRM_TIMEOUT_MS,
+      retries: 0,
+      estimatedCostMicros: resolveOsrmRouteCostMicros(),
     });
 
     if (!response.ok) {
