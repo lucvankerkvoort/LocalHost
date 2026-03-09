@@ -407,7 +407,7 @@ Guidance:
             };
   
             if (searchType === 'hosts') {
-              const results = semanticSearchHosts(intent, limit);
+              const results = await semanticSearchHosts(intent, limit);
               return {
                 success: true,
                 searchType: 'hosts',
@@ -429,7 +429,7 @@ Guidance:
                 })),
               };
             } else {
-              const results = semanticSearchExperiences(intent, limit);
+              const results = await semanticSearchExperiences(intent, limit);
               return {
                 success: true,
                 searchType: 'experiences',

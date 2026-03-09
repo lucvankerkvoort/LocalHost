@@ -596,5 +596,5 @@ test('setItineraryFromPlan deduplicates route markers from converter output', ()
   );
 
   assert.equal(state.routeMarkers.length, 1);
-  assert.equal(state.routeMarkers[0].id, 'shared-place');
+  assert.equal(state.routeMarkers[0].id, 'day-1-shared-place');
 });

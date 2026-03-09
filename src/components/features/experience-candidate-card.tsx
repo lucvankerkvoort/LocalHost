@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Image from 'next/image';
 
-import { HOSTS } from '@/lib/data/hosts';
+import { useAppSelector } from '@/store/hooks';
+import { selectAllHosts } from '@/store/hosts-slice';
 
 // Status types (matching Prisma schema)
 export type CandidateStatus = 
@@ -63,8 +64,9 @@ export function ExperienceCandidateCard({
 }: ExperienceCandidateCardProps) {
   const [isRemoving, setIsRemoving] = useState(false);
   
-  // Get host and experience data from static data
-  const host = HOSTS.find(h => h.id === candidate.hostId);
+  // Get host and experience data from store (API-sourced)
+  const allHosts = useAppSelector(selectAllHosts);
+  const host = allHosts.find(h => h.id === candidate.hostId);
   const experience = host?.experiences.find(e => e.id === candidate.experienceId);
   
   if (!host || !experience) {

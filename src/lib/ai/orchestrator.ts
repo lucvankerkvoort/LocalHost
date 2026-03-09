@@ -1490,8 +1490,8 @@ private async draftItinerary(
             confidence: placeResult?.confidence,
             geoValidation: placeResult?.geoValidation,
             distanceToAnchor: placeResult?.distanceToAnchor,
-            imageUrl: undefined as string | undefined,
-            imageUrls: undefined as string[] | undefined,
+            // imageUrl and imageUrls intentionally omitted — applyPlan merge
+            // preserves the draft's working image URLs for visual consistency.
           },
           timeSlot: act.timeSlot,
           notes: act.notes ?? undefined,
@@ -1518,8 +1518,8 @@ private async draftItinerary(
         ...activity,
         place: {
           ...activity.place,
-          imageUrl: activity.place.imageUrl ?? photos[0],
-          imageUrls: activity.place.imageUrls ?? photos,
+          imageUrl: photos[0],
+          imageUrls: photos,
         },
       };
     });

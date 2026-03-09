@@ -1,4 +1,4 @@
-import { HOSTS, type Host, type HostExperience } from './data/hosts';
+import { loadAllHosts, type Host, type HostExperience } from './data/hosts';
 
 // Category mappings for semantic understanding
 const CATEGORY_SYNONYMS: Record<string, string[]> = {
@@ -218,12 +218,13 @@ export function scoreExperience(
  * Semantic search for hosts - scores all hosts and returns top N
  * If intent.location is provided, FILTERS to only hosts in that location
  */
-export function semanticSearchHosts(intent: SearchIntent, limit: number = 20): ScoredHost[] {
+export async function semanticSearchHosts(intent: SearchIntent, limit: number = 20): Promise<ScoredHost[]> {
+  const allHosts = await loadAllHosts();
   // Filter by location first if provided (strict filtering, not just boosting)
-  let candidates = HOSTS;
+  let candidates = allHosts;
   if (intent.location) {
     const locationLower = intent.location.toLowerCase();
-    candidates = HOSTS.filter(host => 
+    candidates = allHosts.filter(host => 
       host.city.toLowerCase().includes(locationLower) || 
       host.country.toLowerCase().includes(locationLower) ||
       locationLower.includes(host.city.toLowerCase()) ||
@@ -231,7 +232,7 @@ export function semanticSearchHosts(intent: SearchIntent, limit: number = 20): S
     );
     // Fallback to all hosts if no location match (prevents empty results)
     if (candidates.length === 0) {
-      candidates = HOSTS;
+      candidates = allHosts;
     }
   }
   
@@ -245,12 +246,13 @@ export function semanticSearchHosts(intent: SearchIntent, limit: number = 20): S
  * Semantic search for experiences - scores all experiences and returns top N
  * If intent.location is provided, FILTERS to only hosts in that location
  */
-export function semanticSearchExperiences(intent: SearchIntent, limit: number = 20): ScoredExperience[] {
+export async function semanticSearchExperiences(intent: SearchIntent, limit: number = 20): Promise<ScoredExperience[]> {
+  const allHosts = await loadAllHosts();
   // Filter by location first if provided (strict filtering, not just boosting)
-  let candidates = HOSTS;
+  let candidates = allHosts;
   if (intent.location) {
     const locationLower = intent.location.toLowerCase();
-    candidates = HOSTS.filter(host => 
+    candidates = allHosts.filter(host => 
       host.city.toLowerCase().includes(locationLower) || 
       host.country.toLowerCase().includes(locationLower) ||
       locationLower.includes(host.city.toLowerCase()) ||
@@ -258,7 +260,7 @@ export function semanticSearchExperiences(intent: SearchIntent, limit: number = 
     );
     // Fallback to all hosts if no location match (prevents empty results)
     if (candidates.length === 0) {
-      candidates = HOSTS;
+      candidates = allHosts;
     }
   }
   

@@ -5,7 +5,7 @@
  */
 
 import { GlobeDestination, RouteMarkerData, TravelRoute, generateId, getColorForDay, HostMarkerData } from '@/types/globe';
-import { createItem, ItineraryItem, ItineraryItemType } from '@/types/itinerary';
+import { ItineraryItem, ItineraryItemType } from '@/types/itinerary';
 import type { ItineraryPlan as OrchestratorPlan } from '@/lib/ai/types';
 import { isObviouslyInvalid } from '@/lib/ai/validation/geo-validator';
 import { buildPlaceImageUrl } from '@/lib/images/places';
@@ -13,6 +13,24 @@ import { getCityCoordinates } from '@/lib/data/city-coordinates';
 
 const TRANSPORT_OVERRIDE_PATTERN = /transport between cities:\s*([^.\n]+)/i;
 const MIN_INTERCITY_ROUTE_DISTANCE_METERS = 30000;
+
+/** Deterministic destination ID from day number — survives across plan re-applications. */
+function buildDestinationId(dayNumber: number): string {
+  return `day-${dayNumber}`;
+}
+
+/** Deterministic route ID from connected day numbers. */
+function buildRouteId(fromDay: number, toDay: number): string {
+  return `route-${fromDay}-${toDay}`;
+}
+
+/** Deterministic item ID from day + place or index. */
+function buildItemId(dayNumber: number, placeId: string | undefined, index: number): string {
+  if (placeId && !placeId.startsWith('place-') && !placeId.startsWith('loc-') && !placeId.startsWith('fallback-')) {
+    return `day-${dayNumber}-${placeId}`;
+  }
+  return `day-${dayNumber}-item-${index}`;
+}
 
 export function extractTransportPreference(request: string | undefined): string | null {
   if (!request) return null;
@@ -207,7 +225,11 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
             category: cat ?? type,
           });
 
-        return createItem(type, act.place.name, idx, {
+        return {
+          id: buildItemId(day.dayNumber, act.place.id, idx),
+          type,
+          title: act.place.name,
+          position: idx,
           description: act.notes,
           location: act.place.description || act.place.address || `${act.timeSlot}`,
           place: {
@@ -217,12 +239,13 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
             city: currentCity ?? act.place.city,
             country: day.country,
             description: act.place.description,
+            address: act.place.address,
             imageUrl: placeImageUrl,
             imageUrls: act.place.imageUrls,
           },
-          category: act.place.category, // Use place category
-          hostId, // Assign the host
-        });
+          category: act.place.category,
+          hostId,
+        } as ItineraryItem;
     });
 
     // MARKER CONSOLIDATION LOGIC:
@@ -231,7 +254,7 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
     
     // Create NEW destination from anchor location (One destination per day)
     const destination: GlobeDestination = {
-      id: generateId(),
+      id: buildDestinationId(day.dayNumber),
       name: day.title,
       lat: resolvedAnchor.location.lat,
       lng: resolvedAnchor.location.lng,
@@ -309,7 +332,7 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
     }
 
     // Use anchor locations for inter-day routes
-    const routeId = generateId();
+    const routeId = buildRouteId(currentDay.dayNumber, nextDay.dayNumber);
     const interCityMode =
       transportOverride ?? currentDay.interCityTransportToNext ?? 'flight';
     routes.push({

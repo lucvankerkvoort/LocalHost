@@ -101,7 +101,7 @@ export const searchLocalhostsTool = createTool({
       };
 
       if (params.searchType === 'hosts') {
-        const results = semanticSearchHosts(intent, params.limit);
+        const results = await semanticSearchHosts(intent, params.limit);
         
         return {
           success: true,
@@ -121,7 +121,7 @@ export const searchLocalhostsTool = createTool({
           },
         };
       } else {
-        const results = semanticSearchExperiences(intent, params.limit);
+        const results = await semanticSearchExperiences(intent, params.limit);
         
         return {
           success: true,

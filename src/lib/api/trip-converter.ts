@@ -219,6 +219,7 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
                 lng: item.lng ?? primaryLoc.lng,
               },
               city: primaryLoc.name,
+              description: item.description || undefined,
               images: persistedImages.length > 0 ? persistedImages : undefined,
               imageUrl: persistedImages[0]?.url || item.experience?.photo || undefined,
             },
@@ -295,6 +296,7 @@ export function convertGlobeDestinationsToApiPayload(destinations: GlobeDestinat
   // 1. Group by City to reconstruct Stops
   const stops: ApiTripPayloadStop[] = [];
   let currentStop: ApiTripPayloadStop | null = null;
+  let globalDayIndex = 0;
 
   // Ensure sorted by day
   const sortedDestinations = [...destinations].sort((a, b) => a.day - b.day);
@@ -321,23 +323,23 @@ export function convertGlobeDestinationsToApiPayload(destinations: GlobeDestinat
     }
 
     // Add Day to Stop
+    globalDayIndex += 1;
     currentStop.days.push({
-      dayIndex: dest.day,
+      dayIndex: globalDayIndex,
       title: dest.name,
       suggestedHosts: dest.suggestedHosts || [],
-      // date: computed? we don't track absolute dates in GlobeDestination yet, usually relative
       items: dest.activities.map((item, idx) => ({
         type: mapItemType(item.type),
         title: item.title,
-        description: item.description,
-        startTime: null, // item.timeSlot? we need mapping
+        description: item.description || item.place?.description || null,
+        startTime: null,
         experienceId: item.experienceId,
         locationName: item.place?.name || item.location || dest.city || dest.name,
         placeId: normalizePersistedPlaceId(item.place?.id),
         lat: item.place?.location?.lat,
         lng: item.place?.location?.lng,
         orderIndex: idx,
-        createdByAI: true // Assumed
+        createdByAI: true
       }))
     });
   }

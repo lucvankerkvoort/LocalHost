@@ -101,13 +101,13 @@ test('scoreExperience attaches host metadata and produces match reasons', () => 
   assert.ok(scored.matchReasons.length > 0);
 });
 
-test('semanticSearchHosts returns top N results respecting limit', () => {
-  const results = semanticSearchHosts(makeIntent({ keywords: ['food'] }), 3);
+test('semanticSearchHosts returns top N results respecting limit', async () => {
+  const results = await semanticSearchHosts(makeIntent({ keywords: ['food'] }), 3);
   assert.equal(results.length, 3);
 });
 
-test('semanticSearchHosts filters by location when matching hosts exist', () => {
-  const results = semanticSearchHosts(makeIntent({ location: 'Kyoto' }), 10);
+test('semanticSearchHosts filters by location when matching hosts exist', async () => {
+  const results = await semanticSearchHosts(makeIntent({ location: 'Kyoto' }), 10);
   assert.ok(results.length > 0);
   assert.equal(
     results.every(
@@ -119,8 +119,8 @@ test('semanticSearchHosts filters by location when matching hosts exist', () => 
   );
 });
 
-test('semanticSearchHosts falls back to all hosts when location has no matches', () => {
-  const results = semanticSearchHosts(makeIntent({ location: 'Atlantis' }), 5);
+test('semanticSearchHosts falls back to all hosts when location has no matches', async () => {
+  const results = await semanticSearchHosts(makeIntent({ location: 'Atlantis' }), 5);
   assert.equal(results.length, 5);
   assert.equal(
     results.some(
@@ -132,8 +132,8 @@ test('semanticSearchHosts falls back to all hosts when location has no matches',
   );
 });
 
-test('semanticSearchExperiences filters by location and respects result limit', () => {
-  const results = semanticSearchExperiences(
+test('semanticSearchExperiences filters by location and respects result limit', async () => {
+  const results = await semanticSearchExperiences(
     makeIntent({ location: 'Rome', keywords: ['market'] }),
     10
   );
@@ -148,8 +148,8 @@ test('semanticSearchExperiences filters by location and respects result limit', 
   );
 });
 
-test('semanticSearchExperiences returns empty when limit is 0', () => {
-  const results = semanticSearchExperiences(makeIntent({ keywords: ['food'] }), 0);
+test('semanticSearchExperiences returns empty when limit is 0', async () => {
+  const results = await semanticSearchExperiences(makeIntent({ keywords: ['food'] }), 0);
   assert.deepEqual(results, []);
 });
 
@@ -160,8 +160,8 @@ test('getAllCategories returns all category keys without duplicates', () => {
   assert.equal(categories.length, new Set(categories).size);
 });
 
-test('semanticSearchHosts returns empty when limit is 0', () => {
-  const results = semanticSearchHosts(
+test('semanticSearchHosts returns empty when limit is 0', async () => {
+  const results = await semanticSearchHosts(
     {
       categories: [],
       keywords: ['food'],

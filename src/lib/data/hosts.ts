@@ -301,3 +301,84 @@ export function getHostsByInterests(interests: string[]): Host[] {
 export function getAllCities(): string[] {
   return [...new Set(HOSTS.map(host => host.city))];
 }
+
+// ============================================================================
+// Database-backed host loading
+// ============================================================================
+
+/**
+ * Load hosts from the database (HostExperience + User tables).
+ * Maps DB records to the same Host interface used by the static data.
+ */
+export async function loadHostsFromDB(): Promise<Host[]> {
+  // Dynamic import to avoid pulling Prisma into client bundles
+  const { prisma } = await import('@/lib/prisma');
+
+  const dbExperiences = await prisma.hostExperience.findMany({
+    where: { status: 'PUBLISHED' },
+    include: {
+      host: {
+        select: {
+          id: true,
+          name: true,
+          image: true,
+          bio: true,
+          languages: true,
+          interests: true,
+          city: true,
+          country: true,
+          responseTime: true,
+          createdAt: true,
+        },
+      },
+      stops: {
+        orderBy: { order: 'asc' },
+      },
+    },
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (dbExperiences as any[]).map((he) => ({
+    id: he.host.id, // Use the User ID as the host ID (critical for chat thread creation)
+    name: he.host.name || 'Local Host',
+    photo: he.host.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(he.host.name || 'Host')}&background=random`,
+    city: he.city,
+    country: he.country || '',
+    bio: he.host.bio || he.longDesc || '',
+    quote: he.shortDesc || '',
+    interests: he.host.interests || [],
+    languages: he.host.languages || [],
+    responseTime: he.host.responseTime || 'within a few hours',
+    memberSince: he.host.createdAt.getFullYear().toString(),
+    experiences: [
+      {
+        id: he.id,
+        title: he.title,
+        description: he.longDesc || he.shortDesc,
+        category: 'ARTS_CULTURE' as ExperienceCategory, // Default for MVP
+        duration: he.duration,
+        price: he.price || 5000,
+        rating: 0,
+        reviewCount: 0,
+        photos: [] as string[],
+      },
+    ],
+  }));
+}
+
+/**
+ * Load all hosts: static curated/generated + database-backed.
+ * Deduplicates by ID (DB hosts take precedence).
+ */
+export async function loadAllHosts(): Promise<Host[]> {
+  try {
+    const dbHosts = await loadHostsFromDB();
+    // Merge: DB hosts first, then static hosts that don't collide
+    const dbHostIds = new Set(dbHosts.map((h) => h.id));
+    const staticOnly = HOSTS.filter((h) => !dbHostIds.has(h.id));
+    return [...dbHosts, ...staticOnly];
+  } catch (error) {
+    console.warn('[hosts] Failed to load DB hosts, falling back to static:', error);
+    return HOSTS;
+  }
+}

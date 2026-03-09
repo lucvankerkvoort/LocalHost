@@ -3,8 +3,10 @@
 import { useState } from 'react';
 import Image from 'next/image';
 
-import { HOSTS, type Host, type HostExperience } from '@/lib/data/hosts';
-import { CATEGORY_ICONS, CATEGORY_LABELS, type ExperienceCategory } from '@/types';
+import { useAppSelector } from '@/store/hooks';
+import { selectAllHosts } from '@/store/hosts-slice';
+import { type HostExperience } from '@/lib/data/hosts';
+import { CATEGORY_ICONS, type ExperienceCategory } from '@/types';
 
 interface ExperienceSelectorModalProps {
   hostId: string;
@@ -30,7 +32,8 @@ export function ExperienceSelectorModal({
   const [selectedExperience, setSelectedExperience] = useState<HostExperience | null>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('afternoon');
 
-  const host = HOSTS.find(h => h.id === hostId);
+  const allHosts = useAppSelector(selectAllHosts);
+  const host = allHosts.find(h => h.id === hostId);
 
   if (!isOpen || !host) return null;
 

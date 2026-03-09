@@ -1,16 +1,24 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setP2PChatOpen, closeContactHost } from '@/store/ui-slice';
 import { P2PChatPanel } from '@/components/features/p2p-chat-panel';
 import { ContactHostDialog } from '@/components/features/contact-host-dialog';
-import { selectAllHosts } from '@/store/hosts-slice';
+import { selectAllHosts, selectHostsInitialized, fetchHosts } from '@/store/hosts-slice';
 
 export function GlobalUI() {
   const dispatch = useAppDispatch();
   const { isP2PChatOpen, contactHostId, contactExperienceId } = useAppSelector((state) => state.ui);
   const allHosts = useAppSelector(selectAllHosts);
+  const initialized = useAppSelector(selectHostsInitialized);
+
+  // Load hosts from API on mount (static + DB-backed)
+  useEffect(() => {
+    if (!initialized) {
+      dispatch(fetchHosts());
+    }
+  }, [dispatch, initialized]);
 
   const host = contactHostId ? allHosts.find(h => h.id === contactHostId) : null;
   const experience = host && contactExperienceId 

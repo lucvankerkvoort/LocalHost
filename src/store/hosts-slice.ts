@@ -1,6 +1,6 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, type PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
 import { createSelector } from '@reduxjs/toolkit';
-import { HOSTS, type Host } from '@/lib/data/hosts';
+import { type Host } from '@/lib/data/hosts';
 import { getCityCoordinates } from '@/lib/data/city-coordinates';
 
 /**
@@ -15,29 +15,43 @@ interface HostsState {
   allHosts: HostWithLocation[];
   loading: boolean;
   error: string | null;
+  initialized: boolean;
 }
 
 /**
- * Initialize hosts with their city coordinates.
+ * Add coordinates to a host using the city-coordinates lookup.
+ * Falls back to (0,0) if the city isn't in the lookup table.
  */
-function initializeHostsWithLocations(): HostWithLocation[] {
-  return HOSTS.map((host) => {
-    const coords = getCityCoordinates(host.city);
-    if (!coords) {
-      console.warn(`[hosts-slice] No coordinates found for city: ${host.city}`);
-    }
-    return {
-      ...host,
-      lat: coords?.lat ?? 0,
-      lng: coords?.lng ?? 0,
-    };
-  }).filter((host) => host.lat !== 0 || host.lng !== 0); // Filter out hosts without valid coordinates
+function addLocationToHost(host: Host): HostWithLocation {
+  const coords = getCityCoordinates(host.city);
+  return {
+    ...host,
+    lat: coords?.lat ?? 0,
+    lng: coords?.lng ?? 0,
+  };
 }
 
+/**
+ * Async thunk: fetch hosts from the API (static + DB-backed).
+ */
+export const fetchHosts = createAsyncThunk(
+  'hosts/fetchHosts',
+  async (city?: string) => {
+    const url = city ? `/api/hosts?city=${encodeURIComponent(city)}` : '/api/hosts';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to fetch hosts');
+    const data = await res.json();
+    return (data.hosts as Host[]).map(addLocationToHost).filter(
+      (h) => h.lat !== 0 || h.lng !== 0
+    );
+  }
+);
+
 const initialState: HostsState = {
-  allHosts: initializeHostsWithLocations(),
+  allHosts: [],
   loading: false,
   error: null,
+  initialized: false,
 };
 
 const hostsSlice = createSlice({
@@ -62,6 +76,22 @@ const hostsSlice = createSlice({
     setError(state, action: PayloadAction<string | null>) {
       state.error = action.payload;
     },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchHosts.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchHosts.fulfilled, (state, action) => {
+        state.allHosts = action.payload;
+        state.loading = false;
+        state.initialized = true;
+      })
+      .addCase(fetchHosts.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || 'Failed to load hosts';
+      });
   },
 });
 
@@ -107,6 +137,11 @@ export const selectHostsLoading = (state: { hosts: HostsState }) => state.hosts.
  * Select hosts error state.
  */
 export const selectHostsError = (state: { hosts: HostsState }) => state.hosts.error;
+
+/**
+ * Select whether hosts have been loaded from API.
+ */
+export const selectHostsInitialized = (state: { hosts: HostsState }) => state.hosts.initialized;
 
 /**
  * Create a memoized selector for hosts near a specific location.

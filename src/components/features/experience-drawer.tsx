@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Host, HostExperience, getHostsByCity } from '@/lib/data/hosts';
+import { useState, useEffect } from 'react';
+import { type Host, type HostExperience } from '@/lib/data/hosts';
 import { CATEGORY_ICONS, CATEGORY_LABELS, ExperienceCategory } from '@/types';
 
 interface ExperienceDrawerProps {
@@ -24,9 +24,16 @@ export function ExperienceDrawer({
   onAddExperience,
 }: ExperienceDrawerProps) {
   const [selectedCategory, setSelectedCategory] = useState<ExperienceCategory | 'all'>('all');
+  const [hosts, setHosts] = useState<Host[]>([]);
   
-  // Get hosts in this city
-  const hosts = getHostsByCity(city);
+  // Fetch hosts for this city from the API (static + DB-backed)
+  useEffect(() => {
+    if (!isOpen || !city) return;
+    fetch(`/api/hosts?city=${encodeURIComponent(city)}`)
+      .then(res => res.json())
+      .then(data => setHosts(data.hosts || []))
+      .catch(() => setHosts([]));
+  }, [isOpen, city]);
   
   // Flatten all experiences with host info
   const allExperiences = hosts.flatMap(host => 

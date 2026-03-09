@@ -524,6 +524,17 @@ async function resolveOrCreateActivity(
         select: { id: true },
       });
       if (existingByExternalId) {
+        // Refresh the name to ensure English consistency
+        await prisma.activity.update({
+          where: { id: existingByExternalId.id },
+          data: {
+            name: result.name,
+            lat: result.location.lat,
+            lng: result.location.lng,
+            formattedAddress: result.formattedAddress,
+            lastVerifiedAt: new Date(),
+          },
+        });
         return {
           ...result,
           id: existingByExternalId.id,
@@ -568,6 +579,7 @@ async function resolveOrCreateActivity(
       await prisma.activity.update({
         where: { id: existingByName.id },
         data: {
+          name: result.name,
           lat: result.location.lat,
           lng: result.location.lng,
           formattedAddress: result.formattedAddress,
@@ -624,7 +636,7 @@ export async function fetchGooglePlacesResults(
   apiKey: string,
   anchorPoint?: { lat: number; lng: number }
 ): Promise<ResolvePlaceResult[]> {
-  const languageCode = process.env.GOOGLE_PLACES_LANGUAGE;
+  const languageCode = process.env.GOOGLE_PLACES_LANGUAGE || 'en';
   const regionCode = process.env.GOOGLE_PLACES_REGION;
 
   const body: Record<string, unknown> = {

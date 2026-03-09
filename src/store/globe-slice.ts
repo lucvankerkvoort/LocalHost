@@ -61,18 +61,72 @@ const initialState: GlobeState = {
 
 function applyPlan(state: GlobeState, plan: ItineraryPlan) {
   const { destinations, routes, routeMarkers } = convertPlanToGlobeData(plan);
-  state.destinations = destinations;
-  state.routes = routes;
+
+  if (state.destinations.length === 0) {
+    // First apply — full set
+    state.destinations = destinations;
+    state.routes = routes;
+    state.routeMarkers = deduplicate(routeMarkers);
+    state.selectedDestination = destinations[0]?.id ?? null;
+    return;
+  }
+
+  // Incremental merge — preserve enriched data from existing destinations
+  const existingById = new Map(state.destinations.map((d) => [d.id, d]));
+  state.destinations = destinations.map((next) => {
+    const existing = existingById.get(next.id);
+    if (!existing) return next;
+    return {
+      ...next,
+      activities: next.activities.map((activity, idx) => {
+        const existingActivity = existing.activities.find(
+          (a) => a.id === activity.id
+        ) ?? existing.activities[idx];
+        if (!existingActivity) return activity;
+        return {
+          ...activity,
+          place: activity.place ? {
+            ...activity.place,
+            imageUrl: activity.place.imageUrl || existingActivity.place?.imageUrl,
+            imageUrls: activity.place.imageUrls?.length
+              ? activity.place.imageUrls
+              : existingActivity.place?.imageUrls,
+            address: activity.place.address || existingActivity.place?.address,
+            description: activity.place.description || existingActivity.place?.description,
+          } : existingActivity.place,
+        };
+      }),
+    };
+  });
+
+  // Merge routes — keep existing polyline data when available
+  const existingRouteById = new Map(state.routes.map((r) => [r.id, r]));
+  state.routes = routes.map((next) => {
+    const existing = existingRouteById.get(next.id);
+    if (!existing || !existing.path) return next;
+    // Preserve computed polyline from previous apply
+    return {
+      ...next,
+      path: existing.path,
+      distanceMeters: existing.distanceMeters,
+      durationSeconds: existing.durationSeconds,
+      pathSource: existing.pathSource,
+    };
+  });
+
   state.routeMarkers = deduplicate(routeMarkers);
-  state.selectedDestination = destinations[0]?.id ?? null;
-  state.visualTarget = null;
-  state.placeMarkers = [];
-  state.hoveredItemId = null;
-  state.activeItemId = null;
-  state.focusedItemId = null; 
-  state.selectedHostId = null;
-  state.selectedExperienceId = null;
-  // Note: Localhost AI generated plans don't strictly have a DB TripID yet unless saved.
+
+  // Preserve selection if destination still exists
+  if (state.selectedDestination) {
+    const stillExists = state.destinations.some(
+      (d) => d.id === state.selectedDestination
+    );
+    if (!stillExists) {
+      state.selectedDestination = state.destinations[0]?.id ?? null;
+    }
+  } else {
+    state.selectedDestination = state.destinations[0]?.id ?? null;
+  }
 }
 
 const globeSlice = createSlice({
