@@ -162,11 +162,15 @@ type ItineraryItemPreview = {
   itemId: string;
   title: string;
   description?: string;
+  category?: string;
   lat: number;
   lng: number;
   images: ItemPreviewImage[];
   isLoading: boolean;
 };
+
+/** Categories where Unsplash reliably returns good results */
+const LANDMARK_IMAGE_CATEGORIES = new Set(['landmark', 'museum']);
 
 const ITEM_IMAGE_CAROUSEL_COUNT = 3;
 
@@ -1026,9 +1030,9 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
   }, [dispatch]);
 
   const resolveItemDescription = useCallback((item: ItineraryItem) => {
-    const primary = item.description?.trim();
+    const primary = item.place?.description?.trim();
     if (primary) return primary;
-    const secondary = item.place?.description?.trim();
+    const secondary = item.description?.trim();
     if (secondary) return secondary;
     const tertiary = item.location?.trim();
     return tertiary || undefined;
@@ -1197,6 +1201,24 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     if (typeof lat === 'number' && typeof lng === 'number') {
       dispatch(setVisualTarget({ lat, lng, height: 5000 }));
 
+      const itemCategory = item.place?.category ?? item.category ?? item.type;
+      const shouldFetchImages = placeImagesEnabled && LANDMARK_IMAGE_CATEGORIES.has(itemCategory?.toLowerCase() ?? '');
+
+      if (!shouldFetchImages) {
+        // Non-landmark items: description-only card, no image fetching
+        setItemPreview({
+          itemId: item.id,
+          title: item.title,
+          description: resolveItemDescription(item),
+          category: itemCategory,
+          lat,
+          lng,
+          images: [],
+          isLoading: false,
+        });
+        return;
+      }
+
       const cachedImages = imageCacheRef.current.get(item.id);
       const hydratedListImageUrl = listItemImageUrls[item.id];
       const persistedImages = (item.place?.images ?? []).slice(0, ITEM_IMAGE_CAROUSEL_COUNT);
@@ -1204,28 +1226,23 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
         imageCacheRef.current.set(item.id, persistedImages);
       }
       const initialImages =
-        placeImagesEnabled
-          ? (cachedImages ??
-            (persistedImages.length > 0
-              ? persistedImages
-              : null) ??
-            (hydratedListImageUrl
-              ? [{ url: hydratedListImageUrl }]
-              : []))
-          : [{ url: PLACE_IMAGE_FALLBACK }];
+        cachedImages ??
+          (persistedImages.length > 0
+            ? persistedImages
+            : null) ??
+          (hydratedListImageUrl
+            ? [{ url: hydratedListImageUrl }]
+            : []);
       setItemPreview({
         itemId: item.id,
         title: item.title,
         description: resolveItemDescription(item),
+        category: itemCategory,
         lat,
         lng,
         images: initialImages,
-        isLoading: placeImagesEnabled && !cachedImages && persistedImages.length === 0 && !hydratedListImageUrl,
+        isLoading: !cachedImages && persistedImages.length === 0 && !hydratedListImageUrl,
       });
-
-      if (!placeImagesEnabled) {
-        return;
-      }
 
       if (!cachedImages && persistedImages.length === 0) {
         const dayCity = destinations.find((destination) => destination.id === dayId)?.city;
@@ -1555,6 +1572,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                       dayNumber={day.day}
                       title={day.name}
                       city={day.city}
+                      country={day.activities[0]?.place?.country}
                       date={day.date}
                       activities={day.activities}
                       isActive={day.id === selectedDestination}
@@ -1564,7 +1582,6 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                         handleItemClick(item, day.id, 'user')
                       }
                       onItemHover={(itemId) => handleItemHover(itemId)}
-                      resolveItemImageUrl={resolveItemImageUrl}
                       onBookItem={(item) => handleBookItem(day.id, item)}
                     />
                   ))

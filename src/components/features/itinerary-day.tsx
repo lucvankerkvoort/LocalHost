@@ -1,7 +1,7 @@
 'use client';
 
 import { ItineraryItem as ItineraryItemType } from '@/types/itinerary';
-import { buildPlaceImageUrl } from '@/lib/images/places';
+import { DayImageCarousel } from './day-image-carousel';
 import { Clock, Plus, MapPin, CheckCircle2 } from 'lucide-react';
 import {
   isHostedExperienceItem,
@@ -14,6 +14,7 @@ interface ItineraryDayProps {
   dayNumber: number;
   title?: string;
   city?: string;
+  country?: string;
   date?: string;
   activities: ItineraryItemType[];
   isSpaceOptimized?: boolean;
@@ -23,7 +24,6 @@ interface ItineraryDayProps {
   onSelect?: () => void;
   onItemClick?: (item: ItineraryItemType) => void;
   onItemHover?: (itemId: string | null) => void;
-  resolveItemImageUrl?: (item: ItineraryItemType) => string | undefined;
   onEditItem?: (item: ItineraryItemType) => void;
   onDeleteItem?: (itemId: string) => void;
   onBookItem?: (item: ItineraryItemType) => void;
@@ -34,6 +34,7 @@ export function ItineraryDayColumn({
   dayNumber,
   title,
   city,
+  country,
   date,
   activities = [],
   isSpaceOptimized = false,
@@ -42,7 +43,6 @@ export function ItineraryDayColumn({
   onSelect,
   onItemClick,
   onItemHover,
-  resolveItemImageUrl,
   onEditItem,
   onDeleteItem,
   onBookItem,
@@ -80,6 +80,9 @@ export function ItineraryDayColumn({
             </span>
         </div>
       </div>
+
+      {/* City Image Carousel */}
+      <DayImageCarousel city={city} country={country} />
       
       {/* Activities List */}
       <div className="space-y-3">
@@ -87,14 +90,6 @@ export function ItineraryDayColumn({
             const isHostedExperience = isHostedExperienceItem(item);
             const isAnchor = item.type === 'MEAL' || isHostedExperience;
             const showCategory = Boolean(item.category) && (item.type !== 'EXPERIENCE' || isHostedExperience);
-            const imageUrl = isHostedExperience
-              ? undefined
-              : (resolveItemImageUrl?.(item) ?? item.place?.imageUrl ?? buildPlaceImageUrl({
-                  name: item.place?.name ?? item.title,
-                  city: item.place?.city,
-                  category: item.category ?? item.type,
-                  placeId: item.place?.id,
-                }));
             
             return (
             <div 
@@ -113,16 +108,6 @@ export function ItineraryDayColumn({
                 onMouseLeave={() => onItemHover?.(null)}
             >
                 <div className="flex justify-between items-start gap-3">
-                    {imageUrl && (
-                        <div className="w-14 h-14 rounded-md overflow-hidden bg-[var(--muted)]/20 flex-shrink-0">
-                            <img
-                              src={imageUrl}
-                              alt={item.title}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
-                        </div>
-                    )}
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                             {isHostedExperience && (
@@ -148,10 +133,10 @@ export function ItineraryDayColumn({
                             </div>
                         )}
 
-                        {/* Description */}
-                        {(item.place?.description || item.description)?.trim() && (
+                        {/* Notes (practical insight: hours, tickets, tips) */}
+                        {item.description?.trim() && (
                             <p className="mt-1.5 text-xs text-[var(--muted-foreground)] line-clamp-2 leading-relaxed">
-                                {item.place?.description || item.description}
+                                {item.description}
                             </p>
                         )}
                         

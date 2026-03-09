@@ -54,9 +54,10 @@ const DraftItinerarySchema = z.object({
       .describe('Transport mode to the next day city; null if last day or no inter-city travel'),
     activities: z.array(z.object({
       name: z.string().describe('Name of the place/activity'),
+      description: z.string().describe('A vivid 1–2 sentence description of what the traveler will see or do here. Be specific and evocative — mention unique features, atmosphere, or what makes this stop special.'),
       placeId: z.string().nullable().describe('The ID of the place FROM THE AVAILABLE INVENTORY. Use null only if absolutely necessary.'),
       timeSlot: z.enum(['morning', 'afternoon', 'evening']),
-      notes: z.string().nullable().describe('Optional notes about this activity'),
+      notes: z.string().nullable().describe('A single factual sentence with a practical traveler insight: opening hours, ticket requirements, reservation tips, or a specific reason this stop is notable. Do not repeat the description.'),
     })),
   })),
   summary: z.string(),
@@ -1165,7 +1166,7 @@ export class ItineraryOrchestrator {
               name: activity.name,
               location: activityLocation,
               category: 'other' as const,
-              description: `${activity.name} near ${draft.city}`,
+              description: activity.description || `${activity.name} near ${draft.city}`,
               city: draft.city,
             },
             timeSlot: activity.timeSlot,
@@ -1300,6 +1301,7 @@ private async draftItinerary(
       - Pick a logical flow (places near each other).
       - Do NOT include transit, travel, or "drive to/arrive in" as stops. Travel is implied between day anchors.
       - Stop names should be short titles (place name only). No journaling in names.
+      - Each activity MUST have a vivid 1-2 sentence description. Be specific: mention unique features, sensory details, or what makes this stop memorable. NEVER repeat the place name as the description. NEVER use generic phrases like "a popular attraction" or "a must-see spot".
       - Notes must be a single factual sentence (tickets, hours, or why it’s notable).
       - Assign a general "anchor area" for the day (e.g. the neighborhood center).
       ${constraintText}
@@ -1483,6 +1485,7 @@ private async draftItinerary(
             location: placeLocation,
             category: normalizePlaceCategory(placeResult?.category),
             description:
+              act.description ||
               placeResult?.formattedAddress ||
               `${act.name} in ${explicitLocation.locationHint || dayCity}`,
             city: placeResult?.city || dayCity,

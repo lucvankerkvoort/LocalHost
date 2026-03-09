@@ -307,6 +307,7 @@ interface CesiumGlobeProps {
     itemId: string;
     title: string;
     description?: string;
+    category?: string;
     lat: number;
     lng: number;
     images: Array<{
@@ -382,6 +383,9 @@ function ItemPreviewPopper({
     itemPreview.itemId,
   ]);
 
+  const hasImages = itemPreview.images.length > 0;
+  const accentColor = PLACE_MARKER_COLORS[itemPreview.category ?? ''] ?? PLACE_MARKER_DEFAULT_COLOR;
+
   return (
     <div
       className="absolute z-50"
@@ -393,58 +397,63 @@ function ItemPreviewPopper({
       }}
     >
       <div className="pointer-events-auto bg-white rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden w-72">
-        <div className="relative bg-[var(--muted)]/20">
-          {itemPreview.isLoading ? (
-            <div className="w-full h-40 animate-pulse bg-[var(--muted)]/40" />
-          ) : itemPreview.images.length > 0 ? (
-            <img
-              src={itemPreview.images[previewIndex].url}
-              alt={itemPreview.title}
-              className="w-full h-40 object-cover"
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-full h-40 flex items-center justify-center text-xs text-[var(--muted-foreground)]">
-              No image available
-            </div>
-          )}
+        {hasImages ? (
+          /* Landmark/Museum mode: image carousel */
+          <div className="relative bg-[var(--muted)]/20">
+            {itemPreview.isLoading ? (
+              <div className="w-full h-40 animate-pulse bg-[var(--muted)]/40" />
+            ) : (
+              <img
+                src={itemPreview.images[previewIndex].url}
+                alt={itemPreview.title}
+                className="w-full h-40 object-cover"
+                loading="lazy"
+              />
+            )}
 
-          {itemPreview.images.length > 1 && (
-            <>
-              <button
-                onClick={() =>
-                  setPreviewIndex((prev) =>
-                    prev === 0 ? itemPreview.images.length - 1 : prev - 1
-                  )
-                }
-                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded-full"
-              >
-                ◀
-              </button>
-              <button
-                onClick={() =>
-                  setPreviewIndex((prev) =>
-                    prev === itemPreview.images.length - 1 ? 0 : prev + 1
-                  )
-                }
-                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded-full"
-              >
-                ▶
-              </button>
-            </>
-          )}
-        </div>
+            {itemPreview.images.length > 1 && (
+              <>
+                <button
+                  onClick={() =>
+                    setPreviewIndex((prev) =>
+                      prev === 0 ? itemPreview.images.length - 1 : prev - 1
+                    )
+                  }
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded-full"
+                >
+                  ◀
+                </button>
+                <button
+                  onClick={() =>
+                    setPreviewIndex((prev) =>
+                      prev === itemPreview.images.length - 1 ? 0 : prev + 1
+                    )
+                  }
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded-full"
+                >
+                  ▶
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
+          /* Description-only mode: accent bar */
+          <div
+            className="h-1.5 w-full"
+            style={{ background: accentColor }}
+          />
+        )}
 
         <div className="p-3">
           <h4 className="text-sm font-semibold text-[var(--foreground)] line-clamp-1">
             {itemPreview.title}
           </h4>
           {itemPreview.description && (
-            <p className="mt-1 text-xs text-[var(--muted-foreground)] line-clamp-3">
+            <p className={`mt-1 text-xs text-[var(--muted-foreground)] ${hasImages ? 'line-clamp-3' : 'line-clamp-5'}`}>
               {itemPreview.description}
             </p>
           )}
-          {itemPreview.images[previewIndex]?.attribution?.displayName && (
+          {hasImages && itemPreview.images[previewIndex]?.attribution?.displayName && (
             <p className="mt-2 text-[10px] text-[var(--muted-foreground)]/80">
               {itemPreview.images[previewIndex].attribution?.uri ? (
                 <a
