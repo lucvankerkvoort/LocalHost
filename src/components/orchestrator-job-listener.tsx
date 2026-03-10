@@ -8,6 +8,7 @@ import { jobStarted, jobProgress, jobCompleted, jobFailed } from '@/store/orches
 import { recordToolResult } from '@/lib/ai/tool-events';
 import type { ItineraryPlan } from '@/lib/ai/types';
 import { getTripIdFromPath } from '@/components/features/chat-widget-handshake';
+import { fetchActiveTrip } from '@/store/globe-thunks';
 
 const POLL_INTERVAL_MS = 1500;
 const DEBUG_ORCHESTRATOR_LISTENER = process.env.NEXT_PUBLIC_DEBUG_ORCHESTRATOR_PROGRESS === '1';
@@ -251,7 +252,12 @@ export function OrchestratorJobListener() {
             },
             source: 'orchestrator',
           });
-          
+
+          // Reconcile UI with DB to ensure consistency after save
+          if (jobTripId) {
+            contextRef.current.dispatch(fetchActiveTrip(jobTripId));
+          }
+
           if (jobStateRef.current.timer === intervalId) {
              window.clearInterval(intervalId);
              jobStateRef.current.timer = undefined;

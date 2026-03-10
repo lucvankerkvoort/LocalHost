@@ -116,6 +116,12 @@ function applyPlan(state: GlobeState, plan: ItineraryPlan) {
 
   state.routeMarkers = deduplicate(routeMarkers);
 
+  // Clear stale streaming markers and interaction state from the previous plan
+  state.placeMarkers = [];
+  state.hoveredItemId = null;
+  state.activeItemId = null;
+  state.focusedItemId = null;
+
   // Preserve selection if destination still exists
   if (state.selectedDestination) {
     const stillExists = state.destinations.some(

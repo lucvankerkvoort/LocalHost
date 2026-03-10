@@ -63,6 +63,43 @@ const DraftItinerarySchema = z.object({
   summary: z.string(),
 });
 
+// Schema for diff-based trip modification
+const ModificationDiffSchema = z.object({
+  summary: z.string().describe('One sentence describing what changed, e.g. "Replaced Day 2 activities with food-focused stops"'),
+  affectedDays: z.array(z.object({
+    dayNumber: z.number(),
+    action: z.enum(['keep', 'modify', 'remove']),
+    updatedTitle: z.string().nullable().describe('New day title if changed; null to keep existing'),
+    updatedAnchorArea: z.string().nullable().describe('New anchor neighbourhood if changed; null to keep existing'),
+    updatedCity: z.string().nullable().describe('New city if the day moves to a different city; null to keep existing'),
+    updatedCountry: z.string().nullable().describe('New country if changed; null to keep existing'),
+    updatedInterCityTransport: z.enum(['flight', 'train', 'drive', 'boat']).nullable().describe('Updated transport to next day; null means no change'),
+    updatedActivities: z.array(z.object({
+      name: z.string(),
+      description: z.string().describe('Vivid 1-2 sentence description of what the traveler will see or do. Specific, evocative, no generic phrases.'),
+      notes: z.string().nullable().describe('Single factual sentence: opening hours, ticket requirements, or practical tip.'),
+      placeId: z.string().nullable(),
+      timeSlot: z.enum(['morning', 'afternoon', 'evening']),
+    })).nullable().describe('Full replacement activity list for this day; null to keep existing activities unchanged'),
+  })),
+  newDays: z.array(z.object({
+    dayNumber: z.number(),
+    title: z.string(),
+    city: z.string().nullable(),
+    state: z.string().nullable(),
+    country: z.string().nullable(),
+    anchorArea: z.string(),
+    interCityTransportToNext: z.enum(['flight', 'train', 'drive', 'boat']).nullable(),
+    activities: z.array(z.object({
+      name: z.string(),
+      description: z.string(),
+      notes: z.string().nullable(),
+      placeId: z.string().nullable(),
+      timeSlot: z.enum(['morning', 'afternoon', 'evening']),
+    })),
+  })).describe('Entirely new days to append (e.g. if the user is extending the trip)'),
+});
+
 // Schema for intent classification
 // Note: OpenAI structured output requires all properties to be in 'required' array
 // so we use nullable inner fields instead of optional wrapper
@@ -592,24 +629,158 @@ export class ItineraryOrchestrator {
   }
 
   /**
-   * Handle MODIFY_PLAN intent - update existing trip
+   * Handle MODIFY_PLAN intent - update existing trip using diff-based approach
    */
   private async handleModifyPlan(
     message: string,
     session: TripSession
   ): Promise<{ session: TripSession; response: string }> {
-    // For now, regenerate with modification context
-    // TODO: Implement smarter diff-based modification
-    const modifiedPlan = await this.planTrip(
-      `Modify this existing trip to ${session.city}, ${session.country}: ${message}. 
-       Keep the general location but apply these changes.`
-    );
-    
-    const updatedSession = updateSessionPlan(session, modifiedPlan);
-    
+    if (!session.plan) {
+      return { session, response: "No trip to modify. Create a trip first." };
+    }
+
+    const diff = await this.generateModificationDiff(message, session.plan);
+    const updatedPlan = await this.applyDiff(diff, session.plan, session, message);
+    const updatedSession = updateSessionPlan(session, updatedPlan);
+
     return {
       session: updatedSession,
-      response: `✅ Updated your trip!\n\n${modifiedPlan.summary}`,
+      response: `✅ Updated: ${diff.summary}`,
+    };
+  }
+
+  /**
+   * Generate a minimal diff describing only what needs to change in the existing plan.
+   */
+  private async generateModificationDiff(
+    message: string,
+    existingPlan: ItineraryPlan
+  ): Promise<z.infer<typeof ModificationDiffSchema>> {
+    const planSummary = existingPlan.days
+      .map(day => {
+        const activities = day.activities
+          .map(a => `    - [${a.timeSlot ?? '?'}] ${a.place.name}`)
+          .join('\n');
+        return `Day ${day.dayNumber}: ${day.title} (${day.city ?? 'unknown city'})\n${activities}`;
+      })
+      .join('\n');
+
+    const { object } = await generateObject({
+      model: this.model,
+      schema: ModificationDiffSchema,
+      prompt: `You are modifying an existing trip itinerary. Output ONLY the days that are actually affected by the user's request. All other days must use action "keep".
+
+User request: "${message}"
+
+Existing plan:
+${planSummary}
+
+Rules:
+- Use action "keep" for every day NOT mentioned or affected by the request.
+- Use action "modify" only for days that directly change due to the request.
+- Use action "remove" only if the user explicitly asks to remove a day.
+- For "modify" days, provide the full replacement activity list (updatedActivities). Set updatedTitle, updatedCity etc. only if those fields change; otherwise leave them null.
+- Only add entries to newDays if the user wants to extend the trip with additional days.
+- The summary should be one concise sentence describing what changed.`,
+    });
+
+    return object;
+  }
+
+  /**
+   * Apply a modification diff to an existing plan, re-processing only affected days.
+   */
+  private async applyDiff(
+    diff: z.infer<typeof ModificationDiffSchema>,
+    existingPlan: ItineraryPlan,
+    session: TripSession,
+    request: string
+  ): Promise<ItineraryPlan> {
+    // Extract a trip anchor from the first day with a valid anchor location
+    const tripAnchor = existingPlan.days
+      .map(d => d.anchorLocation?.location ?? null)
+      .find(loc => loc != null) ?? null;
+
+    const mainCity = session.city ?? existingPlan.days[0]?.city ?? 'Unknown';
+    const mainCountry = session.country ?? existingPlan.days[0]?.country ?? 'Unknown';
+
+    // Build a map of diff entries by day number for fast lookup
+    const diffMap = new Map(diff.affectedDays.map(d => [d.dayNumber, d]));
+
+    // Process each existing day
+    const processedDays = await Promise.all(
+      existingPlan.days.map(async (existingDay) => {
+        const dayDiff = diffMap.get(existingDay.dayNumber);
+
+        // No diff entry or keep → pass through unchanged
+        if (!dayDiff || dayDiff.action === 'keep') {
+          return existingDay;
+        }
+
+        // Remove → signal with null
+        if (dayDiff.action === 'remove') {
+          return null;
+        }
+
+        // Modify → re-process the day
+        const activities = dayDiff.updatedActivities ?? existingDay.activities.map(a => ({
+          name: a.place.name,
+          description: a.place.description ?? '',
+          notes: a.notes ?? null,
+          placeId: a.place.id ?? null,
+          timeSlot: (a.timeSlot ?? 'morning') as 'morning' | 'afternoon' | 'evening',
+        }));
+
+        const draftDay: DraftItinerary['days'][0] = {
+          dayNumber: existingDay.dayNumber,
+          title: dayDiff.updatedTitle ?? existingDay.title,
+          city: dayDiff.updatedCity ?? existingDay.city ?? null,
+          state: null,
+          country: dayDiff.updatedCountry ?? existingDay.country ?? null,
+          anchorArea: dayDiff.updatedAnchorArea ?? existingDay.anchorLocation?.name ?? mainCity,
+          interCityTransportToNext: dayDiff.updatedInterCityTransport !== undefined
+            ? dayDiff.updatedInterCityTransport
+            : existingDay.interCityTransportToNext ?? null,
+          activities,
+        };
+
+        const result = await this.processDay(draftDay, mainCity, null, mainCountry, tripAnchor, []);
+        this.callbacks.onDayProcessed?.(existingDay.dayNumber, existingPlan.days.length + diff.newDays.length);
+        return result;
+      })
+    );
+
+    // Process new days
+    const newDayResults = await Promise.all(
+      diff.newDays.map(async (newDay) => {
+        const draftDay: DraftItinerary['days'][0] = {
+          dayNumber: newDay.dayNumber,
+          title: newDay.title,
+          city: newDay.city ?? null,
+          state: newDay.state ?? null,
+          country: newDay.country ?? null,
+          anchorArea: newDay.anchorArea,
+          interCityTransportToNext: newDay.interCityTransportToNext ?? null,
+          activities: newDay.activities,
+        };
+        const result = await this.processDay(draftDay, mainCity, null, mainCountry, tripAnchor, []);
+        this.callbacks.onDayProcessed?.(newDay.dayNumber, existingPlan.days.length + diff.newDays.length);
+        return result;
+      })
+    );
+
+    // Merge: kept/modified days (excluding removed) + new days, sorted and renumbered
+    const mergedDays = [
+      ...processedDays.filter((d): d is NonNullable<typeof d> => d !== null),
+      ...newDayResults,
+    ]
+      .sort((a, b) => a.dayNumber - b.dayNumber)
+      .map((day, idx) => ({ ...day, dayNumber: idx + 1 }));
+
+    return {
+      ...existingPlan,
+      request,
+      days: mergedDays,
     };
   }
 

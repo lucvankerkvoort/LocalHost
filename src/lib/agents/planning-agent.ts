@@ -472,6 +472,32 @@ Guidance:
                 if (typeof version === 'number') {
                   expectedVersion = version;
                 }
+
+                // When updating an existing trip and no day count is specified, preserve the
+                // existing trip's day count to prevent AI from generating a different number
+                // of days (which causes duplicate-city display bugs).
+                if (!resolved.resolvedState.durationDays && !resolved.resolvedState.startDate && !resolved.resolvedState.endDate) {
+                  try {
+                    const tripSnapshot = await loadTripPlanSnapshotForUser(context.userId, context.tripId);
+                    if (tripSnapshot) {
+                      const existingDayCount = tripSnapshot.stops.reduce(
+                        (total, stop) => total + stop.days.length,
+                        0
+                      );
+                      if (existingDayCount > 0) {
+                        resolved.resolvedState.durationDays = existingDayCount;
+                        // Rebuild the request to include the day count constraint
+                        if (!input.request) {
+                          resolved.request = buildPlannerRequest(resolved.resolvedState);
+                        } else {
+                          resolved.request = `${resolved.request}\n\nIMPORTANT: Keep the same total duration of ${existingDayCount} days.`;
+                        }
+                      }
+                    }
+                  } catch {
+                    // Non-fatal: proceed without day count constraint
+                  }
+                }
               }
               const snapshot = buildPlannerGenerationSnapshot({
                 request: resolved.request,
