@@ -53,6 +53,12 @@ type GenerationControllerOptions<TSnapshot extends PlannerSnapshot> = {
     mode: GenerationMode;
   }) => void | Promise<void>;
   runGeneration: (task: GenerationTask<TSnapshot>) => Promise<void>;
+  /**
+   * Optional wrapper for the fire-and-forget generation promise.
+   * Use this to register the promise with `after()` from next/server so it
+   * survives after the HTTP response is sent (prevents Vercel from killing it).
+   */
+  wrapTask?: (promise: Promise<void>) => void;
 };
 
 const DEFAULT_REFINEMENT_DEBOUNCE_MS = 600;
@@ -253,7 +259,7 @@ export class GenerationController<TSnapshot extends PlannerSnapshot> {
     record.state = mode === 'draft' ? 'DRAFTING' : 'REFINING';
     record.currentSnapshot = snapshot;
 
-    void this.runGeneration(key, record, {
+    const genPromise = this.runGeneration(key, record, {
       key,
       jobId: resolvedJobId,
       generationId: resolvedGenerationId,
@@ -269,6 +275,12 @@ export class GenerationController<TSnapshot extends PlannerSnapshot> {
         );
       },
     });
+
+    if (this.options.wrapTask) {
+      this.options.wrapTask(genPromise);
+    } else {
+      void genPromise;
+    }
   }
 
   private async runGeneration(

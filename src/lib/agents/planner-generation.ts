@@ -311,29 +311,74 @@ async function runPlannerGenerationTask(
 
 export const plannerGenerationController = new GenerationController<PlannerGenerationSnapshot>({
   refineDebounceMs: 600,
+
+  // Keep the generation alive after the HTTP response is sent.
+  // Without this, Vercel terminates the serverless function as soon as the
+  // chat stream closes, killing the in-flight planTripDraft/hydration work.
+  wrapTask: (promise) => {
+    void import('next/server')
+      .then(({ after }) => { after(() => promise); })
+      .catch(() => { void promise; });
+  },
+
   ensureJobId: async ({ existingJobId, snapshot, mode, generationId }) => {
     const { createOrchestratorJob, resetOrchestratorJob } = await import(
       '@/lib/ai/orchestrator-jobs'
     );
+    const { conversationController } = await import('@/lib/conversation/controller');
+
     const progress = {
       stage: 'draft' as const,
       message: getGenerationStartMessage(mode),
     };
 
-    if (existingJobId) {
-      const reset = await resetOrchestratorJob(existingJobId, {
+    // In serverless, the in-memory GenerationController Map resets on every
+    // invocation so existingJobId is always null. Fall back to the job ID
+    // persisted in the DB-backed session from the previous request.
+    let resolvedExistingJobId = existingJobId;
+    if (!resolvedExistingJobId && snapshot.sessionId) {
+      try {
+        const session = await conversationController.getOrCreateSession(snapshot.sessionId);
+        const persisted = session.metadata?.activeJobId;
+        if (typeof persisted === 'string' && persisted.length > 0) {
+          resolvedExistingJobId = persisted;
+        }
+      } catch {
+        // Non-fatal: proceed without a persisted job ID
+      }
+    }
+
+    const persistJobId = async (jobId: string) => {
+      if (!snapshot.sessionId) return;
+      try {
+        const session = await conversationController.getOrCreateSession(snapshot.sessionId);
+        await conversationController.updateMetadata(snapshot.sessionId, {
+          ...session.metadata,
+          activeJobId: jobId,
+        });
+      } catch {
+        // Non-fatal
+      }
+    };
+
+    if (resolvedExistingJobId) {
+      const reset = await resetOrchestratorJob(resolvedExistingJobId, {
         prompt: snapshot.request,
         progress,
         generationId,
         generationMode: mode,
       });
-      if (reset) return reset.id;
+      if (reset) {
+        void persistJobId(reset.id);
+        return reset.id;
+      }
     }
 
     const created = await createOrchestratorJob(snapshot.request, progress, {
       generationId,
       generationMode: mode,
     });
+    void persistJobId(created.id);
     return created.id;
   },
   onQueued: async ({ jobId, generationId }) => {
