@@ -446,7 +446,7 @@ function ItemPreviewPopper({
 
         <div className="p-3">
           <h4 className="text-sm font-semibold text-[var(--foreground)] line-clamp-1">
-            {itemPreview.title}
+            {itemPreview.title.replace(/\b\w/g, (c) => c.toUpperCase())}
           </h4>
           {itemPreview.description && (
             <p className={`mt-1 text-xs text-[var(--muted-foreground)] ${hasImages ? 'line-clamp-3' : 'line-clamp-5'}`}>
@@ -941,7 +941,7 @@ export default function CesiumGlobe({
           const isSelected = Boolean(
             selectedDestination && marker.dayIds.includes(selectedDestination)
           );
-          const labelText = marker.name;
+          const labelText = marker.name.replace(/\b\w/g, (c) => c.toUpperCase());
           const iconSize = isSelected ? CITY_MARKER_ICON_SELECTED_SIZE : CITY_MARKER_ICON_SIZE;
           const cityColor = marker.color.toLowerCase() === ROUTE_MARKER_COLOR
             ? CITY_MARKER_FALLBACK_COLOR
@@ -1100,7 +1100,7 @@ export default function CesiumGlobe({
                   disableDepthTestDistance: MARKER_DEPTH_TEST_DISTANCE,
                 }}
                 label={{
-                  text: marker.name ?? '',
+                  text: (marker.name ?? '').replace(/\b\w/g, (c) => c.toUpperCase()),
                   font: isActive ? 'bold 14px sans-serif' : '11px sans-serif',
                   fillColor: markerColor.withAlpha(0.95),
                   outlineColor: Color.WHITE,

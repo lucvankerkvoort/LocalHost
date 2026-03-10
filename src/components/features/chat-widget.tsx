@@ -3,12 +3,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useChat } from '@ai-sdk/react';
 import Link from 'next/link';
-import {
-  DndContext,
-  useDraggable,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 import { usePathname } from 'next/navigation';
 import { ChatMessage } from './chat-message';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -41,6 +35,7 @@ import {
   MapPin,
   Wrench,
   Send,
+  Map,
 } from 'lucide-react';
 
 type ChatToolInvocation = {
@@ -93,27 +88,56 @@ interface Position {
   y: number;
 }
 
-// Hook to get drag handle props
+// Hook to get drag handle props using pointer events
 function useDraggablePanel(position: Position, onPositionChange: (pos: Position) => void) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: 'chat-panel',
-  });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef<{ mouseX: number; mouseY: number; posX: number; posY: number } | null>(null);
 
-  // Combine base position with active drag transform
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      posX: position.x,
+      posY: position.y,
+    };
+  }, [position]);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!dragStartRef.current) return;
+      onPositionChange({
+        x: dragStartRef.current.posX + (e.clientX - dragStartRef.current.mouseX),
+        y: dragStartRef.current.posY + (e.clientY - dragStartRef.current.mouseY),
+      });
+    };
+
+    const handlePointerUp = () => {
+      setIsDragging(false);
+      dragStartRef.current = null;
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [isDragging, onPositionChange]);
+
   const style: React.CSSProperties = {
-    transform: CSS.Translate.toString({
-      x: (transform?.x || 0) + position.x,
-      y: (transform?.y || 0) + position.y,
-      scaleX: 1,
-      scaleY: 1,
-    }),
-    transition: isDragging ? undefined : 'transform 0.2s ease',
+    transform: `translate(${position.x}px, ${position.y}px)`,
+    transition: isDragging ? undefined : 'transform 0.1s ease',
   };
 
   return {
-    containerRef: setNodeRef,
+    containerRef,
     containerStyle: style,
-    dragHandleProps: { ...attributes, ...listeners },
+    dragHandleProps: { onPointerDown: handlePointerDown },
     isDragging,
   };
 }
@@ -143,6 +167,14 @@ const INTENT_UI_CONFIG = {
     emptyStateGreeting: 'Let\'s build your traveler profile together.',
     emptyStateHint: 'Tell me about yourself — where you\'re from, what you love.',
     inputPlaceholder: 'Tell me about yourself…',
+  },
+  trip_planning: {
+    Icon: Map,
+    title: 'Trip Planner',
+    subtitle: 'Ask me anything about your itinerary',
+    emptyStateGreeting: 'Your itinerary is ready to shape.',
+    emptyStateHint: 'Try: "Add a day in Florence" or "Find a good dinner spot in Paris"',
+    inputPlaceholder: 'What would you like to change?',
   },
 } as const;
 
@@ -338,18 +370,6 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
     }
   }, [panelPosition, savePosition]);
 
-  // Handle panel drag
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const delta = event.delta;
-    setPanelPosition((prev) => {
-      const newPos = {
-        x: prev.x + delta.x,
-        y: prev.y + delta.y,
-      };
-      return newPos;
-    });
-  }, []);
-
   // Handle scroll events to track user position
   const handleScroll = () => {
     if (!messagesContainerRef.current) return;
@@ -495,11 +515,17 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
 
   // Reset position handler
   const resetPosition = useCallback(() => {
+    setPanelPosition(DEFAULT_POSITION);
     savePosition(DEFAULT_POSITION);
   }, [savePosition]);
 
   // Use draggable hook
-  const { containerRef, containerStyle, dragHandleProps, isDragging } = useDraggablePanel(panelPosition, savePosition);
+  const handlePositionChange = useCallback((pos: Position) => {
+    setPanelPosition(pos);
+    savePosition(pos);
+  }, [savePosition]);
+
+  const { containerRef, containerStyle, dragHandleProps, isDragging } = useDraggablePanel(panelPosition, handlePositionChange);
 
   return (
     <>
@@ -518,7 +544,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
       </button>
 
       {/* Draggable Chat Panel */}
-      <DndContext onDragEnd={handleDragEnd}>
+      <>
         <div
           className={`fixed bottom-24 right-6 z-50 transition-all duration-300 ${
             isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
@@ -537,7 +563,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
                   </div>
                   <div className="flex-1">
                     <h3 className="text-white font-semibold">{uiConfig.title}</h3>
-                    <p className="text-white/80 text-sm">Drag header to move • {uiConfig.subtitle}</p>
+                    <p className="text-white/80 text-sm">{uiConfig.subtitle}</p>
                   </div>
                   {/* Reset position button */}
                   {(panelPosition.x !== 0 || panelPosition.y !== 0) && (
@@ -756,7 +782,7 @@ export function ChatWidget({ intent: intentOverride, isActive = true }: ChatWidg
             </div>
           </div>
         </div>
-      </DndContext>
+      </>
     </>
   );
 }

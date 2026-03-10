@@ -93,7 +93,7 @@ export function ItineraryItem({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h4 className="font-medium text-[var(--foreground)] text-sm truncate">
-              {item.title}
+              {item.title.replace(/\b\w/g, (c) => c.toUpperCase())}
             </h4>
             {status === 'BOOKED' && (
               <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">

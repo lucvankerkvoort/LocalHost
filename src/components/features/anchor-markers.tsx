@@ -82,7 +82,7 @@ export function AnchorMarkers({
               heightReference: HeightReference.CLAMP_TO_GROUND,
             }}
             label={{
-              text: `Day ${dayNumber}: ${anchor.title.substring(0, 20)}${anchor.title.length > 20 ? '...' : ''}`,
+              text: `Day ${dayNumber}: ${anchor.title.replace(/\b\w/g, (c) => c.toUpperCase()).substring(0, 20)}${anchor.title.length > 20 ? '...' : ''}`,
               font: isSelected ? 'bold 14px sans-serif' : '12px sans-serif',
               fillColor: Color.WHITE,
               outlineColor: Color.BLACK,

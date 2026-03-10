@@ -3,7 +3,7 @@ export const PLANNER_ONBOARDING_START_TOKEN = 'ACTION:START_PLANNER';
 export const PROFILE_SETUP_START_TOKEN = 'ACTION:START_PROFILE_SETUP';
 export const HANDSHAKE_STORAGE_PREFIX = 'chat-handshake:';
 
-export type ChatWidgetIntent = 'general' | 'become_host' | 'profile_setup';
+export type ChatWidgetIntent = 'general' | 'become_host' | 'profile_setup' | 'trip_planning';
 export type HostOnboardingStage =
   | 'CITY_MISSING'
   | 'STOPS_MISSING'
@@ -40,7 +40,7 @@ export function shouldStartHostOnboardingHandshake(input: HandshakeCheckInput): 
 
 export function shouldStartPlannerHandshake(input: HandshakeCheckInput): boolean {
   if (!input.isActive) return false;
-  if (input.intent !== 'general') return false;
+  if (input.intent !== 'trip_planning') return false;
   if (!input.pathname?.startsWith('/trips/')) return false;
   if (input.messageCount > 0) return false;
   if (input.alreadyTriggered) return false;
@@ -60,6 +60,7 @@ export function getChatIntent(pathname: string | null, intentOverride?: ChatWidg
   if (intentOverride) return intentOverride;
   if (pathname?.startsWith('/become-host')) return 'become_host';
   if (pathname?.startsWith('/profile/setup')) return 'profile_setup';
+  if (pathname?.startsWith('/trips/')) return 'trip_planning';
   return 'general';
 }
 

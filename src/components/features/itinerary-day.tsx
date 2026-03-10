@@ -122,7 +122,7 @@ export function ItineraryDayColumn({
                             )}
                         </div>
                         <h4 className={`font-medium text-[var(--foreground)] truncate pr-6 ${isAnchor ? 'text-sm' : 'text-xs'}`}>
-                            {item.title}
+                            {item.title.replace(/\b\w/g, (c) => c.toUpperCase())}
                         </h4>
 
                         {/* Location / Address Line */}
