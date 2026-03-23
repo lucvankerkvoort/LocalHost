@@ -28,6 +28,7 @@ interface ItineraryDayProps {
   onDeleteItem?: (itemId: string) => void;
   onBookItem?: (item: ItineraryItemType) => void;
   onChatItem?: (item: ItineraryItemType) => void;
+  onFindAccommodation?: () => void;
 }
 
 export function ItineraryDayColumn({
@@ -48,6 +49,7 @@ export function ItineraryDayColumn({
   onDeleteItem,
   onBookItem,
   onChatItem,
+  onFindAccommodation,
 }: ItineraryDayProps) {
   const headline = resolveItineraryDayHeadline(date, title, dayNumber);
   const caption = resolveItineraryDayCaption(date, title, city, dayNumber);
@@ -210,6 +212,17 @@ export function ItineraryDayColumn({
             );
         })}
         
+        {/* Accommodation shortcut */}
+        {onFindAccommodation && (
+            <button
+                data-testid="find-accommodation-button"
+                onClick={onFindAccommodation}
+                className="w-full py-2 border border-[var(--border)] rounded-lg text-xs font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:border-[var(--blue-green)] hover:bg-[var(--sky-blue-lighter)] transition-all flex items-center justify-center gap-1.5"
+            >
+                🏨 Find accommodation
+            </button>
+        )}
+
         {/* Add Item Placeholder */}
         <button
             onClick={() => onAddActivity(dayId)}

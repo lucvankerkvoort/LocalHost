@@ -21,6 +21,7 @@ import {
 
 import { BookingDialog } from './booking-dialog';
 import { PaymentModal } from './payment/payment-modal';
+import { AccommodationLinksModal } from './accommodation-links-modal';
 import { ItineraryDayColumn } from './itinerary-day';
 import { HostPanel } from './host-panel';
 import { buildAddedExperienceIds, buildBookedExperienceIds } from './host-panel-state';
@@ -462,6 +463,14 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     hostPhoto: string;
   }>({ isOpen: false, bookingId: '', hostId: '', hostName: '', hostPhoto: '' });
 
+  const [accommodationModal, setAccommodationModal] = useState<{
+    isOpen: boolean;
+    city: string;
+    checkin: string;
+    checkout: string;
+    numAdults: number;
+  }>({ isOpen: false, city: '', checkin: '', checkout: '', numAdults: 2 });
+
   const handleViewHostProfile = useCallback((host: HostMarkerData) => {
     const restoreKey = persistItineraryState();
     const returnTo = restoreKey
@@ -902,6 +911,30 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
 
       await dispatch(fetchActiveTrip(tripId));
       alert('Payment submitted. Booking confirmation may take a few seconds to appear. If it does not update, refresh the page and retry.');
+  };
+
+  const handleFindAccommodation = (dayId: string) => {
+    const dayIndex = destinations.findIndex((d) => d.id === dayId);
+    const day = destinations[dayIndex];
+    const nextDay = destinations[dayIndex + 1];
+
+    const city = day?.city || day?.name || '';
+
+    const checkin = day?.date ?? '';
+    const checkout = nextDay?.date ?? (() => {
+      if (!checkin) return '';
+      const d = new Date(checkin);
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().split('T')[0];
+    })();
+
+    setAccommodationModal({
+      isOpen: true,
+      city,
+      checkin,
+      checkout,
+      numAdults: 2,
+    });
   };
 
   const cityMarkers = useMemo<CityMarkerData[]>(() => {
@@ -1603,6 +1636,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                       onItemHover={(itemId) => handleItemHover(itemId)}
                       onBookItem={(item) => handleBookItem(day.id, item)}
                       onChatItem={(item) => { void handleChatItem(item); }}
+                      onFindAccommodation={() => handleFindAccommodation(day.id)}
                     />
                   ))
                 )}
@@ -1720,6 +1754,14 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
       />
 
       {tripId != null && <TripPreferencesWidget tripId={tripId} />}
+      <AccommodationLinksModal
+        isOpen={accommodationModal.isOpen}
+        onClose={() => setAccommodationModal((s) => ({ ...s, isOpen: false }))}
+        city={accommodationModal.city}
+        checkin={accommodationModal.checkin}
+        checkout={accommodationModal.checkout}
+        numAdults={accommodationModal.numAdults}
+      />
     </div>
   );
 }
