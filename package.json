@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test $(find src -name '*.test.ts' -print)",
+    "test:e2e": "playwright test",
     "test:chunk:globe-slice": "tsx --test src/store/globe-slice.test.ts",
     "test:chunk:hosts-slice": "tsx --test src/store/hosts-slice.test.ts",
     "test:chunk:host-creation-slice": "tsx --test src/store/host-creation-slice.test.ts",

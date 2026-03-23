@@ -2,6 +2,26 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { supportsItineraryItemPlaceIdColumn } from '@/lib/trips/place-id-compat';
+import { z } from 'zod';
+
+const ItineraryItemTypeSchema = z.enum([
+  'SIGHT', 'EXPERIENCE', 'MEAL', 'FREE_TIME', 'TRANSPORT', 'NOTE', 'LODGING',
+]);
+
+const CreateItineraryItemSchema = z.object({
+  dayId: z.string().uuid().optional(),
+  dayNumber: z.number().int().positive().optional(),
+  experienceId: z.string().uuid().optional(),
+  hostId: z.string().uuid().optional(),
+  title: z.string().min(1).max(200).optional(),
+  type: ItineraryItemTypeSchema.optional(),
+  locationName: z.string().max(200).optional(),
+  placeId: z.string().max(200).optional(),
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
+}).refine(data => data.dayId || data.dayNumber !== undefined, {
+  message: 'Either dayId or dayNumber must be provided',
+});
 
 export async function POST(
   req: Request,
@@ -26,76 +46,28 @@ export async function POST(
     }
 
     const body = await req.json();
-    console.log('[TRIP_ITEM_POST] Received:', { tripId, session_user: session?.user?.id, body });
-    const { dayId, dayNumber, experienceId, hostId, title, type, locationName, placeId, lat, lng } = body;
+    const parsed = CreateItineraryItemSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid input', issues: parsed.error.issues }, { status: 400 });
+    }
+    const { dayId, dayNumber, experienceId, hostId, title, type, locationName, placeId, lat, lng } = parsed.data;
 
-    // Find the day to attach to
+    // Find the day to attach to.
+    // dayNumber is 1-based (matches GlobeDestination.day); dayIndex in DB is 0-based.
     let day = null;
-    
-    // 1. Try explicit dayId
+
     if (dayId) {
-        day = await prisma.itineraryDay.findFirst({
-            where: {
-                id: dayId,
-                tripAnchor: { tripId: tripId }
-            },
-            include: {
-              items: {
-                select: {
-                  id: true,
-                  orderIndex: true,
-                },
-              },
-            }
-        });
+      day = await prisma.itineraryDay.findFirst({
+        where: { id: dayId, tripAnchor: { tripId } },
+        include: { items: { select: { id: true, orderIndex: true } } },
+      });
     }
 
-    // 2. Fallback to dayNumber if dayId failed or wasn't provided
     if (!day && dayNumber !== undefined) {
-         console.log('[TRIP_ITEM_POST] Falling back to dayNumber lookup:', dayNumber);
-         // Find day by index within the trip
-         // Use findFirst over the whole trip structure or iterate?
-         // Efficient query:
-         day = await prisma.itineraryDay.findFirst({
-            where: {
-                dayIndex: dayNumber, // Assuming backend uses dayIndex 0-based or frontend passes correct one?
-                // Frontend passes `dayNumber` which usually is `dayIndex + 1` in our app, specifically GlobeDestination.day
-                // Let's assume input `dayNumber` matches destination.day
-                // Wait, GlobeDestination.day is usually 1-indexed.
-                // ItineraryDay.dayIndex is 0-indexed usually?
-                // Let's check plan-converter.ts: `dayIndex: day.dayNumber` -> wait, schema says: `dayIndex Int`
-                // Let's check `candidates/route.ts`: `d.dayIndex + 1 === parseInt(dayNumber)`
-                // So dayNumber is 1-based, dayIndex is 0-based.
-                tripAnchor: { tripId: tripId }
-            },
-            include: {
-              items: {
-                select: {
-                  id: true,
-                  orderIndex: true,
-                },
-              },
-            }
-         });
-         
-         // If strictly dayIndex passed? 
-         if (!day) {
-             // Try assuming it WAS dayIndex?
-              day = await prisma.itineraryDay.findFirst({
-                where: {
-                    dayIndex: dayNumber - 1, // Try 1-based to 0-based conversion
-                    tripAnchor: { tripId: tripId }
-                },
-                include: {
-                  items: {
-                    select: {
-                      id: true,
-                      orderIndex: true,
-                    },
-                  },
-                }
-             });
-         }
+      day = await prisma.itineraryDay.findFirst({
+        where: { dayIndex: dayNumber - 1, tripAnchor: { tripId } },
+        include: { items: { select: { id: true, orderIndex: true } } },
+      });
     }
 
     if (!day) {
@@ -215,8 +187,7 @@ export async function POST(
 
   } catch (error) {
     console.error('[TRIP_ITEM_POST] Error:', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return new NextResponse(`Internal Error: ${message}`, { status: 500 });
+    return new NextResponse('Internal Error', { status: 500 });
   }
 }
 

@@ -598,6 +598,24 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     dispatch(setP2PChatOpen(true));
   }, [dispatch, openChatThread]);
 
+  // Chat Handler for itinerary items
+  const handleChatItem = useCallback(async (item: ItineraryItem) => {
+    if (!item.hostId) return;
+    dispatch(setSelectedHostId(item.hostId));
+    if (item.experienceId) dispatch(setSelectedExperienceId(item.experienceId));
+    const thread = await openChatThread(item.hostId);
+    dispatch(
+      initThread({
+        threadId: thread.id,
+        bookingId: thread.bookingId,
+        hostId: thread.counterpartId,
+        hostName: thread.counterpartName || item.hostName || 'Host',
+        hostPhoto: thread.counterpartPhoto || item.hostPhoto || '/placeholder-host.jpg',
+      })
+    );
+    dispatch(setP2PChatOpen(true));
+  }, [dispatch, openChatThread]);
+
   // Booking Handler
   const handleBookItem = async (dayId: string, item: ItineraryItem) => {
     console.log('[GlobeItinerary] handleBookItem called', { dayId, item, tripId });
@@ -1583,6 +1601,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                       }
                       onItemHover={(itemId) => handleItemHover(itemId)}
                       onBookItem={(item) => handleBookItem(day.id, item)}
+                      onChatItem={(item) => { void handleChatItem(item); }}
                     />
                   ))
                 )}

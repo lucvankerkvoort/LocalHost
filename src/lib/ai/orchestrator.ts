@@ -1,8 +1,9 @@
 import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
-import { 
-  GeoPoint, 
+import {
+  GeoPoint,
+  HostCard,
   ItineraryPlan,
   Place,
 } from './types';
@@ -1711,26 +1712,54 @@ private async draftItinerary(
         matchReasons: string[];
         interests?: string[];
         hostName?: string;
+        hostId?: string;
+        price?: number;
+        duration?: number;
+        category?: string;
       }>;
     }>('search_localhosts', {
       query: draftDay.title,
       location: `${dayCity}, ${dayCountry}`,
       limit: 6,
-      searchType: 'hosts',
+      searchType: 'experiences',
     });
 
-    console.log(`[Orchestrator] Day ${draftDay.dayNumber}: search_localhosts for "${dayCity}, ${dayCountry}" returned ${searchResult?.results?.length ?? 0} hosts`);
+    console.log(`[Orchestrator] Day ${draftDay.dayNumber}: search_localhosts for "${dayCity}, ${dayCountry}" returned ${searchResult?.results?.length ?? 0} experiences`);
 
-    const suggestedHosts = searchResult?.results.map(r => ({
-      id: r.id,
-      name: r.name,
-      headline: r.description,
-      photoUrl: r.photo,
-      rating: 4.8,
-      reviewCount: 12,
-      tags: r.interests || r.matchReasons,
-      distanceFromAnchor: Math.floor(Math.random() * 500),
-    })) || [];
+    // Build deduplicated host cards for the globe EXPERIENCES tab (one card per host)
+    const seenHostIds = new Set<string>();
+    const suggestedHosts: HostCard[] = [];
+    for (const r of (searchResult?.results ?? [])) {
+      const cardId = r.hostId ?? r.id;
+      if (seenHostIds.has(cardId)) continue;
+      seenHostIds.add(cardId);
+      suggestedHosts.push({
+        id: cardId,
+        name: r.hostName ?? r.name,
+        headline: r.name, // experience title as the host's headline
+        photoUrl: r.photo,
+        rating: 4.8,
+        reviewCount: 12,
+        tags: r.matchReasons,
+      });
+    }
+
+    // Store top 1 experience to inject as an EXPERIENCE item in the itinerary panel
+    const experienceItems = (searchResult?.results ?? [])
+      .filter(r => r.hostId) // only include experiences linked to a real host
+      .slice(0, 1)
+      .map(r => ({
+        id: r.id,
+        title: r.name,
+        description: r.description,
+        photo: r.photo,
+        hostId: r.hostId,
+        hostName: r.hostName,
+        duration: r.duration,
+        price: r.price,
+      }));
+
+    console.log(`[Orchestrator] Day ${draftDay.dayNumber}: injecting ${experienceItems.length} experience items (${experienceItems.map(e => e.title).join(', ') || 'none'})`);
 
     // D. Generate Navigation between sequential activities using generate_route tool
     const navigationEvents = [];
@@ -1777,6 +1806,7 @@ private async draftItinerary(
       interCityTransportToNext: draftDay.interCityTransportToNext ?? null,
       navigationEvents,
       suggestedHosts,
+      experienceItems,
     };
   }
 
