@@ -10,6 +10,15 @@ import {
   removeItineraryTargetsFromStops,
 } from './planning-agent';
 
+const DEFAULT_TEST_PREFS = {
+  partyType: null,
+  partySize: null,
+  accommodationStyle: null,
+  pace: null,
+  budget: null,
+  foodPreferences: null,
+} as const;
+
 test('buildPlannerRequest prefers road trip wording when driving between two cities', () => {
   const request = buildPlannerRequest({
     destinations: ['Los Angeles', 'Chicago'],
@@ -22,6 +31,7 @@ test('buildPlannerRequest prefers road trip wording when driving between two cit
     hasFlown: true,
     transportPreference: 'drive',
     durationDays: 6,
+    tripPreferences: { ...DEFAULT_TEST_PREFS },
   });
 
   assert.ok(request.includes('road trip from Los Angeles to Chicago'));
@@ -40,6 +50,7 @@ test('buildPlannerRequest includes flight preference for multi-city trips', () =
     hasGenerated: true,
     hasFlown: true,
     transportPreference: 'flight',
+    tripPreferences: { ...DEFAULT_TEST_PREFS },
   });
 
   assert.ok(request.includes('Prefer flights between cities'));
@@ -56,6 +67,7 @@ test('getPlannerQuestion returns destination prompt when empty', () => {
       foodPreferencesProvided: false,
       hasGenerated: false,
       hasFlown: false,
+      tripPreferences: { ...DEFAULT_TEST_PREFS },
     },
     ''
   );
@@ -74,6 +86,7 @@ test('getPlannerQuestion asks for dates when destination is known and timing is 
       foodPreferencesProvided: false,
       hasGenerated: false,
       hasFlown: false,
+      tripPreferences: { ...DEFAULT_TEST_PREFS },
     },
     'Plan me a trip to Tokyo'
   );
@@ -93,6 +106,7 @@ test('getPlannerQuestion does not run full questionnaire after destination and d
       foodPreferencesProvided: false,
       hasGenerated: false,
       hasFlown: false,
+      tripPreferences: { ...DEFAULT_TEST_PREFS },
     },
     '5 days in Tokyo'
   );

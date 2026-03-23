@@ -16,6 +16,14 @@ const BASE_STATE: PlannerFlowState = {
   foodPreferencesProvided: false,
   hasGenerated: false,
   hasFlown: false,
+  tripPreferences: {
+    partyType: null,
+    partySize: null,
+    accommodationStyle: null,
+    pace: null,
+    budget: null,
+    foodPreferences: null,
+  },
 };
 
 test('GenerateItineraryInputSchema accepts request-only payload', () => {

@@ -2,7 +2,11 @@ import { z } from 'zod';
 import type { AgentContext } from './agent';
 import { normalizeDestinations } from './planner-helpers';
 import type { PlannerSnapshot as ControllerPlannerSnapshot } from './generation-controller';
-import { getPlannerTripSeedForUser } from '@/lib/trips/repository';
+import { getPlannerTripSeedForUser, getTripPreferences } from '@/lib/trips/repository';
+import {
+  DEFAULT_TRIP_PREFERENCES,
+  type TripPreferences,
+} from '@/types/trip-preferences';
 
 const PLANNER_ONBOARDING_START_TOKEN = 'ACTION:START_PLANNER';
 
@@ -34,6 +38,8 @@ export type PlannerFlowState = {
   hasGenerated: boolean;
   hasFlown: boolean;
   lastQuestionKey?: string;
+  /** Structured intake preferences — persisted to Trip.preferences in DB. */
+  tripPreferences: TripPreferences;
 };
 
 export const DEFAULT_PLANNER_STATE: PlannerFlowState = {
@@ -45,6 +51,7 @@ export const DEFAULT_PLANNER_STATE: PlannerFlowState = {
   foodPreferencesProvided: false,
   hasGenerated: false,
   hasFlown: false,
+  tripPreferences: { ...DEFAULT_TRIP_PREFERENCES },
 };
 
 export type PlannerGenerationSnapshot = ControllerPlannerSnapshot & {
@@ -131,21 +138,29 @@ export async function seedPlannerStateFromTrip(
   if (state.destinations.length > 0) return state;
 
   try {
-    const seed = await getPlannerTripSeedForUser(context.userId, context.tripId);
+    const [seed, savedPreferences] = await Promise.all([
+      getPlannerTripSeedForUser(context.userId, context.tripId),
+      getTripPreferences(context.userId, context.tripId),
+    ]);
+
     if (!seed) return state;
 
     const destinations = normalizeDestinations(seed.destinationTitles);
 
     if (destinations.length === 0) return state;
 
+    const tripPreferences = savedPreferences ?? { ...DEFAULT_TRIP_PREFERENCES };
+
+    // Sync any already-answered preferences back into the legacy state fields
+    const syncedLegacy = syncPreferencesToLegacyState(state, tripPreferences);
+
     return {
-      ...state,
+      ...syncedLegacy,
       destinations,
       destinationScope: destinations.length > 1 ? 'multi_city' : 'city',
       needsCities: false,
-      // Prevent auto-regeneration only when the trip already has persisted itinerary days.
-      // Anchors alone are not enough to assume an itinerary was generated.
       hasGenerated: state.hasGenerated || seed.hasPersistedItineraryDays,
+      tripPreferences,
     };
   } catch (error) {
     console.warn('[PlanningAgent] Failed to seed planner state from trip', {
@@ -153,6 +168,40 @@ export async function seedPlannerStateFromTrip(
       error: error instanceof Error ? error.message : String(error),
     });
     return state;
+  }
+}
+
+/**
+ * One-way sync: copy non-null, non-waived tripPreferences values into the
+ * legacy PlannerFlowState fields so existing generation logic sees them.
+ */
+export function syncPreferencesToLegacyState(
+  state: PlannerFlowState,
+  prefs: TripPreferences
+): PlannerFlowState {
+  const next = { ...state };
+  if (prefs.partyType && prefs.partyType !== 'waived') next.partyType = prefs.partyType;
+  if (prefs.partySize && prefs.partySize !== 'waived') next.partySize = prefs.partySize;
+  if (prefs.pace && prefs.pace !== 'waived') next.pace = prefs.pace;
+  if (prefs.budget && prefs.budget !== 'waived') next.budget = prefs.budget;
+  if (prefs.foodPreferences && prefs.foodPreferences !== 'waived') {
+    next.foodPreferences = prefs.foodPreferences;
+    next.foodPreferencesProvided = true;
+  }
+  if (prefs.accommodationStyle && prefs.accommodationStyle !== 'waived') {
+    next.lodgingArea = accommodationStyleToLodgingHint(prefs.accommodationStyle);
+  }
+  return next;
+}
+
+function accommodationStyleToLodgingHint(style: string): string {
+  switch (style) {
+    case 'hotel_in_town': return 'hotel in the city centre';
+    case 'house_outside_town': return 'house or villa outside town';
+    case 'campsite': return 'campsite or glamping';
+    case 'hostel': return 'hostel';
+    case 'mixed': return 'flexible accommodation';
+    default: return style;
   }
 }
 

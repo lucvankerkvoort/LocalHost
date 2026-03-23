@@ -54,7 +54,19 @@ import {
   getTripCurrentVersionForUser,
   loadTripPlanSnapshotForUser,
   saveTripPlanSnapshotForUser,
+  persistTripPreferences,
 } from '@/lib/trips/repository';
+import {
+  syncPreferencesToLegacyState,
+} from './planner-state';
+import {
+  DEFAULT_TRIP_PREFERENCES,
+  formatPreferencesForDirective,
+  getMissingRequiredFields,
+  isTripPreferencesComplete,
+  type AccommodationStyle,
+  type TripPreferences,
+} from '@/types/trip-preferences';
 
 export {
   buildPlannerRequest,
@@ -319,6 +331,16 @@ export class PlanningAgent implements Agent {
         nextState = { ...nextState, hasGenerated: true };
       }
 
+      // Sync any delta-extracted preference values into tripPreferences
+      nextState = syncDeltaToTripPreferences(nextState, delta);
+
+      // Persist updated preferences to DB so they survive new sessions
+      if (context.userId && context.tripId) {
+        persistTripPreferences(context.userId, context.tripId, nextState.tripPreferences).catch(
+          (err) => console.warn('[PlanningAgent] Failed to persist trip preferences', err)
+        );
+      }
+
       itineraryRequest = shouldGenerate ? buildPlannerRequest(nextState) : null;
       itineraryUpdateRequest = shouldUpdateItinerary ? userMessageText : null;
       const questionResult = (shouldUpdateItinerary || shouldGetCurrentItinerary)
@@ -328,6 +350,8 @@ export class PlanningAgent implements Agent {
       const nextQuestionKey = questionResult?.key;
 
       const partyLine = `Party: ${nextState.partySize ?? 'unset'} ${nextState.partyType ?? ''}`.trim();
+      const missingRequired = getMissingRequiredFields(nextState.tripPreferences);
+      const prefsComplete = missingRequired.length === 0;
       plannerDirective = `
 Planner Context:
 - Known destinations: ${nextState.destinations.length ? nextState.destinations.join(', ') : 'none'}
@@ -349,12 +373,15 @@ Planner Context:
 - Host experiences: ${typeof nextState.hostExperiences === 'boolean' ? (nextState.hostExperiences ? 'yes' : 'no') : 'unset'}
 - Host experiences per city: ${nextState.hostExperiencesPerCity ?? 'unset'}
 
+${formatPreferencesForDirective(nextState.tripPreferences)}
+
 Tool recommendations:
 - flyToLocation: ${shouldFly ? 'recommended now' : 'optional / not required now'}
-- generateItinerary: ${shouldGenerate ? 'recommended now' : 'not required now'}
+- generateItinerary: ${shouldGenerate && prefsComplete ? 'recommended now' : !prefsComplete ? `BLOCKED — collect missing required preferences first: ${missingRequired.join(', ')}` : 'not required now'}
+- updateTripPreferences: ${!isTripPreferencesComplete(nextState.tripPreferences) ? 'use this to record answers or waivers as the user provides them' : 'all preferences collected'}
 - getCurrentItinerary: ${shouldGetCurrentItinerary ? 'recommended now' : 'not required now'}
 - updateItinerary: ${shouldUpdateItinerary ? 'recommended now' : 'not required now'}
-${itineraryRequest ? `- Suggested generateItinerary request: "${itineraryRequest}"` : ''}
+${itineraryRequest && prefsComplete ? `- Suggested generateItinerary request: "${itineraryRequest}"` : ''}
 ${itineraryUpdateRequest ? `- Suggested updateItinerary request: "${itineraryUpdateRequest}"` : ''}
 ${nextQuestion ? `- If clarifying, target this gap: "${nextQuestionKey ?? 'missing info'}". Suggested phrasing: "${nextQuestion}"` : '- No clarification needed unless blocked.'}
 
@@ -460,10 +487,65 @@ Guidance:
           },
         }),
   
+        updateTripPreferences: tool({
+          description:
+            'Record a single trip preference answer or explicit waiver. Call this as soon as the user provides or skips a preference. Use value "waived" when the user opts out or says they do not care. Required fields (partyType, partySize) cannot be waived — keep asking if the user skips them.',
+          inputSchema: z.object({
+            field: z
+              .enum(['partyType', 'partySize', 'accommodationStyle', 'pace', 'budget', 'foodPreferences'])
+              .describe('Which preference field to update'),
+            value: z
+              .union([z.string(), z.number(), z.array(z.string())])
+              .describe(
+                'The answer, or the string "waived" if the user opted out. For foodPreferences use an array of strings.'
+              ),
+          }),
+          execute: async ({ field, value }) => {
+            const current = nextState.tripPreferences ?? { ...DEFAULT_TRIP_PREFERENCES };
+            const updated: TripPreferences = { ...current, [field]: value };
+            nextState = syncPreferencesToLegacyState(
+              { ...nextState, tripPreferences: updated },
+              updated
+            );
+
+            if (context.userId && context.tripId) {
+              await persistTripPreferences(context.userId, context.tripId, updated).catch((err) =>
+                console.warn('[PlanningAgent] updateTripPreferences persist failed', err)
+              );
+            }
+
+            await conversationController.updateMetadata(sessionId, {
+              ...session.metadata,
+              plannerState: { ...nextState, tripPreferences: updated },
+            });
+
+            const missing = getMissingRequiredFields(updated);
+            return {
+              updated: true,
+              field,
+              value,
+              preferences: updated,
+              complete: isTripPreferencesComplete(updated),
+              missingRequired: missing,
+            };
+          },
+        }),
+
         generateItinerary: tool({
           description: 'Generate a detailed multi-day travel itinerary. Prefer structured inputs (destinations, dates/duration, pace, budget, mustSee/avoid, transportPreference, etc.) when available; request remains backward-compatible.',
           inputSchema: GenerateItineraryInputSchema,
           execute: async (input) => {
+            // Gate: required preferences must be collected before generation
+            const missingReq = getMissingRequiredFields(nextState.tripPreferences ?? DEFAULT_TRIP_PREFERENCES);
+            if (missingReq.length > 0) {
+              return {
+                success: false,
+                blocked: true,
+                missingRequiredFields: missingReq,
+                message: `Cannot generate itinerary yet. Still need: ${missingReq.join(', ')}. Please collect these from the user first, then retry.`,
+              };
+            }
+
             try {
               const resolved = resolveGenerateItineraryRequest(input, nextState);
               let expectedVersion: number | undefined;
@@ -826,4 +908,48 @@ Guidance:
       stopWhen: stepCountIs(5),
     }) as unknown as AgentStreamResult;
   }
+}
+
+/**
+ * Sync non-null values from a PlannerDelta into tripPreferences.
+ * Only updates fields where the delta has an explicit value (not null).
+ * This captures answers the user mentioned naturally without needing a tool call.
+ */
+function syncDeltaToTripPreferences(
+  state: PlannerFlowState,
+  delta: PlannerDelta
+): PlannerFlowState {
+  const prefs = { ...state.tripPreferences };
+  let changed = false;
+
+  if (delta.partyType !== null) {
+    prefs.partyType = delta.partyType as TripPreferences['partyType'];
+    changed = true;
+  }
+  if (delta.partySize !== null) {
+    prefs.partySize = delta.partySize;
+    changed = true;
+  }
+  if (delta.pace !== null) {
+    prefs.pace = delta.pace as TripPreferences['pace'];
+    changed = true;
+  }
+  if (delta.budget !== null) {
+    prefs.budget = delta.budget as TripPreferences['budget'];
+    changed = true;
+  }
+  if (delta.foodPreferences !== null) {
+    // An empty array from a "no preference" response → treat as waived
+    prefs.foodPreferences =
+      Array.isArray(delta.foodPreferences) && delta.foodPreferences.length === 0
+        ? 'waived'
+        : (delta.foodPreferences as string[]);
+    changed = true;
+  }
+  // accommodationStyle has no delta field — only set via updateTripPreferences tool
+
+  if (!changed) return state;
+
+  const updated = { ...state, tripPreferences: prefs };
+  return syncPreferencesToLegacyState(updated, prefs);
 }

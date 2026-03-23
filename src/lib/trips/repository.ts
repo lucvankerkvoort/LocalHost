@@ -4,6 +4,10 @@ import {
   type TripPlanStopInput,
   type TripPlanWritePayload,
 } from './contracts/trip-plan.schema';
+import {
+  parseTripPreferences,
+  type TripPreferences,
+} from '@/types/trip-preferences';
 
 export type PlannerTripSeedSnapshot = {
   destinationTitles: string[];
@@ -513,5 +517,30 @@ export async function saveTripPlanSnapshotForUser(input: SaveTripPlanSnapshotFor
   return saveTripPlanPayloadForUser({
     ...input,
     stops: mapTripPlanStopsToInputPayload(input.stops),
+  });
+}
+
+export async function getTripPreferences(
+  userId: string,
+  tripId: string
+): Promise<TripPreferences | null> {
+  const prisma = await getPrismaClient();
+  const trip = await prisma.trip.findFirst({
+    where: { id: tripId, userId },
+    select: { preferences: true },
+  });
+  if (!trip) return null;
+  return parseTripPreferences(trip.preferences);
+}
+
+export async function persistTripPreferences(
+  userId: string,
+  tripId: string,
+  preferences: TripPreferences
+): Promise<void> {
+  const prisma = await getPrismaClient();
+  await prisma.trip.updateMany({
+    where: { id: tripId, userId },
+    data: { preferences: preferences as unknown as Record<string, unknown> },
   });
 }
