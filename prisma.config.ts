@@ -61,7 +61,9 @@ function withSchema(urlValue: string, schemaName: string): string {
   return parsed.toString();
 }
 
-const enableBranchIsolation = isTruthy(process.env.PRISMA_BRANCH_ISOLATION);
+// Branch isolation only applies in local dev (never in CI/production).
+const isCI = isTruthy(process.env.CI);
+const enableBranchIsolation = !isCI && isTruthy(process.env.PRISMA_BRANCH_ISOLATION);
 const baseDatabaseUrl =
   process.env.PRISMA_DEV_DATABASE_URL?.trim() || process.env.DATABASE_URL;
 const schemaName = resolveSchemaName(enableBranchIsolation);

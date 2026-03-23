@@ -1,198 +1,238 @@
-# Localhost Platform - Product Requirements Document
+# Product Requirements Document
 
-**Current Status Tracker (as of 2026-02-01)**
-See [PRD Progress](#prd-progress) section at the bottom for implementation status.
+## AI Travel App — MVP
 
----
-
-## Executive Summary
-
-**Localhost** is a **host-first** travel platform where itineraries are built around real local people and their experiences, not generic internet recommendations. 
-
-The AI generates itineraries by prioritizing host-led experiences and supplementing them with essential landmarks to preserve traveler confidence and avoid fear of missing out (FOMO). Travelers can then book, rearrange, or refine their itinerary through interaction with the AI.
-
-Localhost is not about showing travelers everything — it is about showing them the right moments to meet real people, framed within a familiar city structure.
-
-### What Localhost is NOT
-- ❌ A dating app - all interactions are activity-focused, not person-focused
-- ❌ A mass tourism platform - experiences are small-scale and intimate
-- ❌ A classified ads board - all hosts are verified, all experiences are curated
+**Version:** 1.0  
+**Status:** Draft  
+**Audience:** Engineering, Design, Product (Solo Founder)  
+**Last Updated:** March 2026
 
 ---
 
-## Core Product Philosophy (Host-First Itinerary Model)
+## 1. Overview
 
-### Hosts First, Landmarks Never Lost
-- Host-led experiences are the primary building blocks of itineraries.
-- Canonical landmarks (e.g. Empire State Building, Eiffel Tower) are included as contextual anchors, not the core offering.
-- The AI actively attempts to associate landmarks with relevant hosts.
-- When no host exists, landmarks are still shown to avoid FOMO, but clearly labeled as self-guided or contextual.
+### 1.1 Product Summary
 
-This ensures:
-- Travelers feel oriented and confident
-- Hosts feel central, not optional
-- The platform never degrades into a generic travel guide
+An AI-powered travel application that generates personalized itineraries and connects travelers with local hosts offering unique experiences. The platform features a 3D interactive globe UI, conversational AI itinerary creation, a host experience builder, and integrated booking with payments.
 
----
+### 1.2 Problem Statement
 
-## Itinerary Model
+Planning meaningful travel is fragmented and time-consuming. Travelers cobble together itineraries from multiple sources, and local hosts offering unique experiences have no dedicated platform to surface their offerings within a planning context. General-purpose AI tools can suggest itineraries but cannot connect them to real bookable experiences.
 
-### Anchor vs Context Stops
+### 1.3 Solution
 
-Each itinerary item is one of two types:
+A vertically integrated travel platform where:
 
-1. **Anchor Experience (Host-Led)**
-   - Backed by a verified local host
-   - Bookable
-   - Time-bound (e.g. "Afternoon", "Evening")
-   - The primary reason a traveler engages with the platform
-
-2. **Context Stop (Landmark / Free Exploration)**
-   - Non-bookable
-   - Provides narrative flow, orientation, and pacing
-   - Included to preserve traveler expectations and city completeness
-   - Can surround or lead into an Anchor Experience
-
-### AI Itinerary Generation Flow
-1. **City Skeleton**: AI identifies essential landmarks, neighborhoods, and city rhythm.
-2. **Host Matching**: AI searches for hosts that occur near landmarks, naturally fit time-of-day blocks, and represent cultural depth. Hosts replace or enrich parts of the skeleton where possible.
-3. **Hybrid Assembly**: Final itinerary contains Anchor Experiences as focal points and Context Stops only where hosts are unavailable/unnecessary. 
-4. **Prefill, Not Finalize**: The generated itinerary is a starting point, not a commitment. The user can book hosts, rearrange items, remove landmarks, or ask the AI to refine.
-
-The itinerary evolves through conversation, not resets.
+- Travelers use a conversational AI to generate rich, globe-visualized itineraries
+- Hosts create and publish experiences that are surfaced directly within AI-generated plans
+- End-to-end booking and payment is handled natively in-product
 
 ---
 
-## User Personas
+## 2. Goals & Success Metrics
 
-### Traveler (Guest)
-**Needs**: 
-- Discover unique, off-the-beaten-path activities
-- Feel safe meeting strangers in a new place
-- Connect meaningfully with local culture
-- Easy booking and clear expectations
+### 2.1 MVP Goals
 
-### Local Host
-**Needs**:
-- Monetize their expertise or hospitality
-- Meet interesting people from around the world
-- Flexible scheduling around their life
-- Protection from problematic guests
+| Goal                 | Description                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------- |
+| Core loop validation | A traveler can go from zero to a booked experience in a single session                |
+| Host activation      | Hosts can onboard, create an experience, and receive a payment                        |
+| AI itinerary quality | Generated itineraries include relevant host experiences, not just generic suggestions |
+| Payment reliability  | Stripe Connect handles host payouts end-to-end with no manual intervention            |
 
----
+### 2.2 Key Metrics (MVP Launch Targets)
 
-## Feature Requirements (Phase 1: MVP)
-
-### 1.1 User Authentication & Profiles
-- Email/password and social auth (Google, Apple)
-- Profile creation with photo, bio, languages, interests
-- Identity verification flow (ID check)
-- Trust badges and verification indicators
-
-### 1.2 Experience Management (Hosts)
-- Create experience with structured fields (Title, Category, Location, Duration, Size, Price, What's included, Photos)
-- Set availability calendar
-- Manage bookings (accept/decline)
-- Cancel/reschedule with policies
-
-### 1.3 Trip Planning (Travelers)
-- AI-generated host-first itinerary
-- Explicit labeling of hosted vs self-guided stops
-- Ability to rearrange items, remove context stops, or request AI refinements
-- Book hosts directly from the itinerary
-
-### 1.4 Booking Flow
-- Select date/time from availability
-- Guest count selection
-- Secure payment processing
-- Booking confirmation with details
-- Pre-experience messaging between host and guest
-
-### 1.5 Reviews & Trust
-- Two-way reviews (host reviews guest, guest reviews experience)
-- Star rating + written review
-- Review moderation
-- Trust score calculation
-
-### 1.6 Messaging
-- In-app messaging (no external contact sharing until confirmed)
-- Message templates for common questions
-- Notification system (push, email)
+- End-to-end booking completion rate > 0% (any successful booking = MVP pass)
+- Itinerary generation success rate ≥ 95% (no crashes, valid output)
+- Host onboarding to first published experience < 10 minutes
+- Stripe Connect activation rate for onboarded hosts ≥ 80%
 
 ---
 
-## Success Metrics
+## 3. Users & Personas
 
-### North Star Metric
-**Completed Experiences** - Number of experiences successfully completed per month
+### 3.1 Traveler
 
-### Supporting Metrics
-- % of itineraries containing ≥1 booked host experience
-- Host exposure per itinerary
-- Conversion rate from context stop → host booking
-- User edits per itinerary (signals engagement, not friction)
-- Booking conversion rate
-- Host activation rate (% of signups who create experience)
+**Who:** Independently-minded traveler, 25–45, plans their own trips, values authentic local experiences over packaged tours.
 
-### Strategic Guardrails
-- The platform must never generate a trip with zero hosts unless explicitly requested
-- Landmarks without hosts must never visually overpower host-led experiences
-- Hosts should feel like protagonists, not ads or upsells
-- The AI must explain why a host fits into a day, not just place them there
+**Goals:**
+
+- Plan a trip quickly without context-switching across 10 tabs
+- Discover experiences they wouldn't find on mainstream platforms
+- Book directly with confidence (secure payment, clear details)
+
+**Pain Points:**
+
+- Generic AI travel suggestions with no bookable output
+- Difficulty finding local hosts/guides outside major tourist circuits
+
+### 3.2 Host
+
+**Who:** Local guide, activity operator, or experience creator. May be a solo individual or small business.
+
+**Goals:**
+
+- Surface their experience to travelers actively in planning mode
+- Get paid reliably without a high-friction ops setup
+
+**Pain Points:**
+
+- Existing platforms charge high commissions or require large inventory
+- No way to appear in AI-generated travel suggestions
 
 ---
 
-## Technical Requirements (Recommended Stack)
+## 4. MVP Feature Scope
 
-- **Frontend**: React/Next.js with TypeScript (Mobile-first PWA)
-- **Styling**: TailwindCSS
-- **Backend**: Next.js API routes
-- **Database**: PostgreSQL with Prisma ORM
-- **Auth**: NextAuth.js
-- **Payments**: Stripe Connect
+### 4.1 In Scope
+
+#### AI Itinerary Creation
+
+- Conversational interface to generate a multi-day itinerary from natural language input (destination, dates, interests, travel style)
+- Itinerary stored as structured data (days → activities/destinations) in the database
+- Support for AI-driven itinerary updates (e.g., "add a cooking class on day 2")
+- Each itinerary item includes location metadata for globe rendering
+
+#### 3D Globe Visualization
+
+- Interactive Cesium/Resium globe rendering itinerary destinations as pins/markers
+- Camera flies to relevant destinations on itinerary load or update
+- Basic click interaction on pins to surface destination details
+
+#### Host Experience Builder
+
+- Host dashboard to create, edit, and publish experiences
+- Experience fields: title, description, location, duration, price, availability, images
+- Drafted/published state management
+- Host profile page (basic)
+
+#### Host Surfacing in Itineraries
+
+- AI itinerary generation logic queries for relevant published host experiences by destination
+- Matched host experiences are embedded within itinerary day cards
+- Traveler can view host experience detail from within the itinerary
+
+#### Host–Traveler Chat
+
+- In-app messaging between a traveler and host scoped to a specific experience
+- Initiated from the experience detail view within an itinerary
+- Basic thread UI, no real-time requirement for MVP (polling acceptable)
+
+#### Booking & Payments (Stripe Connect)
+
+- Traveler can book a host experience from within the itinerary
+- Stripe Connect onboarding flow for hosts (Express account)
+- Payment collected from traveler, platform fee deducted, remainder routed to host
+- Booking confirmation state reflected in itinerary and host dashboard
+
+#### Image System
+
+- Multi-tier image fallback chain for destination imagery: Wikimedia → Unsplash → Pexels
+- Coordinate-based geo search for relevant images
+- Dual-layer caching (in-memory + DB) to minimize redundant API calls
+
+### 4.2 Out of Scope (MVP)
+
+- Social features (trip journals, discovery feed, shareable itineraries)
+- Host profile SEO pages
+- Mobile native app (web-responsive only)
+- Reviews and ratings
+- Group bookings or split payments
+- Advanced recommendation engine (CLIP embeddings, engagement feedback loop)
+- Real-time chat (WebSockets)
+- Multi-currency support
 
 ---
 
-## PRD Progress 
+## 5. Technical Architecture
 
-*Snapshot via Codebase Inspection (2026-02-01)*
+### 5.1 Stack
 
-### Phase 1: MVP (Core Platform)
+| Layer            | Technology                                                   |
+| ---------------- | ------------------------------------------------------------ |
+| Frontend         | React / Next.js (App Router), TypeScript                     |
+| State Management | Redux                                                        |
+| 3D Globe         | Cesium / Resium                                              |
+| Backend          | Next.js API routes / Server Actions                          |
+| Database         | PostgreSQL via Prisma, PostGIS for spatial queries           |
+| AI               | Anthropic Claude API (itinerary generation, update handling) |
+| Payments         | Stripe Connect (Express)                                     |
+| Image Sources    | Wikimedia Commons, Unsplash API, Pexels API                  |
 
-#### 1.1 User Authentication & Profiles — Partial
-- Email/password + Google auth: **Implemented** (`src/auth.ts`)
-- Apple auth: **Not started**
-- Profile creation with photo/bio/languages: **Partial** (UI placeholder, no edit flow)
-- Identity verification flow: **Not started**
-- Trust badges/verification indicators: **Partial** (UI display only)
+### 5.2 Data Model (Key Entities)
 
-#### 1.2 Experience Management (Hosts) — Partial
-- Create experience fields: **Partial** (draft + publish flow, limited schema)
-- Availability calendar: **Partial** (implemented but time-slot oriented; needs date-only alignment)
-- Manage bookings (accept/decline): **Not started**
-- Cancel/reschedule with policies: **Not started**
+- **User** — traveler or host account
+- **Trip** — top-level container for an itinerary (belongs to traveler)
+- **ItineraryDay** — a single day within a trip
+- **ItineraryItem** — activity or destination within a day (linked to destination knowledge or host experience)
+- **Destination** — reusable destination knowledge record (coordinates, images, metadata)
+- **Experience** — host-created bookable item
+- **Booking** — records a traveler booking an experience (status, Stripe payment intent)
+- **Message** — chat message between traveler and host scoped to a booking/experience
 
-#### 1.3 Discovery & Trip Planning — Partial
-- AI trip planning (itinerary builder): **Partial/strong** (`globe-itinerary.tsx`)
-- Browse experiences by location: **Partial** (map/globe only, no browse page)
-- Search Sort/Filters: **Not started** (components exist, not wired)
-- Experience detail page with host profile: **Not started**
+### 5.3 Known Technical Risks (MVP)
 
-#### 1.4 Booking Flow — Partial
-- Select date/time from availability: **Not started** (availability not connected to booking)
-- Guest count selection: **Partial** (booking widget only)
-- Secure payment processing: **Partial** (Stripe Connect wired, not stable)
-- Booking confirmation with details: **Partial**
-- Pre-experience messaging: **Partial** (`p2p-chat-slice.ts`)
+| Risk                               | Description                                                                   | Mitigation                                                                                               |
+| ---------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Sequential AI update corruption    | Multiple rapid AI calls to update itinerary corrupt state and globe rendering | Serialize update calls; debounce user-triggered updates; optimistic UI with rollback                     |
+| Image API rate limits              | High itinerary generation volume could exhaust free-tier image API quotas     | Aggressive caching at city/destination level; fallback chain ensures graceful degradation                |
+| Stripe Connect activation drop-off | Hosts may abandon the Express onboarding flow                                 | Defer Stripe activation prompt until host is ready to publish; allow draft experiences before activation |
 
-#### 1.5 Reviews & Trust — Not started / UI only
-- Two-way reviews: **Not started** (schema present, no flow)
-- Star rating + written review UI: **Partial** (component only)
+---
 
-#### 1.6 Messaging — Partial
-- In-app messaging: **Partial** (booking-based messaging exists)
+## 6. UX & Design Requirements
 
-#### Notes / Known Gaps
-- Availability is currently time-slot oriented but product direction is date-only.
-- Stripe Connect is wired but currently failing (reported). Needs investigation.
-- Traveler-facing experience detail and browse pages are missing.
+### 6.1 Core Flows
+
+**Traveler — Create & Book**
+
+1. Land on home → enter destination + travel details
+2. AI generates itinerary → rendered on globe + day cards
+3. Day card shows matched host experiences inline
+4. Tap experience → detail modal → initiate chat or book
+5. Complete Stripe checkout → booking confirmed
+
+**Host — Onboard & Publish**
+
+1. Sign up as host → complete basic profile
+2. Create experience (form) → save as draft
+3. Activate Stripe Connect → publish experience
+4. Receive booking notification → fulfill experience
+
+### 6.2 Design Principles
+
+- **Globe-first:** The 3D globe is the hero element, not a decorative one. Every destination interaction should feel spatial and tactile.
+- **AI as assistant, not oracle:** The itinerary is editable. Users should feel in control, not locked into AI output.
+- **Host parity:** Host-facing UI should feel like a product, not an afterthought. Simple, clear, trustworthy.
+- **Progressive disclosure:** Booking details, payment flows, and chat should surface contextually, not clutter the planning view.
+
+---
+
+## 7. Open Questions
+
+| #   | Question                                                                                               | Owner       | Status |
+| --- | ------------------------------------------------------------------------------------------------------ | ----------- | ------ |
+| 1   | What is the platform fee percentage for MVP?                                                           | Founder     | Open   |
+| 2   | Should host experiences surface in itineraries pre-booking, or only after traveler expresses interest? | Design      | Open   |
+| 3   | What is the minimum viable host profile required before an experience can be published?                | Product     | Open   |
+| 4   | Is polling sufficient for MVP chat, or is there a latency threshold that breaks UX?                    | Engineering | Open   |
+| 5   | How should the itinerary handle destinations with zero matching host experiences?                      | Design / AI | Open   |
+
+---
+
+## 8. MVP Launch Checklist
+
+- [ ] AI itinerary generation stable (no state corruption on sequential updates)
+- [ ] Globe renders all itinerary destinations correctly
+- [ ] Host experience creation and publishing flow complete
+- [ ] Host experiences surface within relevant AI itineraries
+- [ ] Host–traveler chat functional (polling)
+- [ ] Stripe Connect onboarding live (not test mode)
+- [ ] End-to-end booking completed at least once in production
+- [ ] Image fallback chain stable with caching in place
+- [ ] Basic error handling and fallback states for all AI calls
+- [ ] Mobile-responsive layout for core traveler flows
+
+---
+
+_This document is a living reference. Update version number and status as scope changes._

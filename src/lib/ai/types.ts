@@ -45,6 +45,17 @@ export const HostCardSchema = z.object({
 
 // --- orchestrator domain models ---
 
+export const ExperienceItemSchema = z.object({
+  id: z.string().describe('Experience ID from the platform'),
+  title: z.string().describe('Experience title, e.g. "Traditional Cooking Class"'),
+  description: z.string(),
+  photo: z.string().optional(),
+  hostId: z.string().optional(),
+  hostName: z.string().optional(),
+  duration: z.number().optional().describe('Duration in minutes'),
+  price: z.number().optional().describe('Price in cents'),
+});
+
 export const ActivitySchema = z.object({
   id: z.string(),
   place: PlaceSchema,
@@ -67,7 +78,8 @@ export const DayPlanSchema = z.object({
     .optional()
     .describe('Inter-city transport mode to the next day (null if last day or no travel)'),
   navigationEvents: z.array(NavigationActionSchema).optional(),
-  suggestedHosts: z.array(HostCardSchema).describe('List of >= 6 hosts near the anchor'),
+  suggestedHosts: z.array(HostCardSchema).describe('List of hosts near the anchor'),
+  experienceItems: z.array(ExperienceItemSchema).optional().describe('Top matched local experiences to inject into the itinerary for this day'),
 });
 
 export const ItineraryPlanSchema = z.object({
@@ -90,6 +102,7 @@ export type GeoPoint = z.infer<typeof GeoPointSchema>;
 export type Place = z.infer<typeof PlaceSchema>;
 export type NavigationAction = z.infer<typeof NavigationActionSchema>;
 export type HostCard = z.infer<typeof HostCardSchema>;
+export type ExperienceItem = z.infer<typeof ExperienceItemSchema>;
 export type Activity = z.infer<typeof ActivitySchema>;
 export type DayPlan = z.infer<typeof DayPlanSchema>;
 export type ItineraryPlan = z.infer<typeof ItineraryPlanSchema>;

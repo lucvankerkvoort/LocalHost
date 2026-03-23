@@ -27,6 +27,7 @@ interface ItineraryDayProps {
   onEditItem?: (item: ItineraryItemType) => void;
   onDeleteItem?: (itemId: string) => void;
   onBookItem?: (item: ItineraryItemType) => void;
+  onChatItem?: (item: ItineraryItemType) => void;
 }
 
 export function ItineraryDayColumn({
@@ -46,6 +47,7 @@ export function ItineraryDayColumn({
   onEditItem,
   onDeleteItem,
   onBookItem,
+  onChatItem,
 }: ItineraryDayProps) {
   const headline = resolveItineraryDayHeadline(date, title, dayNumber);
   const caption = resolveItineraryDayCaption(date, title, city, dayNumber);
@@ -122,7 +124,7 @@ export function ItineraryDayColumn({
                             )}
                         </div>
                         <h4 className={`font-medium text-[var(--foreground)] truncate pr-6 ${isAnchor ? 'text-sm' : 'text-xs'}`}>
-                            {item.title.replace(/\b\w/g, (c) => c.toUpperCase())}
+                            {item.title.replace(/(?:^|\s)\p{L}/gu, m => m.toUpperCase())}
                         </h4>
 
                         {/* Location / Address Line */}
@@ -159,21 +161,51 @@ export function ItineraryDayColumn({
                     </div>
                 </div>
                 
-                 {/* Actions (hover only) */}
-                <div className="absolute top-2 right-2 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center gap-1">
-                     {onBookItem && isHostedExperience && (
-                         <button 
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onBookItem(item);
-                            }}
-                            className="px-2 py-1 rounded-md bg-[var(--princeton-orange)] text-white text-xs font-bold hover:bg-[var(--princeton-dark)]"
-                            title="Book Experience"
-                         >
-                            Book
-                         </button>
-                     )}
-                </div>
+                 {/* Actions (hover only) - non-hosted */}
+                {!isHostedExperience && (
+                    <div className="absolute top-2 right-2 opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center gap-1">
+                    </div>
+                )}
+
+                {/* Hosted experience footer: host avatar + CTA buttons */}
+                {isHostedExperience && (
+                    <div className="mt-3 pt-2.5 border-t border-[var(--border)] flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                            {item.hostPhoto ? (
+                                <img
+                                    src={item.hostPhoto}
+                                    alt={item.hostName ?? 'Host'}
+                                    className="w-7 h-7 rounded-full object-cover flex-shrink-0 border border-[var(--border)]"
+                                />
+                            ) : (
+                                <div className="w-7 h-7 rounded-full bg-[var(--princeton-orange)]/20 flex items-center justify-center flex-shrink-0 text-[var(--princeton-orange)] text-xs font-bold">
+                                    {(item.hostName ?? 'H')[0].toUpperCase()}
+                                </div>
+                            )}
+                            {item.hostName && (
+                                <span className="text-xs text-[var(--muted-foreground)] truncate">{item.hostName}</span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {onChatItem && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onChatItem(item); }}
+                                    className="px-2.5 py-1 rounded-md border border-[var(--border)] text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted)]/30 transition-colors"
+                                >
+                                    Chat
+                                </button>
+                            )}
+                            {onBookItem && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onBookItem(item); }}
+                                    className="px-2.5 py-1 rounded-md bg-[var(--princeton-orange)] text-white text-xs font-bold hover:bg-[var(--princeton-dark)] transition-colors"
+                                >
+                                    Book
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
             );
         })}

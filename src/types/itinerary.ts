@@ -28,6 +28,8 @@ export interface ItineraryItem {
   startTime?: string; // HH:MM format
   endTime?: string;
   hostId?: string; // Future: link to Localhost experience
+  hostName?: string; // Cached host display name
+  hostPhoto?: string; // Cached host profile photo URL
   experienceId?: string; // Specific experience ID
   status?: 'DRAFT' | 'PENDING' | 'BOOKED' | 'FAILED';
   candidateId?: string; // Link to ExperienceCandidate for booking

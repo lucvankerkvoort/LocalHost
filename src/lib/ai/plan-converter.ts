@@ -195,7 +195,7 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
     const currentCity = day.city || extractCityName(anchorLocation);
 
     // Create items first to preserve IDs
-    const dayItems = day.activities.map((act, idx): ItineraryItem => {
+    const activityItems = day.activities.map((act, idx): ItineraryItem => {
       // ... (existing mapping logic) ...
         // Map category to item type
         let type: ItineraryItemType = 'EXPERIENCE'; // Default to Anchor/Experience
@@ -205,14 +205,6 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
             type = 'SIGHT'; // Context Stop
         } else if (cat === 'restaurant' || cat === 'cafe' || cat === 'food') {
             type = 'MEAL';
-        }
-
-        // Assign a host if available and appropriate
-        let hostId: string | undefined;
-        if ((type === 'EXPERIENCE' || type === 'MEAL') && day.suggestedHosts && day.suggestedHosts.length > 0) {
-            // Simple logic: cycle through hosts based on index to distribute them
-            const hostIndex = idx % day.suggestedHosts.length;
-            hostId = day.suggestedHosts[hostIndex].id;
         }
 
         const placeImageUrl = act.place.imageUrl
@@ -228,7 +220,7 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
         return {
           id: buildItemId(day.dayNumber, act.place.id, idx),
           type,
-          title: act.place.name,
+          title: act.place.name.replace(/\s*\(hosted\)\s*/gi, '').trim(),
           position: idx,
           description: act.notes,
           location: act.place.description || act.place.address || `${act.timeSlot}`,
@@ -244,14 +236,46 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
             imageUrls: act.place.imageUrls,
           },
           category: act.place.category,
-          hostId,
         } as ItineraryItem;
     });
+
+    // Inject the best matched local experience inline at the midpoint of the day's activities.
+    const insertAt = Math.ceil(activityItems.length / 2);
+    const experienceActivities: ItineraryItem[] = (day.experienceItems ?? []).map((exp) => {
+      return {
+        id: `day-${day.dayNumber}-exp-${exp.id}`,
+        type: 'EXPERIENCE' as const,
+        title: exp.title,
+        description: exp.description,
+        position: insertAt,
+        hostId: exp.hostId,
+        hostName: exp.hostName,
+        hostPhoto: exp.photo,
+        experienceId: exp.id,
+        status: 'DRAFT' as const,
+        duration: exp.duration,
+        place: {
+          id: `exp-place-${exp.id}`,
+          name: exp.hostName ? `${exp.hostName}'s experience` : exp.title,
+          location: {
+            lat: resolvedAnchor.location.lat,
+            lng: resolvedAnchor.location.lng,
+          },
+          city: currentCity ?? undefined,
+        },
+      };
+    });
+
+    const dayItems = [
+      ...activityItems.slice(0, insertAt),
+      ...experienceActivities,
+      ...activityItems.slice(insertAt),
+    ];
 
     // MARKER CONSOLIDATION LOGIC:
     // DISABLED: We want each day to be a distinct column in the UI.
     // The globe component handles visual clustering of markers sharing the same city.
-    
+
     // Create NEW destination from anchor location (One destination per day)
     const destination: GlobeDestination = {
       id: buildDestinationId(day.dayNumber),

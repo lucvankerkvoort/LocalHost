@@ -5,6 +5,25 @@ import { conversationController } from '@/lib/conversation/controller';
 import { validateAgentOutput, withExecution } from '@/lib/agent-constraints';
 import type { HostOnboardingStage } from '@/lib/agents/agent';
 import { rateLimit } from '@/lib/api/rate-limit';
+import { z } from 'zod';
+
+const ChatRequestSchema = z.object({
+  messages: z.array(z.object({
+    role: z.string(),
+    // AI SDK v6 uses `parts` instead of `content` — make content optional
+    content: z.union([z.string(), z.array(z.unknown())]).optional(),
+  }).passthrough()).min(1),
+  id: z.string().optional(),
+  // Trip IDs are CUIDs, not UUIDs
+  tripId: z.string().min(1).optional(),
+  intent: z.string().optional(),
+  onboardingStage: z.string().optional(),
+  execution: z.object({
+    activeAgent: z.string(),
+    enabledSkills: z.array(z.string()),
+    expectedOutput: z.string().optional(),
+  }).optional(),
+});
 
 export const maxDuration = 300; // Allow 5 minutes for generation
 
@@ -42,37 +61,30 @@ export async function POST(req: Request) {
 
   const session = await auth();
   const body = await req.json();
-  const { messages, id, tripId } = body;
-  
-  // Validate messages
-  if (!messages || !Array.isArray(messages) || messages.length === 0) {
-    return new Response(JSON.stringify({ error: 'No messages provided' }), {
+  const parsedBody = ChatRequestSchema.safeParse(body);
+  if (!parsedBody.success) {
+    return new Response(JSON.stringify({ error: 'Invalid input', issues: parsedBody.error.issues }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
   }
+  const { messages, id, tripId } = parsedBody.data;
 
   // Convert UIMessage[] from client to CoreMessage[] for streamText
   const modelMessages = await convertToModelMessages(messages);
 
   // Check if intent was explicitly provided in the request body
-  const requestedIntent = body.intent;
-  
+  const requestedIntent = parsedBody.data.intent;
+
   // Determine intent (routing)
   // If explicitly provided (e.g., from become-host page), use that. Otherwise, let router decide.
   const intent = requestedIntent || await agentRouter.route(modelMessages);
-  
+
   // Get the appropriate agent
   const agent = agentRouter.getAgent(intent);
-  
-  console.log(`[API] Routing to agent: ${agent.name} (intent: ${intent})`);
 
   // Delegate processing to the agent
-  const execution = body.execution as {
-    activeAgent: string;
-    enabledSkills: string[];
-    expectedOutput?: string;
-  } | undefined;
+  const execution = parsedBody.data.execution;
   const strictConstraints = process.env.AGENT_CONSTRAINTS_STRICT === 'true';
 
   if (strictConstraints && !execution) {
@@ -88,7 +100,7 @@ export async function POST(req: Request) {
     });
   }
 
-  const onboardingStage = parseOnboardingStage(body.onboardingStage);
+  const onboardingStage = parseOnboardingStage(parsedBody.data.onboardingStage);
   const runAgent = () =>
     agent.process(modelMessages, {
       userId: session?.user?.id,
