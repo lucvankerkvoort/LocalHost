@@ -30,6 +30,7 @@ import {
   resolveItineraryItemImageUrl,
 } from './itinerary-utils';
 import { OrchestratorJobStatus } from './orchestrator-job-status';
+import { TripPreferencesWidget } from './trip-preferences-widget';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   hydrateGlobeState,
@@ -1717,6 +1718,8 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
         onClose={() => setPaymentModalState({ isOpen: false, bookingId: '', hostId: '', hostName: '', hostPhoto: '' })}
         onSuccess={handlePaymentSuccess}
       />
+
+      {tripId != null && <TripPreferencesWidget tripId={tripId} />}
     </div>
   );
 }
