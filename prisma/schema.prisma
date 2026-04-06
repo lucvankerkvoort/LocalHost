@@ -203,6 +203,8 @@ model Trip {
   startDate   DateTime?
   endDate     DateTime?
 
+  itineraryData Json?   // JSONB blob — replaces TripAnchor/ItineraryDay/ItineraryItem hierarchy (LH-101)
+
   stops       TripAnchor[]
   revisions   TripRevision[]
   bookings    Booking[]
