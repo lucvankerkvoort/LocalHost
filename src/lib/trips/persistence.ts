@@ -176,6 +176,12 @@ async function persistTripPlanCore(
     const nextTitle =
       typeof title === 'string' && title.trim().length > 0 ? title.trim() : txTrip.title;
 
+    const revisionPayload = sanitizeJsonValue({
+      stops,
+      preferences: nextPreferences,
+      title: nextTitle,
+    });
+
     await tx.trip.update({
       where: { id: tripId },
       data: {
@@ -185,13 +191,8 @@ async function persistTripPlanCore(
         status: 'PLANNED',
         preferences: nextPreferences,
         currentVersion: nextVersion,
+        itineraryData: revisionPayload,
       },
-    });
-
-    const revisionPayload = sanitizeJsonValue({
-      stops,
-      preferences: nextPreferences,
-      title: nextTitle,
     });
 
     await tx.tripRevision.create({

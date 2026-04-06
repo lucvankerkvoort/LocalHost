@@ -43,7 +43,7 @@ test('isHostedExperienceItem requires EXPERIENCE type with hostId and experience
 
   assert.equal(isHostedExperienceItem(hosted), true);
   assert.equal(isHostedExperienceItem(notHosted), false);
-  assert.equal(isHostedExperienceItem(missingExperienceId), false);
+  assert.equal(isHostedExperienceItem(missingExperienceId), true); // experienceId not required — static/curated hosts have no FK
   assert.equal(isHostedExperienceItem(otherType), false);
 });
 
