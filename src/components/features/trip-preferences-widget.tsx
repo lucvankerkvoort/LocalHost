@@ -151,7 +151,7 @@ export function TripPreferencesWidget({ tripId }: Props) {
         else body.pace = null;
         if (next.budget) body.budget = next.budget as TripPreferencesPatch['budget'];
         else body.budget = null;
-        if (next.transportMode) body.transportMode = next.transportMode;
+        if (next.transportMode) body.transportMode = next.transportMode as TripPreferencesPatch['transportMode'];
         else body.transportMode = null;
 
         fetch(`/api/trips/${tripId}/preferences`, {
@@ -170,6 +170,13 @@ export function TripPreferencesWidget({ tripId }: Props) {
     (field: keyof TripPreferences, value: string) => {
       setPrefs((prev) => {
         const next = { ...prev, [field]: value };
+        // Auto-derive durationDays whenever both dates are present
+        if ((field === 'startDate' || field === 'endDate') && next.startDate && next.endDate) {
+          const days = Math.round(
+            (new Date(next.endDate).getTime() - new Date(next.startDate).getTime()) / 86_400_000
+          );
+          if (days > 0) next.durationDays = String(days);
+        }
         patch(next);
         return next;
       });
@@ -194,7 +201,7 @@ export function TripPreferencesWidget({ tripId }: Props) {
       <div
         {...dragHandleProps}
         className={`flex items-center justify-between rounded-t-xl px-3 py-2 select-none
-          bg-white/10 backdrop-blur-md border border-white/15 border-b-0
+          bg-gray-900/85 backdrop-blur-md border border-white/20 border-b-0
           ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
       >
         <div className="flex items-center gap-1.5">
@@ -212,7 +219,7 @@ export function TripPreferencesWidget({ tripId }: Props) {
 
       {/* Body */}
       {!collapsed && (
-        <div className="rounded-b-xl bg-white/5 backdrop-blur-md border border-white/15 border-t-0 px-3 py-3 flex flex-col gap-3">
+        <div className="rounded-b-xl bg-gray-900/80 backdrop-blur-md border border-white/20 border-t-0 px-3 py-3 flex flex-col gap-3">
           {/* Dates */}
           <div className="grid grid-cols-2 gap-2">
             <div>

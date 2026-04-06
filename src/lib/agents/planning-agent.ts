@@ -52,6 +52,7 @@ import {
 } from './planner-generate';
 import {
   getTripCurrentVersionForUser,
+  getPlannerTripSeedForUser,
   loadTripPlanSnapshotForUser,
   saveTripPlanSnapshotForUser,
 } from '@/lib/trips/repository';
@@ -531,6 +532,37 @@ Guidance:
               return {
                 success: false,
                 error: 'Failed to generate itinerary. Please try again.',
+              };
+            }
+          },
+        }),
+
+        getTripPreferences: tool({
+          description:
+            'Fetch the trip preferences the user pre-filled in the Trip Details form (dates, duration, party size, group type, pace, budget, transport mode). Call this at the start of any planning request when a tripId is available, before asking clarifying questions.',
+          inputSchema: z.object({}),
+          execute: async () => {
+            if (!context.userId || !context.tripId) {
+              return { success: false, error: 'No active trip.' };
+            }
+            try {
+              const seed = await getPlannerTripSeedForUser(context.userId, context.tripId);
+              if (!seed) return { success: false, error: 'Trip not found.' };
+              return {
+                success: true,
+                startDate: seed.startDate,
+                endDate: seed.endDate,
+                durationDays: seed.preferences.durationDays,
+                partySize: seed.preferences.partySize,
+                partyType: seed.preferences.partyType,
+                pace: seed.preferences.pace,
+                budget: seed.preferences.budget,
+                transportMode: seed.preferences.transportMode,
+              };
+            } catch (error) {
+              return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to load preferences.',
               };
             }
           },

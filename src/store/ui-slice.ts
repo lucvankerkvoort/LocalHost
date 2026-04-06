@@ -1,6 +1,11 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from './store';
 
+interface PendingPlannerTrigger {
+  text: string;
+  tripId: string;
+}
+
 interface UIState {
   isP2PChatOpen: boolean;
   contactHostId: string | null;
@@ -8,6 +13,7 @@ interface UIState {
   showTimeline: boolean;
   isItineraryCollapsed: boolean;
   itineraryPanelTab: 'ITINERARY' | 'EXPERIENCES';
+  pendingPlannerTrigger: PendingPlannerTrigger | null;
 }
 
 const initialState: UIState = {
@@ -17,6 +23,7 @@ const initialState: UIState = {
   showTimeline: true,
   isItineraryCollapsed: false,
   itineraryPanelTab: 'ITINERARY',
+  pendingPlannerTrigger: null,
 };
 
 export const uiSlice = createSlice({

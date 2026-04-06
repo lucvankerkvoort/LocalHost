@@ -8,6 +8,16 @@ import {
 export type PlannerTripSeedSnapshot = {
   destinationTitles: string[];
   hasPersistedItineraryDays: boolean;
+  startDate: string | null;
+  endDate: string | null;
+  preferences: {
+    durationDays: number | null;
+    partySize: number | null;
+    partyType: string | null;
+    pace: string | null;
+    budget: string | null;
+    transportMode: string | null;
+  };
 };
 
 export type TripPlanItemSnapshot = {
@@ -235,6 +245,9 @@ export async function getPlannerTripSeedForUser(
     },
     select: {
       id: true,
+      startDate: true,
+      endDate: true,
+      preferences: true,
     },
   });
 
@@ -258,9 +271,23 @@ export async function getPlannerTripSeedForUser(
     },
   });
 
+  const prefs = (typeof trip.preferences === 'object' && trip.preferences !== null && !Array.isArray(trip.preferences))
+    ? (trip.preferences as Record<string, unknown>)
+    : {};
+
   return {
     destinationTitles,
     hasPersistedItineraryDays: persistedItineraryDayCount > 0,
+    startDate: trip.startDate ? trip.startDate.toISOString().slice(0, 10) : null,
+    endDate: trip.endDate ? trip.endDate.toISOString().slice(0, 10) : null,
+    preferences: {
+      durationDays: typeof prefs.durationDays === 'number' ? prefs.durationDays : null,
+      partySize: typeof prefs.partySize === 'number' ? prefs.partySize : null,
+      partyType: typeof prefs.partyType === 'string' ? prefs.partyType : null,
+      pace: typeof prefs.pace === 'string' ? prefs.pace : null,
+      budget: typeof prefs.budget === 'string' ? prefs.budget : null,
+      transportMode: typeof prefs.transportMode === 'string' ? prefs.transportMode : null,
+    },
   };
 }
 

@@ -138,14 +138,28 @@ export async function seedPlannerStateFromTrip(
 
     if (destinations.length === 0) return state;
 
+    const { preferences: seedPrefs } = seed;
     return {
       ...state,
       destinations,
       destinationScope: destinations.length > 1 ? 'multi_city' : 'city',
       needsCities: false,
-      // Prevent auto-regeneration only when the trip already has persisted itinerary days.
-      // Anchors alone are not enough to assume an itinerary was generated.
       hasGenerated: state.hasGenerated || seed.hasPersistedItineraryDays,
+      // Seed form preferences — only fill gaps, never overwrite values already in the session
+      startDate: state.startDate ?? seed.startDate ?? undefined,
+      endDate: state.endDate ?? seed.endDate ?? undefined,
+      durationDays: state.durationDays ?? seedPrefs.durationDays ?? (() => {
+        const s = state.startDate ?? seed.startDate;
+        const e = state.endDate ?? seed.endDate;
+        if (!s || !e) return undefined;
+        const days = Math.round((new Date(e).getTime() - new Date(s).getTime()) / 86_400_000);
+        return days > 0 ? days : undefined;
+      })(),
+      partySize: state.partySize ?? seedPrefs.partySize ?? undefined,
+      partyType: state.partyType ?? seedPrefs.partyType ?? undefined,
+      budget: state.budget ?? (seedPrefs.budget as PlannerFlowState['budget'] | null) ?? undefined,
+      pace: state.pace ?? (seedPrefs.pace as PlannerFlowState['pace'] | null) ?? undefined,
+      transportPreference: state.transportPreference ?? seedPrefs.transportMode ?? undefined,
     };
   } catch (error) {
     console.warn('[PlanningAgent] Failed to seed planner state from trip', {
