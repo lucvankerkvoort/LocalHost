@@ -973,6 +973,20 @@ model Activity {
   @@index([engagementScore])
 }
 
+// Shared read cache for AI-generated city plans. Not user data.
+model CityPlanCache {
+  id           String   @id @default(cuid())
+  city         String
+  country      String
+  durationDays Int
+  plans        Json     // array of ItineraryPlan, max 5
+  updatedAt    DateTime @updatedAt
+  expiresAt    DateTime
+
+  @@unique([city, country, durationDays])
+  @@index([city, country])
+}
+
 enum ExternalApiProvider {
   GOOGLE_PLACES
   GOOGLE_ROUTES

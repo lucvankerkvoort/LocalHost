@@ -35,6 +35,15 @@ import {
 import { validatePacing } from './validation/pacing-validator';
 import { OPENAI_ORCHESTRATOR_MODEL } from './model-config';
 import { prisma } from '@/lib/prisma';
+import {
+  getCityActivityPool,
+  mergeCityActivityPool,
+  setGenerationProgress,
+  clearGenerationProgress,
+  minCityActivities,
+  getCityPlanFromPool,
+  storeCityPlan,
+} from '@/lib/cache/ai-cache';
 
 // Define the shape of the initial draft from the LLM - simpler than proper schema to give it freedom before hydration
 const DraftItinerarySchema = z.object({
@@ -973,10 +982,23 @@ Rules:
             );
             return [] as ActivitySearchResult[];
           }
-          return searchActivitiesSemantic(`${destination.city}, ${destination.country}. ${prompt}`, {
-            cityId: cityRow.id,
-            limit: perCityLimit,
-          });
+
+          // Use Redis city pool if it has enough activities.
+          const cachedPool = await getCityActivityPool(destination.city, destination.country);
+          const min = minCityActivities();
+          if (cachedPool && cachedPool.length >= min) {
+            console.log(
+              `[Orchestrator] City pool cache hit for ${destination.city}, ${destination.country} (${cachedPool.length} activities)`
+            );
+            return cachedPool.slice(0, perCityLimit);
+          }
+
+          const results = await searchActivitiesSemantic(
+            `${destination.city}, ${destination.country}. ${prompt}`,
+            { cityId: cityRow.id, limit: perCityLimit },
+          );
+          mergeCityActivityPool(destination.city, destination.country, results).catch(() => {});
+          return results;
         })
       );
 
@@ -1066,7 +1088,23 @@ Rules:
       };
     }
 
-    const inventory = await searchActivitiesSemantic(prompt, { limit: 50, cityId: cityRow.id });
+    // Check Redis city pool before hitting the DB + embedding API.
+    // If the pool has enough activities, skip the expensive vector search entirely.
+    const cachedPool = await getCityActivityPool(seed.city, seed.country);
+    const min = minCityActivities();
+    let inventory: ActivitySearchResult[];
+
+    if (cachedPool && cachedPool.length >= min) {
+      console.log(
+        `[Orchestrator] City pool cache hit for ${seed.city}, ${seed.country} (${cachedPool.length} activities)`
+      );
+      inventory = cachedPool;
+    } else {
+      inventory = await searchActivitiesSemantic(prompt, { limit: 50, cityId: cityRow.id });
+      // Write-back: grow the pool for future requests (fire-and-forget).
+      mergeCityActivityPool(seed.city, seed.country, inventory).catch(() => {});
+    }
+
     const enforceInventoryOnly = shouldEnforceStrictInventoryDraft({
       scope: seed.scope,
       inventoryCount: inventory.length,
@@ -1105,21 +1143,80 @@ Rules:
    * Main entry point: Plan a trip based on user instructions.
    */
   async planTrip(userPrompt: string): Promise<ItineraryPlan> {
-    console.log(`[Orchestrator] Starting plan for: "${userPrompt}"`);
-    const draftInventory = await this.prepareDraftInventory(userPrompt);
+    // Track in-progress generation state in Redis so partial progress
+    // survives a timeout and is observable without polling the DB.
+    const generationId = crypto.randomUUID();
+    const startedAt = Date.now();
 
-    // Step 1: Draft the high-level structure
-    const draft = await this.draftItinerary(userPrompt, draftInventory.inventory, {
-      enforceInventoryOnly: draftInventory.enforceInventoryOnly,
+    await setGenerationProgress(generationId, {
+      status: 'in_progress',
+      daysProcessed: 0,
+      totalDays: null,
+      startedAt,
+      updatedAt: startedAt,
     });
-    console.log(`[Orchestrator] Drafted ${draft.days.length} days.`);
-    this.callbacks.onDraftComplete?.(draft);
 
-    const tripAnchor = await this.resolveTripAnchor(draft);
-    const finalPlan = await this.planTripFromDraft(userPrompt, draft, tripAnchor, draftInventory.inventory);
+    // Wrap onDayProcessed so each resolved day updates the progress key.
+    const originalOnDayProcessed = this.callbacks.onDayProcessed;
+    this.callbacks.onDayProcessed = (dayNum: number, total: number) => {
+      originalOnDayProcessed?.(dayNum, total);
+      setGenerationProgress(generationId, {
+        status: 'in_progress',
+        daysProcessed: dayNum,
+        totalDays: total,
+        startedAt,
+        updatedAt: Date.now(),
+      }).catch(() => {/* fire-and-forget, non-fatal */});
+    };
 
-    console.log(`[Orchestrator] Plan generated successfully.`);
-    return finalPlan;
+    try {
+      console.log(`[Orchestrator] Starting plan for: "${userPrompt}"`);
+      const draftInventory = await this.prepareDraftInventory(userPrompt);
+
+      // L2: Check plan pool before running the expensive LLM + geocoding pipeline.
+      const { seed } = draftInventory;
+      const l2City = seed.scope === 'single_city' ? seed.city : null;
+      const l2Country = seed.scope === 'single_city' ? seed.country : null;
+      const l2Duration = draftInventory.durationDays;
+
+      if (l2City && l2Country && l2Duration) {
+        const cached = await getCityPlanFromPool(l2City, l2Country, l2Duration);
+        if (cached) {
+          await clearGenerationProgress(generationId);
+          console.log(`[Orchestrator] L2 plan pool hit for ${l2City} ${l2Duration}d — returning cached plan.`);
+          return cached;
+        }
+      }
+
+      const draft = await this.draftItinerary(userPrompt, draftInventory.inventory, {
+        enforceInventoryOnly: draftInventory.enforceInventoryOnly,
+      });
+      console.log(`[Orchestrator] Drafted ${draft.days.length} days.`);
+      this.callbacks.onDraftComplete?.(draft);
+
+      const tripAnchor = await this.resolveTripAnchor(draft);
+      const finalPlan = await this.planTripFromDraft(userPrompt, draft, tripAnchor, draftInventory.inventory);
+
+      // L2: Store in plan pool for future requests (fire-and-forget).
+      if (l2City && l2Country && l2Duration) {
+        storeCityPlan(l2City, l2Country, l2Duration, finalPlan).catch(() => {});
+      }
+
+      await clearGenerationProgress(generationId);
+      console.log(`[Orchestrator] Plan generated successfully.`);
+      return finalPlan;
+    } catch (err) {
+      await setGenerationProgress(generationId, {
+        status: 'failed',
+        daysProcessed: 0,
+        totalDays: null,
+        startedAt,
+        updatedAt: Date.now(),
+      }).catch(() => {});
+      throw err;
+    } finally {
+      this.callbacks.onDayProcessed = originalOnDayProcessed;
+    }
   }
 
   /**
