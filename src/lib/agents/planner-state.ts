@@ -3,6 +3,8 @@ import type { AgentContext } from './agent';
 import { normalizeDestinations } from './planner-helpers';
 import type { PlannerSnapshot as ControllerPlannerSnapshot } from './generation-controller';
 import { getPlannerTripSeedForUser } from '@/lib/trips/repository';
+import type { TravelProfile } from '@/lib/travel-profile/types';
+import { STYLE_TRANSPORT_DEFAULTS } from '@/lib/travel-profile/types';
 
 const PLANNER_ONBOARDING_START_TOKEN = 'ACTION:START_PLANNER';
 
@@ -120,6 +122,26 @@ export function isPlannerOnboardingTriggerMessage(text: string): boolean {
     trimmed === PLANNER_ONBOARDING_START_TOKEN ||
     trimmed.startsWith(`${PLANNER_ONBOARDING_START_TOKEN}:`)
   );
+}
+
+// Pre-fills planner state from saved profile so the agent skips redundant questions.
+// Only applies when the profile has been explicitly completed by the user.
+export function seedPlannerStateFromProfile(
+  state: PlannerFlowState,
+  profile: TravelProfile | null | undefined
+): PlannerFlowState {
+  if (!profile || !profile.completedAt) return state;
+
+  const styleTransport = STYLE_TRANSPORT_DEFAULTS[profile.travelStyle];
+
+  return {
+    ...state,
+    pace: state.pace ?? (profile.pace.toLowerCase() as PlannerFlowState['pace']),
+    budget: state.budget ?? (profile.budget.toLowerCase() as PlannerFlowState['budget']),
+    transportPreference:
+      state.transportPreference ?? styleTransport ?? profile.transportPreference ?? undefined,
+    partyType: state.partyType ?? profile.groupType.toLowerCase(),
+  };
 }
 
 export async function seedPlannerStateFromTrip(

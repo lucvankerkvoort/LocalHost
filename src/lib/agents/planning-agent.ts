@@ -14,7 +14,7 @@ import {
   extractFromToDestinations,
   normalizeDestinations,
 } from './planner-helpers';
-import { SYSTEM_PROMPT, TRIP_JSON_CONTEXT_GUIDE } from './planner-prompts';
+import { SYSTEM_PROMPT, TRIP_JSON_CONTEXT_GUIDE, buildProfileSystemContext } from './planner-prompts';
 import {
   getGenerationStartMessage,
   getQueuedMessage,
@@ -32,7 +32,10 @@ import {
   isPlannerOnboardingTriggerMessage,
   mergeUnique,
   seedPlannerStateFromTrip,
+  seedPlannerStateFromProfile,
 } from './planner-state';
+import { saveTravelProfile } from '@/lib/travel-profile/loader';
+import type { TravelProfile, TravelStyle, TravelPace, TravelBudget, TravelGroup } from '@/lib/travel-profile/types';
 import {
   dedupeStrings,
   detectItineraryReadIntent,
@@ -94,8 +97,9 @@ export class PlanningAgent implements Agent {
     const session = await conversationController.getOrCreateSession(sessionId);
     const storedState = (session.metadata?.plannerState as PlannerFlowState | undefined)
       ?? DEFAULT_PLANNER_STATE;
+    const profileSeededState = seedPlannerStateFromProfile(storedState, context.travelProfile);
     const currentState =
-      isPlannerMode ? await seedPlannerStateFromTrip(storedState, context) : storedState;
+      isPlannerMode ? await seedPlannerStateFromTrip(profileSeededState, context) : profileSeededState;
 
     if (isPlannerMode && currentState !== storedState) {
       await conversationController.updateMetadata(sessionId, {
@@ -327,8 +331,11 @@ export class PlanningAgent implements Agent {
       nextQuestion = questionResult?.question ?? null;
       const nextQuestionKey = questionResult?.key;
 
+      const profileContext = buildProfileSystemContext(context.travelProfile);
       const partyLine = `Party: ${nextState.partySize ?? 'unset'} ${nextState.partyType ?? ''}`.trim();
       plannerDirective = `
+${profileContext}
+
 Planner Context:
 - Known destinations: ${nextState.destinations.length ? nextState.destinations.join(', ') : 'none'}
 - Destination scope: ${nextState.destinationScope}
@@ -801,6 +808,75 @@ Guidance:
           },
         }),
   
+        saveUserProfile: tool({
+          description:
+            'Persist the user\'s travel style preferences so future sessions are personalized automatically. Call this after learning the user\'s travel style (road-tripper, region-explorer, etc.) and at least one other preference (pace, budget, or group type). Do NOT call without a userId.',
+          inputSchema: z.object({
+            travelStyle: z
+              .enum([
+                'ROAD_TRIP',
+                'REGION_EXPLORER',
+                'MULTI_COUNTRY',
+                'BACKPACKER',
+                'LUXURY',
+                'CULTURAL',
+                'ADVENTURE',
+                'FLEXIBLE',
+              ])
+              .describe('Primary travel style'),
+            pace: z
+              .enum(['RELAXED', 'BALANCED', 'PACKED'])
+              .optional()
+              .describe('Preferred trip pace'),
+            budget: z
+              .enum(['BUDGET', 'MID', 'PREMIUM'])
+              .optional()
+              .describe('Typical budget tier'),
+            groupType: z
+              .enum(['SOLO', 'COUPLE', 'FAMILY', 'GROUP'])
+              .optional()
+              .describe('Who they usually travel with'),
+            transportPreference: z
+              .string()
+              .optional()
+              .describe('Preferred mode of transport, e.g. drive, flight, train'),
+            interests: z
+              .array(z.string())
+              .optional()
+              .describe('Travel interests, e.g. food, history, nature'),
+          }),
+          execute: async ({
+            travelStyle,
+            pace,
+            budget,
+            groupType,
+            transportPreference,
+            interests,
+          }) => {
+            if (!context.userId) {
+              return { success: false, error: 'Sign in required to save travel profile.' };
+            }
+            try {
+              await saveTravelProfile(context.userId, {
+                travelStyle: travelStyle as TravelStyle,
+                pace: pace as TravelPace | undefined,
+                budget: budget as TravelBudget | undefined,
+                groupType: groupType as TravelGroup | undefined,
+                transportPreference: transportPreference ?? null,
+                interests: interests ?? [],
+                completedAt: new Date(),
+              });
+              return {
+                success: true,
+                message: `Got it — I've saved your travel profile (${travelStyle.replace('_', ' ').toLowerCase()}). Future trips will be personalized to your style.`,
+              };
+            } catch (error) {
+              console.error('[PlanningAgent] saveUserProfile failed', error);
+              return { success: false, error: 'Could not save profile. Please try again.' };
+            }
+          },
+        }),
+
         flyToLocation: tool({
           description: 'Fly the interactive globe to a specific location defined by latitude and longitude. ALWAYS use this tool when the user asks to see a place, city, country, or location. Common triggers: "Show me X", "Take me to X", "Fly to X", "Go to X", where X is any location name.',
           inputSchema: z.object({

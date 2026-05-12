@@ -5,6 +5,7 @@ import { conversationController } from '@/lib/conversation/controller';
 import { validateAgentOutput, withExecution } from '@/lib/agent-constraints';
 import type { HostOnboardingStage } from '@/lib/agents/agent';
 import { rateLimit } from '@/lib/api/rate-limit';
+import { loadTravelProfile } from '@/lib/travel-profile/loader';
 
 export const maxDuration = 300; // Allow 5 minutes for generation
 
@@ -88,13 +89,17 @@ export async function POST(req: Request) {
     });
   }
 
+  const userId = session?.user?.id;
+  const travelProfile = userId ? await loadTravelProfile(userId) : null;
+
   const onboardingStage = parseOnboardingStage(body.onboardingStage);
   const runAgent = () =>
     agent.process(modelMessages, {
-      userId: session?.user?.id,
+      userId,
       sessionId: id,
       onboardingStage,
       tripId,
+      travelProfile,
     });
   const result = execution ? await withExecution(execution, runAgent) : await runAgent();
 
