@@ -1,6 +1,7 @@
 // Itinerary types for the visual builder
+import type { LodgingMetadata } from './hotels';
 
-export type ItineraryItemType = 
+export type ItineraryItemType =
   | 'SIGHT' 
   | 'EXPERIENCE' 
   | 'MEAL' 
@@ -61,6 +62,7 @@ export interface ItineraryItem {
   };
   duration?: number; // duration in minutes
   category?: string; // specific category if different from type
+  metadataJson?: LodgingMetadata; // OTA booking metadata; only set for LODGING items
 }
 
 export interface ItineraryDay {

@@ -1,11 +1,12 @@
 'use client';
 
 import { ItineraryItem as ItineraryItemData, ItineraryItemType, ITEM_TYPE_CONFIG } from '@/types/itinerary';
+import { LodgingMetadataSchema } from '@/types/hotels';
 import { isHostedExperienceItem } from './itinerary-utils';
-import { 
-  MapPin, 
-  Clock, 
-  Pencil, 
+import {
+  MapPin,
+  Clock,
+  Pencil,
   Trash2,
   Eye,
   Sparkles,
@@ -13,7 +14,9 @@ import {
   Sun,
   Car,
   StickyNote,
-  House
+  House,
+  Star,
+  ExternalLink,
 } from 'lucide-react';
 
 interface ItineraryItemProps {
@@ -122,6 +125,53 @@ export function ItineraryItem({
           {item.description}
         </p>
       )}
+
+      {/* LODGING: hotel details + affiliate CTA */}
+      {configKey === 'LODGING' && (() => {
+        const metaParsed = item.metadataJson
+          ? LodgingMetadataSchema.safeParse(item.metadataJson)
+          : null;
+        const meta = metaParsed?.success ? metaParsed.data : null;
+        if (!meta) return null;
+        return (
+          <div className="mt-2 space-y-1.5">
+            {/* Stars + price */}
+            <div className="flex items-center gap-3 text-xs text-[var(--muted-foreground)]">
+              {meta.stars && (
+                <span className="flex items-center gap-0.5">
+                  {Array.from({ length: meta.stars }).map((_, i) => (
+                    <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
+                  ))}
+                </span>
+              )}
+              {meta.pricePerNightCents && (
+                <span className="font-medium text-[var(--foreground)]">
+                  ~${Math.round(meta.pricePerNightCents / 100)}<span className="text-[var(--muted-foreground)] font-normal">/night</span>
+                </span>
+              )}
+            </div>
+            {/* Check-in / Check-out */}
+            <div className="text-xs text-[var(--muted-foreground)]">
+              {meta.checkIn} → {meta.checkOut}
+              {meta.nights > 1 ? ` (${meta.nights} nights)` : ' (1 night)'}
+            </div>
+            {/* Affiliate CTA */}
+            <a
+              href={meta.affiliateUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              data-testid="lodging-book-link"
+              className="mt-1 flex items-center justify-center gap-1.5 w-full py-1.5
+                         bg-[var(--deep-space-blue)] text-white text-xs font-medium
+                         rounded-md hover:opacity-90 transition-opacity"
+            >
+              <ExternalLink className="w-3 h-3" />
+              View on Booking.com
+            </a>
+          </div>
+        );
+      })()}
 
       {/* Booking Action */}
       {isHostedExperience && status === 'DRAFT' && (

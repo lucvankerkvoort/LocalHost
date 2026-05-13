@@ -12,6 +12,7 @@ Read this before touching any of the areas below.
 - If you skip `expectedVersion`, concurrent edits silently overwrite each other.
 - `TripRevision` rows store the full payload — changing the payload schema without a migration **breaks revision replay**.
 - Optimistic locking: if `currentVersion !== expectedVersion`, the write returns a 409. The client must re-fetch and retry.
+- After the Postgres transaction commits, `persistTripPlanCore` clears the `gen:progress:{generationId}` Redis key if `audit.generationId` is present. The Redis call is outside the transaction — a Redis failure does not roll back the DB write, it only leaves the progress key to expire via its 1-hour TTL.
 
 ---
 
@@ -35,13 +36,14 @@ Read this before touching any of the areas below.
 
 ---
 
-## pgvector Embeddings
+## Curated Destination Context (replaces RAG)
 
-**Fragile area**: `prisma/schema.prisma`, `src/lib/semantic-search.ts`
+**Fragile area**: `src/data/destinations.json`, `src/lib/ai/destination-context.ts`
 
-- Requires the `vector` PostgreSQL extension. Migrations that touch vector columns fail on databases without it.
-- The `Activity.embedding` and `Experience.embedding` columns use `text-embedding-3-small` (1536 dims). Switching models changes the vector space — existing embeddings become incompatible and must be regenerated.
-- pgvector cosine similarity queries: `<=>` operator. Do not use Euclidean (`<->`) — the embeddings are not normalized for it.
+- The system prompt receives curated destination context (summary, highlights, neighborhoods, practical tips) from `destinations.json` for the primary trip city.
+- Context is injected as a plain text block — it is a hint, not a constraint. The LLM may pick places not listed here.
+- `getDestinationContext()` matches on `city` + `country` case-insensitively, checking `aliases`. If no match is found it returns `null` and the prompt runs without context.
+- To add a new destination: add an entry to `destinations.json` following the existing schema. AI-generated batch content is appropriate; review for accuracy before committing.
 
 ---
 
@@ -75,15 +77,6 @@ Read this before touching any of the areas below.
 
 ---
 
-## Activity Enrichment & Strict Mode Planning
-
-**Fragile area**: `src/lib/activity-enrichment.ts`, `src/lib/ai/orchestrator.ts`
-
-- The planner has two modes: **strict** (uses only activities in the `Activity` table for single-city trips) and **optional** (allows LLM to hallucinate places).
-- Strict mode fails if a city has fewer than `MIN_ACTIVITY_COUNT` (currently 15) enriched activities. Always run enrichment before setting a city to strict mode.
-- Enrichment calls Google Places and counts against the daily Places API quota. Do not trigger enrichment in user-facing request paths.
-
----
 
 ## Google Places Cache
 
@@ -123,7 +116,30 @@ Read this before touching any of the areas below.
 
 ## Engagement Score Feedback Loop
 
-**Fragile area**: `Experience.engagementScore`, `Activity.engagementScore`
+**Fragile area**: `Experience.engagementScore`
 
-- These scores decrease when the AI suggests an experience and the user removes it from their itinerary.
-- A score of 0 means the item will never be suggested again. Do not reset scores without understanding why they dropped — it may reflect real user rejection signals.
+- Score decreases when the AI suggests a host experience and the user removes it from their itinerary.
+- A score of 0 means the experience will never be suggested again. Do not reset scores without understanding why they dropped — it may reflect genuine user rejection signals.
+
+---
+
+## LODGING metadataJson — App-Layer Typing Only
+
+**Fragile area**: `ItineraryItem.metadataJson`
+
+- The `metadataJson` column is `Json?` (JSONB) in Postgres — no DB-level constraints.
+- Validation is enforced at the app layer via `LodgingMetadataSchema` (`src/types/hotels.ts`).
+- `itinerary-item.tsx` uses `LodgingMetadataSchema.safeParse()` before rendering hotel details. If parsing fails (e.g. stale/malformed data), the lodging card silently returns null — this is intentional.
+- If you add fields to `LodgingMetadataSchema`, existing DB rows won't have them. Use `.optional()` for new fields or write a migration to backfill.
+- Do not store anything sensitive (credentials, PII) in `metadataJson` — it's readable in the client bundle via the itinerary API response.
+
+---
+
+## Amadeus Hotel Client — Graceful Degradation
+
+**Fragile area**: `src/lib/providers/amadeus-hotels-client.ts`
+
+- If `AMADEUS_API_KEY` / `AMADEUS_API_SECRET` are unset, `searchHotels()` returns `[]` silently (no error thrown).
+- The `search_hotels` orchestrator tool falls back to a Booking.com city search affiliate link when Amadeus returns no results or the city isn't in the IATA map.
+- OAuth2 tokens are cached in memory with a 55-minute TTL. Token cache is lost on process restart (cold start = one extra auth round-trip).
+- Amadeus sandbox has rate limits (~10 req/s). The in-memory cache on `/api/hotels/search` (1hr TTL, keyed by city+dates+guests) prevents redundant calls during a planning session.

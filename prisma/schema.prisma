@@ -151,7 +151,6 @@ model Experience {
   rating      Float @default(0)
   reviewCount Int   @default(0)
   engagementScore Float @default(1.0)
-  embedding   Unsupported("vector(1536)")? // Requires text-embedding-3-small
 
   // Status
   isActive Boolean @default(true)
@@ -297,6 +296,8 @@ model ItineraryItem {
   experienceId String?
   experience   Experience? @relation(fields: [experienceId], references: [id])
   hostId       String? // Direct host reference for mock experiences
+
+  metadataJson Json?   // Typed at app layer via Zod; used for LODGING (hotel details + affiliate URL), and future OTA types
 
   orderIndex  Int
   createdByAI Boolean @default(true)
@@ -916,63 +917,6 @@ model RateLimitEntry {
   @@index([expiresAt])
 }
 
-// ============================================
-// ACTIVITY INTELLIGENCE LAYER (RAG MOAT)
-// ============================================
-
-model City {
-  id              String   @id @default(cuid())
-  name            String
-  country         String
-  tier            Int      @default(3) // 1 = High volume, 2 = Core, 3 = Long-tail
-
-  // Enrichment state tracking
-  lastEnrichedAt  DateTime? // When we last hit Google Places API
-  enrichmentScore Float    @default(0) // Internal metric for coverage quality
-  activityCount   Int      @default(0) // Denormalized count to avoid runtime COUNT()
-
-  activities      Activity[]
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@unique([name, country])
-  @@index([tier])
-}
-
-model Activity {
-  id               String   @id @default(cuid())
-  cityId           String
-  city             City     @relation(fields: [cityId], references: [id], onDelete: Cascade)
-
-  source           String   @default("google") // google | user | curated
-  externalId       String?  @unique // e.g., Google Place ID
-
-  name             String
-  category         String   // e.g., 'Landmark', 'Restaurant'
-  rating           Float?
-  priceLevel       Int?     // 1 to 4
-
-  // Location
-  lat              Float
-  lng              Float
-  formattedAddress String?
-  photos           String[] @default([])
-
-  // Semantic Search Payload
-  metadataJson     Json?    @default("{}") // Extracted review keywords, vibe tags
-  engagementScore  Float    @default(1.0) // Drops if AI picks it but user removes it
-  embedding        Unsupported("vector(1536)")? // For text-embedding-3-small
-
-  lastVerifiedAt   DateTime @default(now())
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@index([cityId])
-  @@index([category])
-  @@index([engagementScore])
-}
-
 // Shared read cache for AI-generated city plans. Not user data.
 model CityPlanCache {
   id           String   @id @default(cuid())
@@ -995,6 +939,7 @@ enum ExternalApiProvider {
   UNSPLASH
   PEXELS
   WIKIMEDIA_COMMONS
+  AMADEUS_HOTELS
 }
 
 enum PlaceProvider {

@@ -161,3 +161,34 @@ Return JSON: { score: number, reasoning: string }
 
 **Changelog**:
 - 1.0 (2025-01): Initial version. LLM re-ranking only triggers when deterministic scorer returns < 0.5 confidence.
+
+---
+
+## Hotel Search Tool (search_hotels)
+
+**Tool name**: `search_hotels`  
+**Registered in**: `src/lib/ai/tools/index.ts`  
+**Handler**: `src/lib/ai/tools/search-hotels.ts`
+
+### Purpose
+Searches Amadeus Hotel Search API for available hotels in a city for a date range. Called by the orchestrator during multi-night trip planning to populate `lodging` fields in the day plan.
+
+### Parameters
+- `city` (string) — destination city name
+- `country` (string) — country name (used for display and Booking.com fallback link)
+- `checkIn` (YYYY-MM-DD)
+- `checkOut` (YYYY-MM-DD)
+- `guests` (int, default 1)
+- `limit` (int 1-5, default 3)
+
+### Orchestrator behaviour
+The system prompt instructs the orchestrator to:
+1. Call `search_hotels` for each overnight city on trips ≥ 2 nights
+2. Pick the best-fit hotel from results and populate `day.lodging`
+3. Fall back to a Booking.com city search link if no hotels are returned
+
+### Output shape
+Returns `HotelResult[]` (`src/types/hotels.ts`). Each result includes `affiliateUrl` — a Booking.com deep link that `plan-converter.ts` writes into `LodgingMetadata.affiliateUrl`.
+
+**Changelog**:
+- 1.0 (2026-04): Initial version. Affiliate redirect model — no in-app payment, Booking.com handles checkout.

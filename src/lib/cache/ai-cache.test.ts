@@ -2,15 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  cityPoolKey,
   cityPlanPoolKey,
   cityPlanCursorKey,
   progressKey,
-  minCityActivities,
-  cityPoolTtl,
   planPoolTtlSeconds,
-  getCityActivityPool,
-  mergeCityActivityPool,
   getCityPlanFromPool,
   storeCityPlan,
   getGenerationProgress,
@@ -23,44 +18,8 @@ import { _resetRedisClient } from './redis';
 // Key helpers
 // ---------------------------------------------------------------------------
 
-test('cityPoolKey uses correct prefix and slugifies city/country', () => {
-  assert.equal(cityPoolKey('Paris', 'France'), 'city:inventory:paris:france');
-  assert.equal(cityPoolKey('New York', 'United States'), 'city:inventory:new-york:united-states');
-  assert.equal(cityPoolKey('  Amsterdam  ', ' Netherlands '), 'city:inventory:amsterdam:netherlands');
-});
-
 test('progressKey uses correct prefix', () => {
   assert.equal(progressKey('gen-001'), 'gen:progress:gen-001');
-});
-
-// ---------------------------------------------------------------------------
-// Configuration helpers
-// ---------------------------------------------------------------------------
-
-test('minCityActivities defaults to 12', () => {
-  const original = process.env.CACHE_MIN_CITY_ACTIVITIES;
-  delete process.env.CACHE_MIN_CITY_ACTIVITIES;
-  assert.equal(minCityActivities(), 12);
-  if (original !== undefined) process.env.CACHE_MIN_CITY_ACTIVITIES = original;
-});
-
-test('minCityActivities respects env override', () => {
-  process.env.CACHE_MIN_CITY_ACTIVITIES = '20';
-  assert.equal(minCityActivities(), 20);
-  delete process.env.CACHE_MIN_CITY_ACTIVITIES;
-});
-
-test('cityPoolTtl defaults to 86400', () => {
-  const original = process.env.CACHE_TTL_CITY_ACTIVITIES_SECONDS;
-  delete process.env.CACHE_TTL_CITY_ACTIVITIES_SECONDS;
-  assert.equal(cityPoolTtl(), 86_400);
-  if (original !== undefined) process.env.CACHE_TTL_CITY_ACTIVITIES_SECONDS = original;
-});
-
-test('cityPoolTtl respects env override', () => {
-  process.env.CACHE_TTL_CITY_ACTIVITIES_SECONDS = '3600';
-  assert.equal(cityPoolTtl(), 3600);
-  delete process.env.CACHE_TTL_CITY_ACTIVITIES_SECONDS;
 });
 
 // ---------------------------------------------------------------------------
@@ -80,37 +39,6 @@ function withoutRedis(fn: () => Promise<void>): () => Promise<void> {
     }
   };
 }
-
-const mockActivity = {
-  id: 'act-1',
-  name: 'Eiffel Tower',
-  category: 'landmark',
-  lat: 48.8584,
-  lng: 2.2945,
-  formattedAddress: 'Champ de Mars, Paris',
-  cityName: 'Paris',
-  country: 'France',
-  rating: 4.7,
-  priceLevel: 2,
-  similarity: 0.9,
-  engagementScore: 1.2,
-  finalScore: 1.08,
-};
-
-test(
-  'getCityActivityPool returns null when Redis is unavailable',
-  withoutRedis(async () => {
-    const result = await getCityActivityPool('Paris', 'France');
-    assert.equal(result, null);
-  }),
-);
-
-test(
-  'mergeCityActivityPool is a no-op when Redis is unavailable',
-  withoutRedis(async () => {
-    await assert.doesNotReject(() => mergeCityActivityPool('Paris', 'France', [mockActivity]));
-  }),
-);
 
 test(
   'getGenerationProgress returns null when Redis is unavailable',
@@ -143,7 +71,7 @@ test(
 );
 
 // ---------------------------------------------------------------------------
-// L2 — Plan pool key helpers
+// Plan pool key helpers
 // ---------------------------------------------------------------------------
 
 test('cityPlanPoolKey uses correct prefix and slugifies inputs', () => {
@@ -156,7 +84,7 @@ test('cityPlanCursorKey matches pool key with :cursor suffix', () => {
 });
 
 // ---------------------------------------------------------------------------
-// L2 — planPoolTtlSeconds
+// planPoolTtlSeconds
 // ---------------------------------------------------------------------------
 
 test('planPoolTtlSeconds defaults to 7 days in seconds', () => {
@@ -173,13 +101,12 @@ test('planPoolTtlSeconds respects env override', () => {
 });
 
 // ---------------------------------------------------------------------------
-// L2 — Graceful degradation without Redis
+// Graceful degradation without Redis
 // ---------------------------------------------------------------------------
 
 test(
   'getCityPlanFromPool returns null when Redis is unavailable and no Postgres row exists',
   withoutRedis(async () => {
-    // Postgres lookup also returns null (no row seeded in test DB).
     const result = await getCityPlanFromPool('Paris', 'France', 3);
     assert.equal(result, null);
   }),
@@ -195,7 +122,6 @@ test(
       days: [],
       summary: 'Test plan',
     };
-    // Should not throw even if Postgres write fails (error swallowed).
     await assert.doesNotReject(() => storeCityPlan('Paris', 'France', 3, minimalPlan as never));
   }),
 );

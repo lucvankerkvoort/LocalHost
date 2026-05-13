@@ -10,6 +10,8 @@ import type { ItineraryPlan as OrchestratorPlan } from '@/lib/ai/types';
 import { isObviouslyInvalid } from '@/lib/ai/validation/geo-validator';
 import { buildPlaceImageUrl } from '@/lib/images/places';
 import { getCityCoordinates } from '@/lib/data/city-coordinates';
+import { buildBookingComSearchLink } from '@/lib/hotels/affiliate-links';
+import type { LodgingMetadata } from '@/types/hotels';
 
 const TRANSPORT_OVERRIDE_PATTERN = /transport between cities:\s*([^.\n]+)/i;
 const MIN_INTERCITY_ROUTE_DISTANCE_METERS = 30000;
@@ -17,6 +19,12 @@ const MIN_INTERCITY_ROUTE_DISTANCE_METERS = 30000;
 /** Deterministic destination ID from day number — survives across plan re-applications. */
 function buildDestinationId(dayNumber: number): string {
   return `day-${dayNumber}`;
+}
+
+/** Nights between two YYYY-MM-DD dates. */
+function nightsBetween(checkIn: string, checkOut: string): number {
+  const msPerDay = 86_400_000;
+  return Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / msPerDay));
 }
 
 /** Deterministic route ID from connected day numbers. */
@@ -266,10 +274,66 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
       };
     });
 
+    // Inject LODGING item at end of day if the AI included hotel data
+    const lodgingItems: ItineraryItem[] = [];
+    if (day.lodging) {
+      const lodging = day.lodging;
+      const affiliateUrl =
+        lodging.affiliateUrl ??
+        buildBookingComSearchLink({
+          city: lodging.city,
+          countryCode: lodging.country.slice(0, 2).toUpperCase(),
+          checkIn: lodging.checkIn,
+          checkOut: lodging.checkOut,
+          adults: 1,
+        });
+
+      const metadata: LodgingMetadata = {
+        provider: 'booking_com',
+        hotelName: lodging.hotelName,
+        stars: lodging.stars,
+        pricePerNightCents: lodging.pricePerNightCents,
+        currency: 'USD',
+        checkIn: lodging.checkIn,
+        checkOut: lodging.checkOut,
+        nights: nightsBetween(lodging.checkIn, lodging.checkOut),
+        guests: 1,
+        thumbnailUrl: lodging.thumbnailUrl,
+        affiliateUrl,
+        amenities: [],
+      };
+
+      lodgingItems.push({
+        id: `day-${day.dayNumber}-lodging`,
+        type: 'LODGING' as const,
+        title: lodging.hotelName,
+        description: [
+          lodging.stars ? `${lodging.stars}-star hotel` : '',
+          lodging.pricePerNightCents
+            ? `~$${Math.round(lodging.pricePerNightCents / 100)}/night`
+            : '',
+        ]
+          .filter(Boolean)
+          .join(' · ') || 'Hotel accommodation',
+        position: activityItems.length + experienceActivities.length,
+        location: `${lodging.city}, ${lodging.country}`,
+        place: {
+          id: `lodging-place-${day.dayNumber}`,
+          name: lodging.hotelName,
+          location: resolvedAnchor.location,
+          city: lodging.city,
+          country: lodging.country,
+          imageUrl: lodging.thumbnailUrl,
+        },
+        metadataJson: metadata,
+      });
+    }
+
     const dayItems = [
       ...activityItems.slice(0, insertAt),
       ...experienceActivities,
       ...activityItems.slice(insertAt),
+      ...lodgingItems,
     ];
 
     // MARKER CONSOLIDATION LOGIC:

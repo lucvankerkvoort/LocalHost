@@ -1,6 +1,4 @@
-import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import type { ActivitySearchResult } from '@/lib/db/activity-search';
 import { ItineraryPlanSchema, type ItineraryPlan } from '@/lib/ai/types';
 import { getRedisClient } from './redis';
 
@@ -8,18 +6,9 @@ import { getRedisClient } from './redis';
 // Configuration
 // ---------------------------------------------------------------------------
 
-const DEFAULT_CITY_POOL_TTL_SECONDS = 86_400; // 24 h
-const DEFAULT_MIN_CITY_ACTIVITIES = 12;
 const PROGRESS_TTL_SECONDS = 3_600; // 1 h
 const DEFAULT_PLAN_POOL_TTL_DAYS = 7;
 const PLAN_POOL_MAX_SIZE = 5;
-
-export function cityPoolTtl(): number {
-  const env = process.env.CACHE_TTL_CITY_ACTIVITIES_SECONDS;
-  if (!env) return DEFAULT_CITY_POOL_TTL_SECONDS;
-  const n = Number(env);
-  return Number.isFinite(n) && n > 0 ? n : DEFAULT_CITY_POOL_TTL_SECONDS;
-}
 
 export function planPoolTtlSeconds(): number {
   const env = process.env.CACHE_TTL_PLAN_POOL_DAYS;
@@ -28,44 +17,9 @@ export function planPoolTtlSeconds(): number {
   return Number.isFinite(n) && n > 0 ? n * 86_400 : DEFAULT_PLAN_POOL_TTL_DAYS * 86_400;
 }
 
-export function minCityActivities(): number {
-  const env = process.env.CACHE_MIN_CITY_ACTIVITIES;
-  if (!env) return DEFAULT_MIN_CITY_ACTIVITIES;
-  const n = Number(env);
-  return Number.isFinite(n) && n > 0 ? n : DEFAULT_MIN_CITY_ACTIVITIES;
-}
-
 // ---------------------------------------------------------------------------
 // Schemas
 // ---------------------------------------------------------------------------
-
-/**
- * Mirrors ActivitySearchResult from @/lib/db/activity-search.
- * Defined here so the cache layer can validate on read without a circular dep.
- */
-export const ActivitySearchResultSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  category: z.string(),
-  lat: z.number(),
-  lng: z.number(),
-  formattedAddress: z.string(),
-  cityName: z.string().nullable().optional(),
-  country: z.string().nullable().optional(),
-  rating: z.number().nullable(),
-  priceLevel: z.number().nullable(),
-  similarity: z.number(),
-  engagementScore: z.number(),
-  finalScore: z.number(),
-});
-
-export const CityActivityPoolSchema = z.object({
-  city: z.string(),
-  country: z.string(),
-  activities: z.array(ActivitySearchResultSchema),
-  updatedAt: z.number(),
-});
-export type CityActivityPool = z.infer<typeof CityActivityPoolSchema>;
 
 export const GenerationProgressSchema = z.object({
   status: z.enum(['in_progress', 'complete', 'failed']),
@@ -84,17 +38,8 @@ function slug(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, '-');
 }
 
-export function cityPoolKey(city: string, country: string): string {
-  return `city:inventory:${slug(city)}:${slug(country)}`;
-}
-
 export function progressKey(generationId: string): string {
   return `gen:progress:${generationId}`;
-}
-
-/** Kept for tests that need a stable hash for a given city+country pair. */
-export function hashCity(city: string, country: string): string {
-  return createHash('sha256').update(`${slug(city)}:${slug(country)}`).digest('hex');
 }
 
 export function cityPlanPoolKey(city: string, country: string, durationDays: number): string {
@@ -106,71 +51,7 @@ export function cityPlanCursorKey(city: string, country: string, durationDays: n
 }
 
 // ---------------------------------------------------------------------------
-// City activity pool
-// ---------------------------------------------------------------------------
-
-/**
- * Returns the cached activity pool for a city, or null if not present / too small.
- * Callers should check pool.length >= minCityActivities() themselves if they
- * need to decide whether to fall through to the DB.
- */
-export async function getCityActivityPool(
-  city: string,
-  country: string,
-): Promise<ActivitySearchResult[] | null> {
-  const client = getRedisClient();
-  if (!client) return null;
-
-  try {
-    const raw = await client.get(cityPoolKey(city, country));
-    if (!raw) return null;
-
-    const result = CityActivityPoolSchema.safeParse(JSON.parse(raw));
-    if (!result.success) {
-      console.warn(`[Cache] Corrupted city pool for ${city}, ignoring`);
-      return null;
-    }
-    return result.data.activities as ActivitySearchResult[];
-  } catch (err) {
-    console.warn('[Cache] getCityActivityPool error:', err);
-    return null;
-  }
-}
-
-/**
- * Merges new activities into the city's Redis pool (deduplicated by id).
- * Refreshes the TTL on every write. Safe to fire-and-forget.
- */
-export async function mergeCityActivityPool(
-  city: string,
-  country: string,
-  newActivities: ActivitySearchResult[],
-): Promise<void> {
-  const client = getRedisClient();
-  if (!client || !newActivities.length) return;
-
-  try {
-    const existing = (await getCityActivityPool(city, country)) ?? [];
-    const merged = Array.from(
-      new Map([...existing, ...newActivities].map((a) => [a.id, a])).values(),
-    );
-
-    const pool: CityActivityPool = {
-      city,
-      country,
-      activities: merged,
-      updatedAt: Date.now(),
-    };
-
-    await client.set(cityPoolKey(city, country), JSON.stringify(pool), 'EX', cityPoolTtl());
-    console.log(`[Cache] City pool updated: ${city} (${merged.length} activities)`);
-  } catch (err) {
-    console.warn('[Cache] mergeCityActivityPool error:', err);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// L2: City plan pool (Redis hot + Postgres durable)
+// City plan pool (Redis hot + Postgres durable)
 // ---------------------------------------------------------------------------
 
 const CityPlanPoolSchema = z.array(ItineraryPlanSchema);

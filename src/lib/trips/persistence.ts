@@ -4,6 +4,7 @@ import { decideTripPlanWriteAccess } from './persistence-auth';
 import { supportsItineraryItemPlaceIdColumn } from './place-id-compat';
 import type { TripPlanStopInput, TripPlanWritePayload } from './contracts/trip-plan.schema';
 import { resolveNextTripVersion, TripVersionConflictError } from './versioning';
+import { clearGenerationProgress } from '@/lib/cache/ai-cache';
 
 type PersistTripPlanBaseInput = {
   tripId: string;
@@ -210,6 +211,10 @@ async function persistTripPlanCore(
       select: { id: true },
     });
   });
+
+  if (input.audit?.generationId) {
+    await clearGenerationProgress(input.audit.generationId);
+  }
 
   logTripPlanPersistence('write.success', {
     tripId,

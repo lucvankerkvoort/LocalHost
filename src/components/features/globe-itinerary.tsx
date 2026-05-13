@@ -31,7 +31,6 @@ import {
   resolveItineraryItemImageUrl,
 } from './itinerary-utils';
 import { OrchestratorJobStatus } from './orchestrator-job-status';
-import { TripPreferencesWidget } from './trip-preferences-widget';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   hydrateGlobeState,
@@ -49,6 +48,9 @@ import {
   clearPlannerHosts,
   clearHostMarkers,
   setCameraHeight,
+  deleteItem,
+  reorderItems,
+  appendItem,
 } from '@/store/globe-slice';
 import { 
   fetchActiveTrip, 
@@ -1435,6 +1437,91 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     dispatch(setItineraryCollapsed(false));
   }, [dispatch, handleDaySelect]);
 
+  /** Delete an item optimistically from Redux, then persist to the API. */
+  const handleDeleteItem = useCallback(async (itemId: string) => {
+    // Optimistic update — remove from Redux immediately
+    dispatch(deleteItem({ itemId }));
+
+    if (!tripId) return; // guest mode — no DB to update
+    try {
+      const resp = await fetch(`/api/trips/${tripId}/items/${itemId}`, { method: 'DELETE' });
+      if (!resp.ok) {
+        console.error('[GlobeItinerary] Failed to delete item', itemId, resp.status);
+        // Could refetch to restore — for now just log; optimistic delete is acceptable
+      }
+    } catch (err) {
+      console.error('[GlobeItinerary] Delete item error', err);
+    }
+  }, [dispatch, tripId]);
+
+  /** Add a new place as a stop on a specific day. */
+  const handleAddStop = useCallback(async (
+    destinationId: string,
+    dayNumber: number,
+    place: { placeId: string; name: string; address: string; lat: number; lng: number; category: string },
+    type: 'SIGHT' | 'MEAL' | 'NOTE' | 'FREE_TIME',
+  ) => {
+    // Optimistic — append a placeholder immediately
+    const tempId = `temp-${Date.now()}`;
+    dispatch(appendItem({
+      destinationId,
+      item: {
+        id: tempId,
+        type,
+        title: place.name,
+        position: 999,
+        place: {
+          id: place.placeId,
+          name: place.name,
+          address: place.address,
+          location: { lat: place.lat, lng: place.lng },
+          city: '',
+        },
+      },
+    }));
+
+    if (!tripId) return; // guest mode
+
+    try {
+      const resp = await fetch(`/api/trips/${tripId}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dayNumber,
+          title: place.name,
+          type,
+          locationName: place.address,
+          placeId: place.placeId,
+          lat: place.lat,
+          lng: place.lng,
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json() as { item: { id: string; orderIndex: number } };
+        // Replace temp item with real persisted item
+        dispatch(deleteItem({ itemId: tempId }));
+        dispatch(appendItem({
+          destinationId,
+          item: {
+            id: data.item.id,
+            type,
+            title: place.name,
+            position: data.item.orderIndex,
+            place: {
+              id: place.placeId,
+              name: place.name,
+              address: place.address,
+              location: { lat: place.lat, lng: place.lng },
+              city: '',
+            },
+          },
+        }));
+      }
+    } catch (err) {
+      console.error('[GlobeItinerary] Add stop error', err);
+    }
+  }, [dispatch, tripId]);
+
   useEffect(() => {
     if (selectedDestination || destinations.length === 0) return;
     dispatch(setSelectedDestination(destinations[0].id));
@@ -1637,6 +1724,24 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                       onBookItem={(item) => handleBookItem(day.id, item)}
                       onChatItem={(item) => { void handleChatItem(item); }}
                       onFindAccommodation={() => handleFindAccommodation(day.id)}
+                      onDeleteItem={(itemId) => { void handleDeleteItem(itemId); }}
+                      onAddStop={(place, type) => {
+                        void handleAddStop(day.id, day.day, place, type);
+                      }}
+                      onReorderItems={(items) => {
+                        dispatch(reorderItems({ destinationId: day.id, items }));
+                        // Persist new order — fire PATCH for each item that moved
+                        if (tripId) {
+                          items.forEach((item, idx) => {
+                            void fetch(`/api/trips/${tripId}/items/${item.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ orderIndex: idx }),
+                            });
+                          });
+                        }
+                      }}
+                      searchContext={[day.city, day.activities[0]?.place?.country].filter(Boolean).join(', ')}
                     />
                   ))
                 )}
@@ -1753,8 +1858,7 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
         onSuccess={handlePaymentSuccess}
       />
 
-      {tripId != null && <TripPreferencesWidget tripId={tripId} />}
-      <AccommodationLinksModal
+<AccommodationLinksModal
         isOpen={accommodationModal.isOpen}
         onClose={() => setAccommodationModal((s) => ({ ...s, isOpen: false }))}
         city={accommodationModal.city}

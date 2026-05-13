@@ -64,6 +64,20 @@ export const ActivitySchema = z.object({
   notes: z.string().optional(),
 });
 
+export const LodgingPlanSchema = z.object({
+  hotelName: z.string().describe('Hotel name, e.g. "Le Marais Boutique Hotel"'),
+  stars: z.number().min(1).max(5).optional().describe('Star rating if known'),
+  city: z.string(),
+  country: z.string(),
+  checkIn: z.string().describe('Check-in date in YYYY-MM-DD format'),
+  checkOut: z.string().describe('Check-out date in YYYY-MM-DD format'),
+  pricePerNightCents: z.number().int().positive().optional().describe('Nightly rate in USD cents from search_hotels'),
+  affiliateUrl: z.string().url().optional().describe('Booking.com affiliate URL from search_hotels results'),
+  thumbnailUrl: z.string().url().optional().describe('Hotel photo URL from search_hotels results'),
+});
+
+export type LodgingPlan = z.infer<typeof LodgingPlanSchema>;
+
 export const DayPlanSchema = z.object({
   dayNumber: z.number(),
   date: z.string().optional(), // ISO date string if available
@@ -80,6 +94,11 @@ export const DayPlanSchema = z.object({
   navigationEvents: z.array(NavigationActionSchema).optional(),
   suggestedHosts: z.array(HostCardSchema).describe('List of hosts near the anchor'),
   experienceItems: z.array(ExperienceItemSchema).optional().describe('Top matched local experiences to inject into the itinerary for this day'),
+  lodging: LodgingPlanSchema.optional().describe(
+    'Hotel accommodation for this night. Populate by calling search_hotels for multi-night trips. ' +
+    'Set checkIn to this day\'s date and checkOut to the next day\'s date. ' +
+    'Omit for day trips or if the user already has accommodation.'
+  ),
 });
 
 export const ItineraryPlanSchema = z.object({
@@ -106,3 +125,4 @@ export type ExperienceItem = z.infer<typeof ExperienceItemSchema>;
 export type Activity = z.infer<typeof ActivitySchema>;
 export type DayPlan = z.infer<typeof DayPlanSchema>;
 export type ItineraryPlan = z.infer<typeof ItineraryPlanSchema>;
+// LodgingPlan is already exported above as a named export

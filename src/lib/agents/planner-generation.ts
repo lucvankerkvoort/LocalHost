@@ -203,7 +203,6 @@ async function runPlannerGenerationTask(
       snapshot.request,
       draftResult.context.draft,
       draftResult.context.tripAnchor,
-      draftResult.context.inventory
     );
     if (shouldIgnore()) return;
 
