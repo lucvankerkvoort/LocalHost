@@ -1,0 +1,9 @@
+{
+  "user": {
+    "id": "e2e-host-full-access",
+    "email": "host@e2e.localhost",
+    "name": "Test Host",
+    "image": null
+  },
+  "expires": "2027-12-31T00:00:00.000Z"
+}

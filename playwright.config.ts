@@ -11,57 +11,68 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
  */
 export default defineConfig({
   testDir: './e2e',
-  
+
+  /* Global setup — verifies app health before tests run */
+  globalSetup: './e2e/global-setup.ts',
+
   /* Ignore setup files - we don't need global auth setup */
   testIgnore: ['**/*.setup.ts'],
-  
+
   /* Maximum time per test */
   timeout: 30000,
-  
+
   /* Expect configuration */
   expect: {
     timeout: 10000,
   },
-  
+
   /* Run tests in files in parallel */
   fullyParallel: true,
-  
+
   /* Fail the build on CI if you accidentally left test.only in the source code */
   forbidOnly: !!process.env.CI,
-  
+
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 1,
-  
+
   /* Opt out of parallel tests on CI */
   workers: process.env.CI ? 1 : undefined,
-  
+
   /* Reporter to use */
   reporter: [
     ['html', { open: 'never' }],
     ['list'],
   ],
-  
+
   /* Shared settings for all test projects */
   use: {
     /* Base URL for navigation */
     baseURL: 'http://localhost:3000',
-    
+
     /* Collect trace on first retry */
     trace: 'on-first-retry',
-    
+
     /* Screenshot on failure */
     screenshot: 'only-on-failure',
-    
+
     /* Video on first retry */
     video: 'on-first-retry',
   },
 
-  /* Configure projects - single Chromium project for simplicity */
+  /* Configure projects */
   projects: [
     {
       name: 'chromium',
-      use: { 
+      use: {
         ...devices['Desktop Chrome'],
+      },
+    },
+
+    /* Mobile project using iPhone 14 */
+    {
+      name: 'mobile',
+      use: {
+        ...devices['iPhone 14'],
       },
     },
 

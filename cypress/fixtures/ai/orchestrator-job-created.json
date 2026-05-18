@@ -1,0 +1,8 @@
+{
+  "jobId": "mock-job-123",
+  "status": "running",
+  "stage": "geocoding",
+  "message": "Planning your trip...",
+  "progressCurrent": 1,
+  "progressTotal": 4
+}

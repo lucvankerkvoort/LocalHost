@@ -1,0 +1,32 @@
+{
+  "jobId": "mock-job-123",
+  "status": "complete",
+  "stage": "complete",
+  "message": "Your itinerary is ready!",
+  "progressCurrent": 4,
+  "progressTotal": 4,
+  "plan": {
+    "destinations": [
+      { "name": "Barcelona", "lat": 41.3851, "lng": 2.1734 }
+    ],
+    "stops": [
+      {
+        "title": "Barcelona",
+        "type": "CITY",
+        "days": [
+          {
+            "dayIndex": 1,
+            "title": "Day 1 - Gothic Quarter",
+            "items": [
+              {
+                "title": "Gothic Quarter",
+                "type": "SIGHT",
+                "locationName": "Gothic Quarter, Barcelona"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
