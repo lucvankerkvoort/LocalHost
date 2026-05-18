@@ -1,0 +1,76 @@
+{
+  "jobId": "mock-job-multi-country",
+  "status": "complete",
+  "stage": "complete",
+  "message": "Your multi-country itinerary is ready!",
+  "progressCurrent": 4,
+  "progressTotal": 4,
+  "plan": {
+    "destinations": [
+      { "name": "Paris",     "lat": 48.8566, "lng": 2.3522  },
+      { "name": "Amsterdam", "lat": 52.3676, "lng": 4.9041  },
+      { "name": "Berlin",    "lat": 52.5200, "lng": 13.4050 },
+      { "name": "Prague",    "lat": 50.0755, "lng": 14.4378 }
+    ],
+    "stops": [
+      {
+        "title": "Paris",
+        "type": "CITY",
+        "days": [
+          {
+            "dayIndex": 1,
+            "title": "Day 1 - Paris",
+            "items": [
+              { "title": "Eiffel Tower",   "type": "SIGHT",     "locationName": "Eiffel Tower, Paris" },
+              { "title": "Louvre Museum",  "type": "SIGHT",     "locationName": "Louvre Museum, Paris" },
+              { "title": "Flight to Amsterdam", "type": "TRANSPORT", "locationName": "CDG Airport" }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Amsterdam",
+        "type": "CITY",
+        "days": [
+          {
+            "dayIndex": 2,
+            "title": "Day 2 - Amsterdam",
+            "items": [
+              { "title": "Rijksmuseum",        "type": "SIGHT",     "locationName": "Rijksmuseum, Amsterdam" },
+              { "title": "Canal Cruise",       "type": "EXPERIENCE","locationName": "Amsterdam Canals" },
+              { "title": "Flight to Berlin",   "type": "TRANSPORT", "locationName": "AMS Airport" }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Berlin",
+        "type": "CITY",
+        "days": [
+          {
+            "dayIndex": 3,
+            "title": "Day 3 - Berlin",
+            "items": [
+              { "title": "Brandenburg Gate",  "type": "SIGHT", "locationName": "Brandenburg Gate, Berlin" },
+              { "title": "East Side Gallery", "type": "SIGHT", "locationName": "East Side Gallery, Berlin" }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Prague",
+        "type": "CITY",
+        "days": [
+          {
+            "dayIndex": 4,
+            "title": "Day 4 - Prague",
+            "items": [
+              { "title": "Prague Castle",     "type": "SIGHT", "locationName": "Prague Castle, Prague" },
+              { "title": "Old Town Square",   "type": "SIGHT", "locationName": "Old Town Square, Prague" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

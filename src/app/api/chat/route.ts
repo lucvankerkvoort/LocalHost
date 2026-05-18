@@ -90,7 +90,21 @@ export async function POST(req: Request) {
   }
 
   const userId = session?.user?.id;
-  const travelProfile = userId ? await loadTravelProfile(userId) : null;
+  let travelProfile = userId ? await loadTravelProfile(userId) : null;
+
+  // Test-only: allow profile injection via request header so E2E tests can verify
+  // persona-specific agent behavior without a seeded database.
+  // Disabled in production unconditionally.
+  if (process.env.NODE_ENV !== 'production' && process.env.E2E_PROFILE_INJECTION === 'true') {
+    const injectedHeader = req.headers.get('x-e2e-travel-profile');
+    if (injectedHeader) {
+      try {
+        travelProfile = JSON.parse(injectedHeader);
+      } catch {
+        // Malformed header — ignore and use DB profile
+      }
+    }
+  }
 
   const onboardingStage = parseOnboardingStage(body.onboardingStage);
   const runAgent = () =>

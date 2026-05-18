@@ -1,0 +1,59 @@
+{
+  "jobId": "mock-job-road-trip",
+  "status": "complete",
+  "stage": "complete",
+  "message": "Your road trip itinerary is ready!",
+  "progressCurrent": 4,
+  "progressTotal": 4,
+  "plan": {
+    "destinations": [
+      { "name": "Los Angeles", "lat": 34.0522, "lng": -118.2437 },
+      { "name": "Big Sur",     "lat": 36.2704, "lng": -121.8081 },
+      { "name": "San Francisco", "lat": 37.7749, "lng": -122.4194 }
+    ],
+    "stops": [
+      {
+        "title": "Los Angeles",
+        "type": "CITY",
+        "days": [
+          {
+            "dayIndex": 1,
+            "title": "Day 1 - Coastal Start",
+            "items": [
+              { "title": "Santa Monica Pier",   "type": "SIGHT", "locationName": "Santa Monica Pier, Los Angeles" },
+              { "title": "Pacific Coast Highway Start", "type": "TRANSPORT", "locationName": "PCH, Santa Monica" }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Big Sur",
+        "type": "ROAD_TRIP",
+        "days": [
+          {
+            "dayIndex": 2,
+            "title": "Day 2 - Big Sur Drive",
+            "items": [
+              { "title": "Bixby Creek Bridge", "type": "SIGHT", "locationName": "Bixby Creek Bridge, Big Sur" },
+              { "title": "McWay Falls",         "type": "SIGHT", "locationName": "Julia Pfeiffer Burns State Park" }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "San Francisco",
+        "type": "CITY",
+        "days": [
+          {
+            "dayIndex": 3,
+            "title": "Day 3 - Golden Gate Arrival",
+            "items": [
+              { "title": "Golden Gate Bridge", "type": "SIGHT", "locationName": "Golden Gate Bridge, San Francisco" },
+              { "title": "Fisherman's Wharf",  "type": "SIGHT", "locationName": "Fisherman's Wharf, San Francisco" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

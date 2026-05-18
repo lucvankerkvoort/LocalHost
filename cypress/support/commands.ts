@@ -23,6 +23,18 @@ interface MockAIChatOptions {
   toolResult?: Record<string, unknown>;
 }
 
+interface TestTravelProfile {
+  id?: string;
+  userId?: string;
+  travelStyle: 'ROAD_TRIP' | 'REGION_EXPLORER' | 'MULTI_COUNTRY' | 'BACKPACKER' | 'LUXURY' | 'CULTURAL' | 'ADVENTURE' | 'FLEXIBLE';
+  pace?: 'RELAXED' | 'BALANCED' | 'PACKED';
+  budget?: 'BUDGET' | 'MID' | 'PREMIUM';
+  groupType?: 'SOLO' | 'COUPLE' | 'FAMILY' | 'GROUP';
+  transportPreference?: string | null;
+  interests?: string[];
+  completedAt?: string | null;
+}
+
 interface OrchestratorPlan {
   destinations?: Array<{ name: string; lat: number; lng: number }>;
   stops?: Array<{
@@ -82,6 +94,14 @@ declare global {
        * Type a message into the chat input and click send.
        */
       sendChatMessage(text: string): Chainable<void>;
+
+      /**
+       * Intercept /api/chat and inject an x-e2e-travel-profile header so the
+       * server runs its real personalization logic with the given profile.
+       * Requires the server to be started with E2E_PROFILE_INJECTION=true.
+       * The chat response is still mocked (same as mockAIChat) so no real LLM is hit.
+       */
+      mockAIChatWithProfile(profile: TestTravelProfile, options?: MockAIChatOptions): Chainable<void>;
     }
   }
 }
@@ -236,6 +256,54 @@ Cypress.Commands.add('mockOrchestrator', (plan?: OrchestratorPlan) => {
       plan: resolvedPlan,
     },
   }).as('orchestratorGet');
+});
+
+Cypress.Commands.add('mockAIChatWithProfile', (testProfile: TestTravelProfile, options?: MockAIChatOptions) => {
+  const responseText =
+    options?.responseText ??
+    "I'll plan a trip for you! Let me generate your itinerary.";
+
+  const toolResult = options?.toolResult ?? {
+    success: true,
+    jobId: 'mock-job-profile',
+    queued: false,
+    mode: 'draft',
+  };
+
+  const resolvedProfile: TestTravelProfile = {
+    id: 'e2e-injected-profile',
+    userId: 'e2e-test-user',
+    pace: 'BALANCED',
+    budget: 'MID',
+    groupType: 'SOLO',
+    transportPreference: null,
+    interests: [],
+    completedAt: new Date().toISOString(),
+    ...testProfile,
+  };
+
+  const streamLines = [
+    'f:{"messageId":"msg_profile_001"}',
+    `0:${JSON.stringify(responseText)}`,
+    `a:{"toolCallId":"tc_profile_001","toolName":"generateItinerary","args":{}}`,
+    `b:{"toolCallId":"tc_profile_001","result":${JSON.stringify(toolResult)}}`,
+    'e:{"finishReason":"stop","usage":{"promptTokens":60,"completionTokens":40},"isContinued":false}',
+    'd:{"finishReason":"stop","usage":{"promptTokens":60,"completionTokens":40}}',
+  ].join('\n');
+
+  cy.intercept('POST', '/api/chat', (req) => {
+    // Inject the travel profile so the server's personalization logic runs with it.
+    // Only takes effect when the server is started with E2E_PROFILE_INJECTION=true.
+    req.headers['x-e2e-travel-profile'] = JSON.stringify(resolvedProfile);
+    req.reply({
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'x-vercel-ai-data-stream': 'v1',
+      },
+      body: streamLines,
+    });
+  }).as('mockAIChatWithProfile');
 });
 
 Cypress.Commands.add('mockTripsAPI', (trips?: unknown[]) => {
