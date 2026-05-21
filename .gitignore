@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# Claude Code MCP config (may contain local DATABASE_URL)
+.mcp.json
+
 # debug
 npm-debug.log*
 yarn-debug.log*
