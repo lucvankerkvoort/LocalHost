@@ -36,6 +36,9 @@ import {
 } from './planner-state';
 import { saveTravelProfile } from '@/lib/travel-profile/loader';
 import type { TravelProfile, TravelStyle, TravelPace, TravelBudget, TravelGroup } from '@/lib/travel-profile/types';
+import { classifyIntent } from './intent/classifier';
+import { buildDiscoveryPrompt } from './intent/discovery-prompt';
+import { routeToStrategy } from './strategies/router';
 import {
   dedupeStrings,
   detectItineraryReadIntent,
@@ -88,6 +91,10 @@ export class PlanningAgent implements Agent {
     const isLocalsMode = userMessageText.includes('[Mode: locals]');
     const isExperiencesMode = userMessageText.includes('[Mode: experiences]');
     const isPlannerMode = !isLocalsMode && !isExperiencesMode;
+
+    // Classify trip intent from conversation + profile; route to the matching strategy.
+    const tripIntent = classifyIntent(messages, context.travelProfile);
+    const strategy = routeToStrategy(tripIntent);
 
     const sessionId = context.sessionId ?? 'planner-session';
     const controllerKey = context.tripId
@@ -332,10 +339,12 @@ export class PlanningAgent implements Agent {
       const nextQuestionKey = questionResult?.key;
 
       const profileContext = buildProfileSystemContext(context.travelProfile);
+      const strategyContext = strategy.systemPromptSection;
+      const discoveryPrompt = buildDiscoveryPrompt(tripIntent, nextState.destinations.length > 0);
       const partyLine = `Party: ${nextState.partySize ?? 'unset'} ${nextState.partyType ?? ''}`.trim();
       plannerDirective = `
 ${profileContext}
-
+${strategyContext ? `\n${strategyContext}\n` : ''}${discoveryPrompt ? `\n${discoveryPrompt}\n` : ''}
 Planner Context:
 - Known destinations: ${nextState.destinations.length ? nextState.destinations.join(', ') : 'none'}
 - Destination scope: ${nextState.destinationScope}
