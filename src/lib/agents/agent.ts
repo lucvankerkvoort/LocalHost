@@ -1,4 +1,5 @@
 import { StreamTextResult, type ToolSet, Output } from 'ai';
+import type { TravelProfile } from '@/lib/travel-profile/types';
 
 export type HostOnboardingStage =
   | 'CITY_MISSING'
@@ -7,10 +8,11 @@ export type HostOnboardingStage =
   | 'READY_FOR_ASSIST';
 
 export interface AgentContext {
-  userId?: string; 
+  userId?: string;
   sessionId?: string;
   tripId?: string;
   onboardingStage?: HostOnboardingStage;
+  travelProfile?: TravelProfile | null;
 }
 
 export type AgentStreamResult = StreamTextResult<

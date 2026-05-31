@@ -279,3 +279,78 @@ export async function assertNoPageErrors(page: Page, errors: string[]) {
   );
   expect(criticalErrors).toHaveLength(0);
 }
+
+// =============================================================================
+// API MOCKING HELPERS
+// =============================================================================
+
+/**
+ * Mock the AI chat API with a Vercel AI SDK data-stream response.
+ * Prevents real OpenAI calls during E2E tests.
+ */
+export async function mockChatAPI(
+  page: Page,
+  responseText = "I'll help plan your trip! Let me generate your itinerary."
+): Promise<void> {
+  await page.route('/api/chat', async (route) => {
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'x-vercel-ai-data-stream': 'v1',
+      },
+      body: [
+        'f:{"messageId":"msg_test_001"}',
+        `0:${JSON.stringify(responseText)}`,
+        'e:{"finishReason":"stop","usage":{"promptTokens":50,"completionTokens":30},"isContinued":false}',
+        'd:{"finishReason":"stop","usage":{"promptTokens":50,"completionTokens":30}}',
+      ].join('\n'),
+    });
+  });
+}
+
+/**
+ * Mock the orchestrator API (POST create + GET poll).
+ * Prevents real job execution during E2E tests.
+ */
+export async function mockOrchestratorAPI(page: Page): Promise<void> {
+  await page.route('**/api/orchestrator', async (route) => {
+    const method = route.request().method();
+    if (method === 'POST') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          jobId: 'mock-job-e2e',
+          status: 'running',
+          stage: 'geocoding',
+        }),
+      });
+    } else {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'complete',
+          stage: 'complete',
+          plan: {
+            destinations: [{ name: 'Barcelona', lat: 41.3851, lng: 2.1734 }],
+            stops: [
+              {
+                title: 'Barcelona',
+                type: 'CITY',
+                days: [
+                  {
+                    dayIndex: 1,
+                    title: 'Day 1',
+                    items: [{ title: 'Gothic Quarter', type: 'SIGHT' }],
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      });
+    }
+  });
+}

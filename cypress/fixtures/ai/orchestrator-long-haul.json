@@ -1,0 +1,62 @@
+{
+  "jobId": "mock-job-long-haul",
+  "status": "complete",
+  "stage": "complete",
+  "message": "Your 6-month itinerary is ready!",
+  "progressCurrent": 4,
+  "progressTotal": 4,
+  "plan": {
+    "destinations": [
+      { "name": "Tokyo",         "lat": 35.6762, "lng": 139.6503 },
+      { "name": "Bangkok",       "lat": 13.7563, "lng": 100.5018 },
+      { "name": "Bali",          "lat": -8.4095, "lng": 115.1889 },
+      { "name": "Cape Town",     "lat": -33.9249,"lng": 18.4241  },
+      { "name": "Buenos Aires",  "lat": -34.6037,"lng": -58.3816 },
+      { "name": "Mexico City",   "lat": 19.4326, "lng": -99.1332 }
+    ],
+    "stops": [
+      {
+        "title": "Japan — Month 1",
+        "type": "CITY",
+        "days": [
+          {
+            "dayIndex": 1,
+            "title": "Day 1 - Tokyo Arrival",
+            "items": [
+              { "title": "Shinjuku",    "type": "SIGHT",     "locationName": "Shinjuku, Tokyo" },
+              { "title": "Shibuya Crossing", "type": "SIGHT","locationName": "Shibuya Crossing, Tokyo" }
+            ]
+          },
+          {
+            "dayIndex": 30,
+            "title": "Day 30 - Flight to Bangkok",
+            "items": [
+              { "title": "Flight NRT → BKK", "type": "TRANSPORT", "locationName": "Narita Airport" }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Southeast Asia — Months 2–3",
+        "type": "MULTI_COUNTRY",
+        "days": [
+          {
+            "dayIndex": 31,
+            "title": "Day 31 - Bangkok",
+            "items": [
+              { "title": "Grand Palace",   "type": "SIGHT",     "locationName": "Grand Palace, Bangkok" },
+              { "title": "Street Food Tour","type": "EXPERIENCE","locationName": "Chatuchak Market, Bangkok" }
+            ]
+          },
+          {
+            "dayIndex": 60,
+            "title": "Day 60 - Ubud, Bali",
+            "items": [
+              { "title": "Tegalalang Rice Terraces", "type": "SIGHT", "locationName": "Tegalalang, Ubud, Bali" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

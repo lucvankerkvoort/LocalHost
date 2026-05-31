@@ -1,3 +1,43 @@
+import type { TravelProfile } from '@/lib/travel-profile/types';
+import {
+  TRAVEL_STYLE_LABELS,
+  TRAVEL_GROUP_LABELS,
+} from '@/lib/travel-profile/types';
+
+export function buildProfileSystemContext(profile: TravelProfile | null | undefined): string {
+  if (!profile) {
+    return `Travel Profile: Not set up yet.
+- On the user's first message (when no destination is known yet), ask ONE brief question about their travel style before asking where they want to go.
+  Example: "Before we dive in — are you more of a road-tripper, a region deep-diver, or a multi-country hopper? Knowing your style helps me personalize your trips. (Or just tell me where you want to go!)"
+- After they answer, call saveUserProfile with the extracted data. Then continue with trip planning normally.
+- Do NOT ask multiple profile questions — one warm opener is enough.`;
+  }
+
+  const styleLabel = TRAVEL_STYLE_LABELS[profile.travelStyle];
+  const groupLabel = TRAVEL_GROUP_LABELS[profile.groupType];
+  const paceLabel = profile.pace.toLowerCase();
+  const budgetLabel = profile.budget.toLowerCase();
+  const lines = [
+    `Travel Profile: ${styleLabel}`,
+    `- Pace preference: ${paceLabel}`,
+    `- Budget tier: ${budgetLabel}`,
+    `- Travels: ${groupLabel}`,
+    profile.transportPreference
+      ? `- Preferred transport: ${profile.transportPreference}`
+      : null,
+    profile.interests.length > 0
+      ? `- Interests: ${profile.interests.join(', ')}`
+      : null,
+    !profile.completedAt
+      ? '- Profile is partial — infer preferences from conversation and call saveUserProfile when you have enough to save.'
+      : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return lines;
+}
+
 export const SYSTEM_PROMPT = `You are the travel planning agent for Localhost.
 
 Primary objective:

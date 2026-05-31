@@ -5,6 +5,7 @@ import { conversationController } from '@/lib/conversation/controller';
 import { validateAgentOutput, withExecution } from '@/lib/agent-constraints';
 import type { HostOnboardingStage } from '@/lib/agents/agent';
 import { rateLimit } from '@/lib/api/rate-limit';
+import { loadTravelProfile } from '@/lib/travel-profile/loader';
 
 export const maxDuration = 300; // Allow 5 minutes for generation
 
@@ -88,13 +89,31 @@ export async function POST(req: Request) {
     });
   }
 
+  const userId = session?.user?.id;
+  let travelProfile = userId ? await loadTravelProfile(userId) : null;
+
+  // Test-only: allow profile injection via request header so E2E tests can verify
+  // persona-specific agent behavior without a seeded database.
+  // Disabled in production unconditionally.
+  if (process.env.NODE_ENV !== 'production' && process.env.E2E_PROFILE_INJECTION === 'true') {
+    const injectedHeader = req.headers.get('x-e2e-travel-profile');
+    if (injectedHeader) {
+      try {
+        travelProfile = JSON.parse(injectedHeader);
+      } catch {
+        // Malformed header — ignore and use DB profile
+      }
+    }
+  }
+
   const onboardingStage = parseOnboardingStage(body.onboardingStage);
   const runAgent = () =>
     agent.process(modelMessages, {
-      userId: session?.user?.id,
+      userId,
       sessionId: id,
       onboardingStage,
       tripId,
+      travelProfile,
     });
   const result = execution ? await withExecution(execution, runAgent) : await runAgent();
 

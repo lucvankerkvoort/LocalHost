@@ -1,0 +1,44 @@
+{
+  "jobId": "mock-job-region-explorer",
+  "status": "complete",
+  "stage": "complete",
+  "message": "Your regional itinerary is ready!",
+  "progressCurrent": 4,
+  "progressTotal": 4,
+  "plan": {
+    "destinations": [
+      { "name": "Tuscany", "lat": 43.7711, "lng": 11.2486 }
+    ],
+    "stops": [
+      {
+        "title": "Tuscany",
+        "type": "REGION",
+        "days": [
+          {
+            "dayIndex": 1,
+            "title": "Day 1 - Florence Morning",
+            "items": [
+              { "title": "Uffizi Gallery",   "type": "SIGHT",      "locationName": "Uffizi Gallery, Florence" },
+              { "title": "Local Market",     "type": "EXPERIENCE", "locationName": "Mercato Centrale, Florence" }
+            ]
+          },
+          {
+            "dayIndex": 2,
+            "title": "Day 2 - Siena Afternoon",
+            "items": [
+              { "title": "Piazza del Campo", "type": "SIGHT", "locationName": "Piazza del Campo, Siena" }
+            ]
+          },
+          {
+            "dayIndex": 3,
+            "title": "Day 3 - Chianti Valley",
+            "items": [
+              { "title": "Chianti Wine Tasting", "type": "EXPERIENCE", "locationName": "Greve in Chianti" },
+              { "title": "Castellina in Chianti", "type": "SIGHT",     "locationName": "Castellina in Chianti" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

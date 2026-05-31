@@ -24,6 +24,7 @@ model User {
   image         String?
   languages     String[]  @default([])
   interests     String[]  @default([])
+  travelProfile TravelProfile?
 
   // Traveler Profile
   occupation        String?
@@ -110,6 +111,61 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// ============================================
+// TRAVEL PROFILE
+// ============================================
+
+model TravelProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  travelStyle         TravelStyle  @default(FLEXIBLE)
+  pace                TravelPace   @default(BALANCED)
+  budget              TravelBudget @default(MID)
+  groupType           TravelGroup  @default(SOLO)
+  transportPreference String?
+
+  // Mirrors User.interests but scoped to travel context
+  interests String[] @default([])
+
+  // Set when the user has explicitly completed profile setup
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TravelStyle {
+  ROAD_TRIP
+  REGION_EXPLORER
+  MULTI_COUNTRY
+  BACKPACKER
+  LUXURY
+  CULTURAL
+  ADVENTURE
+  FLEXIBLE
+}
+
+enum TravelPace {
+  RELAXED
+  BALANCED
+  PACKED
+}
+
+enum TravelBudget {
+  BUDGET
+  MID
+  PREMIUM
+}
+
+enum TravelGroup {
+  SOLO
+  COUPLE
+  FAMILY
+  GROUP
 }
 
 // ============================================
