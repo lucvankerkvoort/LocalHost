@@ -7,22 +7,26 @@ import { defaultStrategy } from './default';
 
 /**
  * Map resolved trip intent to a strategy.
- * Spatial pattern takes priority; mobility mode is a fallback signal.
+ * Spatial pattern takes absolute priority over mobility mode.
+ * Mobility mode is only a fallback when spatial pattern is UNKNOWN,
+ * so "driving a multi-city loop" (MULTI_DESTINATION + OWN_CAR) correctly
+ * routes to multi-country rather than road-trip.
  */
 export function routeToStrategy(intent: TripIntent): AgentStrategy {
   const { spatialPattern, mobilityMode } = intent;
 
+  // Spatial pattern wins unconditionally
   if (spatialPattern === 'BASE_EXPLORE' || spatialPattern === 'HUB_SPOKE')
     return regionExplorerStrategy;
-
-  if (
-    spatialPattern === 'LINEAR_ROUTE' ||
-    mobilityMode === 'OWN_CAR' ||
-    mobilityMode === 'RV'
-  )
+  if (spatialPattern === 'LINEAR_ROUTE')
     return roadTripStrategy;
+  if (spatialPattern === 'MULTI_DESTINATION')
+    return multiCountryStrategy;
 
-  if (spatialPattern === 'MULTI_DESTINATION' || mobilityMode === 'FLIGHTS_ONLY')
+  // spatialPattern === 'UNKNOWN' — fall back to mobility clues
+  if (mobilityMode === 'OWN_CAR' || mobilityMode === 'RV')
+    return roadTripStrategy;
+  if (mobilityMode === 'FLIGHTS_ONLY')
     return multiCountryStrategy;
 
   return defaultStrategy;

@@ -342,9 +342,10 @@ export class PlanningAgent implements Agent {
       const strategyContext = strategy.systemPromptSection;
       const discoveryPrompt = buildDiscoveryPrompt(tripIntent, nextState.destinations.length > 0);
       const partyLine = `Party: ${nextState.partySize ?? 'unset'} ${nextState.partyType ?? ''}`.trim();
+      const sections = [profileContext, strategyContext, discoveryPrompt].filter(Boolean);
       plannerDirective = `
-${profileContext}
-${strategyContext ? `\n${strategyContext}\n` : ''}${discoveryPrompt ? `\n${discoveryPrompt}\n` : ''}
+${sections.join('\n\n')}
+
 Planner Context:
 - Known destinations: ${nextState.destinations.length ? nextState.destinations.join(', ') : 'none'}
 - Destination scope: ${nextState.destinationScope}
