@@ -6,6 +6,29 @@ import { validateAgentOutput, withExecution } from '@/lib/agent-constraints';
 import type { HostOnboardingStage } from '@/lib/agents/agent';
 import { rateLimit } from '@/lib/api/rate-limit';
 import { loadTravelProfile } from '@/lib/travel-profile/loader';
+import type { TravelProfile } from '@/lib/travel-profile/types';
+
+const VALID_TRAVEL_STYLES = new Set(['ROAD_TRIP','REGION_EXPLORER','MULTI_COUNTRY','BACKPACKER','LUXURY','CULTURAL','ADVENTURE','FLEXIBLE']);
+const VALID_PACES = new Set(['RELAXED','BALANCED','PACKED']);
+const VALID_BUDGETS = new Set(['BUDGET','MID','PREMIUM']);
+const VALID_GROUPS = new Set(['SOLO','COUPLE','FAMILY','GROUP']);
+
+function parseInjectedProfile(raw: string): TravelProfile | null {
+  try {
+    const obj = JSON.parse(raw) as Record<string, unknown>;
+    if (
+      typeof obj.userId === 'string' &&
+      VALID_TRAVEL_STYLES.has(obj.travelStyle as string) &&
+      VALID_PACES.has(obj.pace as string) &&
+      VALID_BUDGETS.has(obj.budget as string) &&
+      VALID_GROUPS.has(obj.groupType as string) &&
+      Array.isArray(obj.interests)
+    ) {
+      return obj as unknown as TravelProfile;
+    }
+  } catch { /* malformed JSON */ }
+  return null;
+}
 
 export const maxDuration = 300; // Allow 5 minutes for generation
 
@@ -98,11 +121,9 @@ export async function POST(req: Request) {
   if (process.env.NODE_ENV !== 'production' && process.env.E2E_PROFILE_INJECTION === 'true') {
     const injectedHeader = req.headers.get('x-e2e-travel-profile');
     if (injectedHeader) {
-      try {
-        travelProfile = JSON.parse(injectedHeader);
-      } catch {
-        // Malformed header — ignore and use DB profile
-      }
+      const parsed = parseInjectedProfile(injectedHeader);
+      if (parsed) travelProfile = parsed;
+      // Invalid header silently falls back to DB profile
     }
   }
 

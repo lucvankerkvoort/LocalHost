@@ -29,5 +29,8 @@ export function routeToStrategy(intent: TripIntent): AgentStrategy {
   if (mobilityMode === 'FLIGHTS_ONLY')
     return multiCountryStrategy;
 
+  // NO_CAR, MIXED, and UNKNOWN mobility: no spatial signal to act on.
+  // defaultStrategy leaves systemPromptSection empty so the discovery prompt
+  // fires and asks the user one clarifying question before routing.
   return defaultStrategy;
 }

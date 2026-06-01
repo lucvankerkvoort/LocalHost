@@ -10,7 +10,6 @@ export type ActivityFocus =
   | 'FOOD'
   | 'NATURE'
   | 'ADVENTURE'
-  | 'MIXED'
   | 'UNKNOWN';
 
 export type MobilityMode =

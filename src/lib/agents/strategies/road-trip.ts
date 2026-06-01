@@ -10,13 +10,4 @@ export const roadTripStrategy: AgentStrategy = {
 - Order stops strictly in geographic route direction — never backtrack.
 - Include practical driving context where helpful: estimated drive times, notable highway numbers, best time of day to drive a stretch.
 - Do not suggest flights unless the user explicitly asks for a hybrid itinerary.`,
-  allowedTools: [
-    'semanticSearch',
-    'generateItinerary',
-    'getCurrentItinerary',
-    'updateItinerary',
-    'navigate',
-    'saveUserProfile',
-    'flyToLocation',
-  ],
 };

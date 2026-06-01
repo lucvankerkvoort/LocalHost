@@ -10,13 +10,4 @@ export const regionExplorerStrategy: AgentStrategy = {
 - For days: fill the morning and early afternoon; leave late afternoons loose so the user can cook, rest, or wander freely.
 - When using semanticSearch, focus on local experiences and hosts within the immediate region — not tourist highlights in other cities.
 - Clarifying questions to ask if unclear: What's their base location? How much structure do they want each day (relaxed vs. full schedule)? Any specific interests (food, culture, nature)?`,
-  allowedTools: [
-    'semanticSearch',
-    'generateItinerary',
-    'getCurrentItinerary',
-    'updateItinerary',
-    'navigate',
-    'saveUserProfile',
-    'flyToLocation',
-  ],
 };
