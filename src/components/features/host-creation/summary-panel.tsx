@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   selectHostCreation,
@@ -37,6 +38,7 @@ interface SummaryPanelProps {
 export function SummaryPanel({ draftId }: SummaryPanelProps) {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { data: session } = useSession();
   const [isPublishing, setIsPublishing] = useState(false);
   const { city, stops, title, shortDesc, longDesc, duration, status } =
     useAppSelector(selectHostCreation);
@@ -58,10 +60,9 @@ export function SummaryPanel({ draftId }: SummaryPanelProps) {
     }
   };
 
-  // Mock host info for MVP
   const host = {
-    name: "Luc V.",
-    photo: "https://i.pravatar.cc/150?u=luc",
+    name: session?.user?.name ?? 'Host',
+    photo: session?.user?.image ?? null,
   };
 
   const handlePublish = async () => {
@@ -128,11 +129,17 @@ export function SummaryPanel({ draftId }: SummaryPanelProps) {
             Host
           </h3>
           <div className="flex items-center gap-3">
-            <img
-              src={host.photo}
-              alt={host.name}
-              className="w-10 h-10 rounded-full object-cover border border-[var(--border)]"
-            />
+            {host.photo ? (
+              <img
+                src={host.photo}
+                alt={host.name}
+                className="w-10 h-10 rounded-full object-cover border border-[var(--border)]"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-[var(--princeton-orange)] flex items-center justify-center text-white font-semibold text-sm border border-[var(--border)]">
+                {host.name.charAt(0).toUpperCase()}
+              </div>
+            )}
             <span className="font-medium">{host.name}</span>
           </div>
         </section>

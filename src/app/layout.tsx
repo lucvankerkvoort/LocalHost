@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { ConditionalChatWidget, Navbar } from "@/components/features";
 import { GlobalUI } from "@/components/layout/global-ui";
+import { DevLogPanel } from "@/components/features/dev-log-panel";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -44,6 +45,7 @@ export default function RootLayout({
             {children}
           </main>
           <ConditionalChatWidget />
+          {process.env.NODE_ENV === 'development' && <DevLogPanel />}
         </Providers>
       </body>
     </html>

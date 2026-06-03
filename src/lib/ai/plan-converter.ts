@@ -10,6 +10,8 @@ import type { ItineraryPlan as OrchestratorPlan } from '@/lib/ai/types';
 import { isObviouslyInvalid } from '@/lib/ai/validation/geo-validator';
 import { buildPlaceImageUrl } from '@/lib/images/places';
 import { getCityCoordinates } from '@/lib/data/city-coordinates';
+import { buildBookingComSearchLink } from '@/lib/hotels/affiliate-links';
+import type { LodgingMetadata } from '@/types/hotels';
 
 const TRANSPORT_OVERRIDE_PATTERN = /transport between cities:\s*([^.\n]+)/i;
 const MIN_INTERCITY_ROUTE_DISTANCE_METERS = 30000;
@@ -17,6 +19,12 @@ const MIN_INTERCITY_ROUTE_DISTANCE_METERS = 30000;
 /** Deterministic destination ID from day number — survives across plan re-applications. */
 function buildDestinationId(dayNumber: number): string {
   return `day-${dayNumber}`;
+}
+
+/** Nights between two YYYY-MM-DD dates. */
+function nightsBetween(checkIn: string, checkOut: string): number {
+  const msPerDay = 86_400_000;
+  return Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / msPerDay));
 }
 
 /** Deterministic route ID from connected day numbers. */
@@ -195,7 +203,7 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
     const currentCity = day.city || extractCityName(anchorLocation);
 
     // Create items first to preserve IDs
-    const dayItems = day.activities.map((act, idx): ItineraryItem => {
+    const activityItems = day.activities.map((act, idx): ItineraryItem => {
       // ... (existing mapping logic) ...
         // Map category to item type
         let type: ItineraryItemType = 'EXPERIENCE'; // Default to Anchor/Experience
@@ -205,14 +213,6 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
             type = 'SIGHT'; // Context Stop
         } else if (cat === 'restaurant' || cat === 'cafe' || cat === 'food') {
             type = 'MEAL';
-        }
-
-        // Assign a host if available and appropriate
-        let hostId: string | undefined;
-        if ((type === 'EXPERIENCE' || type === 'MEAL') && day.suggestedHosts && day.suggestedHosts.length > 0) {
-            // Simple logic: cycle through hosts based on index to distribute them
-            const hostIndex = idx % day.suggestedHosts.length;
-            hostId = day.suggestedHosts[hostIndex].id;
         }
 
         const placeImageUrl = act.place.imageUrl
@@ -228,7 +228,7 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
         return {
           id: buildItemId(day.dayNumber, act.place.id, idx),
           type,
-          title: act.place.name,
+          title: act.place.name.replace(/\s*\(hosted\)\s*/gi, '').trim(),
           position: idx,
           description: act.notes,
           location: act.place.description || act.place.address || `${act.timeSlot}`,
@@ -244,14 +244,102 @@ export function convertPlanToGlobeData(plan: OrchestratorPlan): {
             imageUrls: act.place.imageUrls,
           },
           category: act.place.category,
-          hostId,
         } as ItineraryItem;
     });
+
+    // Inject the best matched local experience inline at the midpoint of the day's activities.
+    const insertAt = Math.ceil(activityItems.length / 2);
+    const experienceActivities: ItineraryItem[] = (day.experienceItems ?? []).map((exp) => {
+      return {
+        id: `day-${day.dayNumber}-exp-${exp.id}`,
+        type: 'EXPERIENCE' as const,
+        title: exp.title,
+        description: exp.description,
+        position: insertAt,
+        hostId: exp.hostId,
+        hostName: exp.hostName,
+        hostPhoto: exp.photo,
+        experienceId: exp.id,
+        status: 'DRAFT' as const,
+        duration: exp.duration,
+        place: {
+          id: `exp-place-${exp.id}`,
+          name: exp.hostName ? `${exp.hostName}'s experience` : exp.title,
+          location: {
+            lat: resolvedAnchor.location.lat,
+            lng: resolvedAnchor.location.lng,
+          },
+          city: currentCity ?? undefined,
+        },
+      };
+    });
+
+    // Inject LODGING item at end of day if the AI included hotel data
+    const lodgingItems: ItineraryItem[] = [];
+    if (day.lodging) {
+      const lodging = day.lodging;
+      const affiliateUrl =
+        lodging.affiliateUrl ??
+        buildBookingComSearchLink({
+          city: lodging.city,
+          countryCode: lodging.country.slice(0, 2).toUpperCase(),
+          checkIn: lodging.checkIn,
+          checkOut: lodging.checkOut,
+          adults: 1,
+        });
+
+      const metadata: LodgingMetadata = {
+        provider: 'booking_com',
+        hotelName: lodging.hotelName,
+        stars: lodging.stars,
+        pricePerNightCents: lodging.pricePerNightCents,
+        currency: 'USD',
+        checkIn: lodging.checkIn,
+        checkOut: lodging.checkOut,
+        nights: nightsBetween(lodging.checkIn, lodging.checkOut),
+        guests: 1,
+        thumbnailUrl: lodging.thumbnailUrl,
+        affiliateUrl,
+        amenities: [],
+      };
+
+      lodgingItems.push({
+        id: `day-${day.dayNumber}-lodging`,
+        type: 'LODGING' as const,
+        title: lodging.hotelName,
+        description: [
+          lodging.stars ? `${lodging.stars}-star hotel` : '',
+          lodging.pricePerNightCents
+            ? `~$${Math.round(lodging.pricePerNightCents / 100)}/night`
+            : '',
+        ]
+          .filter(Boolean)
+          .join(' · ') || 'Hotel accommodation',
+        position: activityItems.length + experienceActivities.length,
+        location: `${lodging.city}, ${lodging.country}`,
+        place: {
+          id: `lodging-place-${day.dayNumber}`,
+          name: lodging.hotelName,
+          location: resolvedAnchor.location,
+          city: lodging.city,
+          country: lodging.country,
+          imageUrl: lodging.thumbnailUrl,
+        },
+        metadataJson: metadata,
+      });
+    }
+
+    const dayItems = [
+      ...activityItems.slice(0, insertAt),
+      ...experienceActivities,
+      ...activityItems.slice(insertAt),
+      ...lodgingItems,
+    ];
 
     // MARKER CONSOLIDATION LOGIC:
     // DISABLED: We want each day to be a distinct column in the UI.
     // The globe component handles visual clustering of markers sharing the same city.
-    
+
     // Create NEW destination from anchor location (One destination per day)
     const destination: GlobeDestination = {
       id: buildDestinationId(day.dayNumber),

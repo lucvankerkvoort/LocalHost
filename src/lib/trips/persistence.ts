@@ -4,6 +4,7 @@ import { decideTripPlanWriteAccess } from './persistence-auth';
 import { supportsItineraryItemPlaceIdColumn } from './place-id-compat';
 import type { TripPlanStopInput, TripPlanWritePayload } from './contracts/trip-plan.schema';
 import { resolveNextTripVersion, TripVersionConflictError } from './versioning';
+import { clearGenerationProgress } from '@/lib/cache/ai-cache';
 
 type PersistTripPlanBaseInput = {
   tripId: string;
@@ -176,6 +177,12 @@ async function persistTripPlanCore(
     const nextTitle =
       typeof title === 'string' && title.trim().length > 0 ? title.trim() : txTrip.title;
 
+    const revisionPayload = sanitizeJsonValue({
+      stops,
+      preferences: nextPreferences,
+      title: nextTitle,
+    });
+
     await tx.trip.update({
       where: { id: tripId },
       data: {
@@ -185,13 +192,8 @@ async function persistTripPlanCore(
         status: 'PLANNED',
         preferences: nextPreferences,
         currentVersion: nextVersion,
+        itineraryData: revisionPayload,
       },
-    });
-
-    const revisionPayload = sanitizeJsonValue({
-      stops,
-      preferences: nextPreferences,
-      title: nextTitle,
     });
 
     await tx.tripRevision.create({
@@ -209,6 +211,10 @@ async function persistTripPlanCore(
       select: { id: true },
     });
   });
+
+  if (input.audit?.generationId) {
+    await clearGenerationProgress(input.audit.generationId);
+  }
 
   logTripPlanPersistence('write.success', {
     tripId,

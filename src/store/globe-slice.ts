@@ -363,7 +363,35 @@ const globeSlice = createSlice({
     },
     setFocusedItemId(state, action: PayloadAction<string | null>) {
       state.focusedItemId = action.payload;
-    }
+    },
+    /** Remove a single itinerary item from whichever day contains it. */
+    deleteItem(state, action: PayloadAction<{ itemId: string }>) {
+      const { itemId } = action.payload;
+      state.destinations = state.destinations.map((dest) => ({
+        ...dest,
+        activities: dest.activities.filter((item) => item.id !== itemId),
+      }));
+    },
+    /** Replace the ordered activities list for a specific destination (used after drag-to-reorder). */
+    reorderItems(
+      state,
+      action: PayloadAction<{ destinationId: string; items: ItineraryItem[] }>
+    ) {
+      const dest = state.destinations.find((d) => d.id === action.payload.destinationId);
+      if (dest) {
+        dest.activities = action.payload.items;
+      }
+    },
+    /** Append a newly-created item to a day (used after POST /api/trips/[tripId]/items succeeds). */
+    appendItem(
+      state,
+      action: PayloadAction<{ destinationId: string; item: ItineraryItem }>
+    ) {
+      const dest = state.destinations.find((d) => d.id === action.payload.destinationId);
+      if (dest) {
+        dest.activities = [...dest.activities, action.payload.item];
+      }
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(toolCallReceived, (state, action: PayloadAction<ToolCallEvent>) => {
@@ -485,7 +513,10 @@ export const {
   updateDayIds,
   setHoveredItemId,
   setActiveItemId,
-  setFocusedItemId
+  setFocusedItemId,
+  deleteItem,
+  reorderItems,
+  appendItem,
 } = globeSlice.actions;
 
 export default globeSlice.reducer;

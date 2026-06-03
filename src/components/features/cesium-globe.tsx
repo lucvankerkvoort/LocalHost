@@ -19,12 +19,13 @@ if (typeof window !== 'undefined') {
 
 // Now import Cesium and Resium
 import { Viewer, Entity } from 'resium';
-import { 
+import {
   ArcType,
   Cartesian2,
-  Cartesian3, 
-  Color, 
+  Cartesian3,
+  Color,
   HeightReference,
+  LabelStyle,
   SceneTransforms,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
@@ -286,6 +287,56 @@ function createCircularAvatar(imageUrl: string, size: number = 48): Promise<stri
   });
 }
 
+// Create a rounded-pill label badge as a canvas data URL.
+// Renders at 2× resolution for crisp display on retina screens.
+function createRoundedLabelBadge(text: string): string {
+  const scale = 2;
+  const fontSize = 12;
+  const paddingX = 8;
+  const paddingY = 5;
+  const radius = 8;
+
+  // Measure text width first
+  const probe = document.createElement('canvas');
+  const probeCtx = probe.getContext('2d')!;
+  probeCtx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  const textWidth = probeCtx.measureText(text).width;
+
+  const w = Math.ceil(textWidth + paddingX * 2);
+  const h = Math.ceil(fontSize + paddingY * 2);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w * scale;
+  canvas.height = h * scale;
+  const ctx = canvas.getContext('2d')!;
+  ctx.scale(scale, scale);
+
+  // Rounded pill background
+  const r = Math.min(radius, h / 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.76)';
+  ctx.beginPath();
+  ctx.moveTo(r, 0);
+  ctx.lineTo(w - r, 0);
+  ctx.arcTo(w, 0, w, r, r);
+  ctx.lineTo(w, h - r);
+  ctx.arcTo(w, h, w - r, h, r);
+  ctx.lineTo(r, h);
+  ctx.arcTo(0, h, 0, h - r, r);
+  ctx.lineTo(0, r);
+  ctx.arcTo(0, 0, r, 0, r);
+  ctx.closePath();
+  ctx.fill();
+
+  // Label text
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, w / 2, h / 2);
+
+  return canvas.toDataURL();
+}
+
 interface CesiumGlobeProps {
   destinations: GlobeDestination[];
   cityMarkers: CityMarkerData[];
@@ -445,16 +496,16 @@ function ItemPreviewPopper({
         )}
 
         <div className="p-3">
-          <h4 className="text-sm font-semibold text-[var(--foreground)] line-clamp-1">
-            {itemPreview.title.replace(/\b\w/g, (c) => c.toUpperCase())}
+          <h4 className="text-sm font-semibold text-gray-900 line-clamp-1">
+            {itemPreview.title.replace(/(?:^|\s)\p{L}/gu, m => m.toUpperCase())}
           </h4>
           {itemPreview.description && (
-            <p className={`mt-1 text-xs text-[var(--muted-foreground)] ${hasImages ? 'line-clamp-3' : 'line-clamp-5'}`}>
+            <p className={`mt-1 text-xs text-gray-500 ${hasImages ? 'line-clamp-3' : 'line-clamp-5'}`}>
               {itemPreview.description}
             </p>
           )}
           {hasImages && itemPreview.images[previewIndex]?.attribution?.displayName && (
-            <p className="mt-2 text-[10px] text-[var(--muted-foreground)]/80">
+            <p className="mt-2 text-[10px] text-gray-400">
               {itemPreview.images[previewIndex].attribution?.uri ? (
                 <a
                   href={itemPreview.images[previewIndex].attribution?.uri}
@@ -500,6 +551,7 @@ export default function CesiumGlobe({
   const viewerRef = useRef<CesiumViewer | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [hostAvatars, setHostAvatars] = useState<Record<string, string>>({});
+  const [placeLabelBadges, setPlaceLabelBadges] = useState<Record<string, string>>({});
   const [hoveredHost, setHoveredHost] = useState<HostMarkerData | null>(null);
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
   const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null);
@@ -719,6 +771,21 @@ export default function CesiumGlobe({
     }
   }, [hostMarkers]);
 
+  // Pre-generate rounded label badges for place markers
+  useEffect(() => {
+    if (placeMarkers.length === 0) {
+      setPlaceLabelBadges({});
+      return;
+    }
+    const badges: Record<string, string> = {};
+    for (const marker of placeMarkers) {
+      if (marker.name) {
+        badges[marker.id] = createRoundedLabelBadge(marker.name);
+      }
+    }
+    setPlaceLabelBadges(badges);
+  }, [placeMarkers]);
+
   // Setup hover detection
   useEffect(() => {
     if (!viewerRef.current || !isReady) return;
@@ -773,8 +840,24 @@ export default function CesiumGlobe({
         const entity = pickedObject.id as CesiumEntity;
         const entityId = entity.id;
 
+        if (entityId?.startsWith('host-')) {
+          const hostId = entityId.replace('host-', '');
+          const host = hostMarkers.find(h => h.id === hostId);
+          if (host) {
+            onHostClick?.(host);
+            return;
+          }
+        }
+
         if (entityId?.startsWith('route-marker-')) {
           const markerId = entityId.replace('route-marker-', '');
+          onItemClick?.(markerId);
+          return;
+        }
+
+        if (entityId?.startsWith('place-lbl-')) {
+          // Label badge entity — treat same as clicking the icon
+          const markerId = entityId.replace('place-lbl-', '');
           onItemClick?.(markerId);
           return;
         }
@@ -941,7 +1024,7 @@ export default function CesiumGlobe({
           const isSelected = Boolean(
             selectedDestination && marker.dayIds.includes(selectedDestination)
           );
-          const labelText = marker.name.replace(/\b\w/g, (c) => c.toUpperCase());
+          const labelText = marker.name.replace(/(?:^|\s)\p{L}/gu, m => m.toUpperCase());
           const iconSize = isSelected ? CITY_MARKER_ICON_SELECTED_SIZE : CITY_MARKER_ICON_SIZE;
           const cityColor = marker.color.toLowerCase() === ROUTE_MARKER_COLOR
             ? CITY_MARKER_FALLBACK_COLOR
@@ -1100,7 +1183,7 @@ export default function CesiumGlobe({
                   disableDepthTestDistance: MARKER_DEPTH_TEST_DISTANCE,
                 }}
                 label={{
-                  text: (marker.name ?? '').replace(/\b\w/g, (c) => c.toUpperCase()),
+                  text: (marker.name ?? '').replace(/(?:^|\s)\p{L}/gu, m => m.toUpperCase()),
                   font: isActive ? 'bold 14px sans-serif' : '11px sans-serif',
                   fillColor: markerColor.withAlpha(0.95),
                   outlineColor: Color.WHITE,
@@ -1134,7 +1217,10 @@ export default function CesiumGlobe({
               size: PLACE_MARKER_ICON_SIZE,
             });
 
-            return (
+            const badgeImage = placeLabelBadges[marker.id];
+
+            return [
+              // Icon pin
               <Entity
                 key={`place-${marker.id}`}
                 id={`place-${marker.id}`}
@@ -1146,10 +1232,26 @@ export default function CesiumGlobe({
                   height: PLACE_MARKER_ICON_SIZE,
                   heightReference: HeightReference.CLAMP_TO_GROUND,
                   verticalOrigin: VerticalOrigin.BOTTOM,
-                  disableDepthTestDistance: MARKER_DEPTH_TEST_DISTANCE,
+                  disableDepthTestDistance: Number.POSITIVE_INFINITY,
                 }}
-              />
-            );
+              />,
+              // Rounded label badge above the pin (rendered once canvas image is ready)
+              badgeImage ? (
+                <Entity
+                  key={`place-lbl-${marker.id}`}
+                  id={`place-lbl-${marker.id}`}
+                  position={Cartesian3.fromDegrees(marker.lng, marker.lat, 0)}
+                  billboard={{
+                    image: badgeImage,
+                    heightReference: HeightReference.CLAMP_TO_GROUND,
+                    verticalOrigin: VerticalOrigin.BOTTOM,
+                    pixelOffset: new Cartesian2(0, -28),
+                    disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                    scale: 0.5, // drawn at 2× for retina, display at 1×
+                  }}
+                />
+              ) : null,
+            ];
           })}
 
         {/* Host markers - billboard with photo */}
@@ -1174,8 +1276,23 @@ export default function CesiumGlobe({
               heightReference: HeightReference.CLAMP_TO_GROUND,
               verticalOrigin: VerticalOrigin.BOTTOM,
               disableDepthTestDistance: Number.POSITIVE_INFINITY,
-              // Fallback color if no image
               color: hostAvatars[host.id] ? Color.WHITE : Color.fromCssColorString('#2a9d8f'),
+            }}
+            label={{
+              text: host.name,
+              font: 'bold 12px sans-serif',
+              fillColor: Color.WHITE,
+              outlineColor: Color.BLACK,
+              outlineWidth: 2,
+              style: LabelStyle.FILL_AND_OUTLINE,
+              verticalOrigin: VerticalOrigin.BOTTOM,
+              // Sits just above the 44px avatar billboard
+              pixelOffset: new Cartesian2(0, -52),
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              heightReference: HeightReference.CLAMP_TO_GROUND,
+              showBackground: true,
+              backgroundColor: Color.fromCssColorString('rgba(0,0,0,0.55)'),
+              backgroundPadding: new Cartesian2(6, 3),
             }}
             onClick={() => onHostClick?.(host)}
           />

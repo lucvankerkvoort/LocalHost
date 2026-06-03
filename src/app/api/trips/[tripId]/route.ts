@@ -26,7 +26,11 @@ export async function GET(
                                 items: {
                                     orderBy: { orderIndex: 'asc' },
                                     include: {
-                                        experience: true, // Include experience details if needed
+                                        experience: {
+                                            include: {
+                                                host: { select: { name: true, image: true } }
+                                            }
+                                        },
                                         images: {
                                             orderBy: { position: 'asc' }
                                         },

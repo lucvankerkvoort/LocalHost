@@ -1,2 +1,9 @@
+[build]
+  command = "pnpm run build"
+  publish = ".next"
+
 [build.environment]
   SECRETS_SCAN_OMIT_KEYS = "DEMO_USER_PASSWORD,UNSPLASH_APP_NAME,DEMO_USER_EMAIL,NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
