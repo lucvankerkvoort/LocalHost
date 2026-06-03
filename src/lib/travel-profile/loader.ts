@@ -1,6 +1,9 @@
 import { prisma } from '@/lib/prisma';
 import type { TravelProfile, TravelProfileInput } from './types';
 
+const profileCache = new Map<string, { profile: TravelProfile | null; expiresAt: number }>();
+const CACHE_TTL_MS = 60_000;
+
 function toProfile(row: {
   id: string;
   userId: string;
@@ -26,14 +29,20 @@ function toProfile(row: {
 }
 
 export async function loadTravelProfile(userId: string): Promise<TravelProfile | null> {
+  const now = Date.now();
+  const cached = profileCache.get(userId);
+  if (cached && cached.expiresAt > now) return cached.profile;
   const row = await prisma.travelProfile.findUnique({ where: { userId } });
-  return row ? toProfile(row) : null;
+  const profile = row ? toProfile(row) : null;
+  profileCache.set(userId, { profile, expiresAt: now + CACHE_TTL_MS });
+  return profile;
 }
 
 export async function saveTravelProfile(
   userId: string,
   data: TravelProfileInput
 ): Promise<TravelProfile> {
+  profileCache.delete(userId);
   const row = await prisma.travelProfile.upsert({
     where: { userId },
     create: {

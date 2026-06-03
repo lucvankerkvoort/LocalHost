@@ -45,6 +45,17 @@ export const HostCardSchema = z.object({
 
 // --- orchestrator domain models ---
 
+export const ExperienceItemSchema = z.object({
+  id: z.string().describe('Experience ID from the platform'),
+  title: z.string().describe('Experience title, e.g. "Traditional Cooking Class"'),
+  description: z.string(),
+  photo: z.string().optional(),
+  hostId: z.string().optional(),
+  hostName: z.string().optional(),
+  duration: z.number().optional().describe('Duration in minutes'),
+  price: z.number().optional().describe('Price in cents'),
+});
+
 export const ActivitySchema = z.object({
   id: z.string(),
   place: PlaceSchema,
@@ -52,6 +63,20 @@ export const ActivitySchema = z.object({
   durationMinutes: z.number().optional(),
   notes: z.string().optional(),
 });
+
+export const LodgingPlanSchema = z.object({
+  hotelName: z.string().describe('Hotel name, e.g. "Le Marais Boutique Hotel"'),
+  stars: z.number().min(1).max(5).optional().describe('Star rating if known'),
+  city: z.string(),
+  country: z.string(),
+  checkIn: z.string().describe('Check-in date in YYYY-MM-DD format'),
+  checkOut: z.string().describe('Check-out date in YYYY-MM-DD format'),
+  pricePerNightCents: z.number().int().positive().optional().describe('Nightly rate in USD cents from search_hotels'),
+  affiliateUrl: z.string().url().optional().describe('Booking.com affiliate URL from search_hotels results'),
+  thumbnailUrl: z.string().url().optional().describe('Hotel photo URL from search_hotels results'),
+});
+
+export type LodgingPlan = z.infer<typeof LodgingPlanSchema>;
 
 export const DayPlanSchema = z.object({
   dayNumber: z.number(),
@@ -67,7 +92,13 @@ export const DayPlanSchema = z.object({
     .optional()
     .describe('Inter-city transport mode to the next day (null if last day or no travel)'),
   navigationEvents: z.array(NavigationActionSchema).optional(),
-  suggestedHosts: z.array(HostCardSchema).describe('List of >= 6 hosts near the anchor'),
+  suggestedHosts: z.array(HostCardSchema).describe('List of hosts near the anchor'),
+  experienceItems: z.array(ExperienceItemSchema).optional().describe('Top matched local experiences to inject into the itinerary for this day'),
+  lodging: LodgingPlanSchema.optional().describe(
+    'Hotel accommodation for this night. Populate by calling search_hotels for multi-night trips. ' +
+    'Set checkIn to this day\'s date and checkOut to the next day\'s date. ' +
+    'Omit for day trips or if the user already has accommodation.'
+  ),
 });
 
 export const ItineraryPlanSchema = z.object({
@@ -90,6 +121,8 @@ export type GeoPoint = z.infer<typeof GeoPointSchema>;
 export type Place = z.infer<typeof PlaceSchema>;
 export type NavigationAction = z.infer<typeof NavigationActionSchema>;
 export type HostCard = z.infer<typeof HostCardSchema>;
+export type ExperienceItem = z.infer<typeof ExperienceItemSchema>;
 export type Activity = z.infer<typeof ActivitySchema>;
 export type DayPlan = z.infer<typeof DayPlanSchema>;
 export type ItineraryPlan = z.infer<typeof ItineraryPlanSchema>;
+// LodgingPlan is already exported above as a named export

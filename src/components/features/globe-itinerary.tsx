@@ -21,6 +21,7 @@ import {
 
 import { BookingDialog } from './booking-dialog';
 import { PaymentModal } from './payment/payment-modal';
+import { AccommodationLinksModal } from './accommodation-links-modal';
 import { ItineraryDayColumn } from './itinerary-day';
 import { HostPanel } from './host-panel';
 import { buildAddedExperienceIds, buildBookedExperienceIds } from './host-panel-state';
@@ -47,6 +48,9 @@ import {
   clearPlannerHosts,
   clearHostMarkers,
   setCameraHeight,
+  deleteItem,
+  reorderItems,
+  appendItem,
 } from '@/store/globe-slice';
 import { 
   fetchActiveTrip, 
@@ -461,6 +465,14 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     hostPhoto: string;
   }>({ isOpen: false, bookingId: '', hostId: '', hostName: '', hostPhoto: '' });
 
+  const [accommodationModal, setAccommodationModal] = useState<{
+    isOpen: boolean;
+    city: string;
+    checkin: string;
+    checkout: string;
+    numAdults: number;
+  }>({ isOpen: false, city: '', checkin: '', checkout: '', numAdults: 2 });
+
   const handleViewHostProfile = useCallback((host: HostMarkerData) => {
     const restoreKey = persistItineraryState();
     const returnTo = restoreKey
@@ -593,6 +605,24 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
         hostId: thread.counterpartId,
         hostName: thread.counterpartName,
         hostPhoto: thread.counterpartPhoto || '/placeholder-host.jpg',
+      })
+    );
+    dispatch(setP2PChatOpen(true));
+  }, [dispatch, openChatThread]);
+
+  // Chat Handler for itinerary items
+  const handleChatItem = useCallback(async (item: ItineraryItem) => {
+    if (!item.hostId) return;
+    dispatch(setSelectedHostId(item.hostId));
+    if (item.experienceId) dispatch(setSelectedExperienceId(item.experienceId));
+    const thread = await openChatThread(item.hostId);
+    dispatch(
+      initThread({
+        threadId: thread.id,
+        bookingId: thread.bookingId,
+        hostId: thread.counterpartId,
+        hostName: thread.counterpartName || item.hostName || 'Host',
+        hostPhoto: thread.counterpartPhoto || item.hostPhoto || '/placeholder-host.jpg',
       })
     );
     dispatch(setP2PChatOpen(true));
@@ -883,6 +913,30 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
 
       await dispatch(fetchActiveTrip(tripId));
       alert('Payment submitted. Booking confirmation may take a few seconds to appear. If it does not update, refresh the page and retry.');
+  };
+
+  const handleFindAccommodation = (dayId: string) => {
+    const dayIndex = destinations.findIndex((d) => d.id === dayId);
+    const day = destinations[dayIndex];
+    const nextDay = destinations[dayIndex + 1];
+
+    const city = day?.city || day?.name || '';
+
+    const checkin = day?.date ?? '';
+    const checkout = nextDay?.date ?? (() => {
+      if (!checkin) return '';
+      const d = new Date(checkin);
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().split('T')[0];
+    })();
+
+    setAccommodationModal({
+      isOpen: true,
+      city,
+      checkin,
+      checkout,
+      numAdults: 2,
+    });
   };
 
   const cityMarkers = useMemo<CityMarkerData[]>(() => {
@@ -1383,6 +1437,91 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
     dispatch(setItineraryCollapsed(false));
   }, [dispatch, handleDaySelect]);
 
+  /** Delete an item optimistically from Redux, then persist to the API. */
+  const handleDeleteItem = useCallback(async (itemId: string) => {
+    // Optimistic update — remove from Redux immediately
+    dispatch(deleteItem({ itemId }));
+
+    if (!tripId) return; // guest mode — no DB to update
+    try {
+      const resp = await fetch(`/api/trips/${tripId}/items/${itemId}`, { method: 'DELETE' });
+      if (!resp.ok) {
+        console.error('[GlobeItinerary] Failed to delete item', itemId, resp.status);
+        // Could refetch to restore — for now just log; optimistic delete is acceptable
+      }
+    } catch (err) {
+      console.error('[GlobeItinerary] Delete item error', err);
+    }
+  }, [dispatch, tripId]);
+
+  /** Add a new place as a stop on a specific day. */
+  const handleAddStop = useCallback(async (
+    destinationId: string,
+    dayNumber: number,
+    place: { placeId: string; name: string; address: string; lat: number; lng: number; category: string },
+    type: 'SIGHT' | 'MEAL' | 'NOTE' | 'FREE_TIME',
+  ) => {
+    // Optimistic — append a placeholder immediately
+    const tempId = `temp-${Date.now()}`;
+    dispatch(appendItem({
+      destinationId,
+      item: {
+        id: tempId,
+        type,
+        title: place.name,
+        position: 999,
+        place: {
+          id: place.placeId,
+          name: place.name,
+          address: place.address,
+          location: { lat: place.lat, lng: place.lng },
+          city: '',
+        },
+      },
+    }));
+
+    if (!tripId) return; // guest mode
+
+    try {
+      const resp = await fetch(`/api/trips/${tripId}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dayNumber,
+          title: place.name,
+          type,
+          locationName: place.address,
+          placeId: place.placeId,
+          lat: place.lat,
+          lng: place.lng,
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json() as { item: { id: string; orderIndex: number } };
+        // Replace temp item with real persisted item
+        dispatch(deleteItem({ itemId: tempId }));
+        dispatch(appendItem({
+          destinationId,
+          item: {
+            id: data.item.id,
+            type,
+            title: place.name,
+            position: data.item.orderIndex,
+            place: {
+              id: place.placeId,
+              name: place.name,
+              address: place.address,
+              location: { lat: place.lat, lng: place.lng },
+              city: '',
+            },
+          },
+        }));
+      }
+    } catch (err) {
+      console.error('[GlobeItinerary] Add stop error', err);
+    }
+  }, [dispatch, tripId]);
+
   useEffect(() => {
     if (selectedDestination || destinations.length === 0) return;
     dispatch(setSelectedDestination(destinations[0].id));
@@ -1583,6 +1722,26 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
                       }
                       onItemHover={(itemId) => handleItemHover(itemId)}
                       onBookItem={(item) => handleBookItem(day.id, item)}
+                      onChatItem={(item) => { void handleChatItem(item); }}
+                      onFindAccommodation={() => handleFindAccommodation(day.id)}
+                      onDeleteItem={(itemId) => { void handleDeleteItem(itemId); }}
+                      onAddStop={(place, type) => {
+                        void handleAddStop(day.id, day.day, place, type);
+                      }}
+                      onReorderItems={(items) => {
+                        dispatch(reorderItems({ destinationId: day.id, items }));
+                        // Persist new order — fire PATCH for each item that moved
+                        if (tripId) {
+                          items.forEach((item, idx) => {
+                            void fetch(`/api/trips/${tripId}/items/${item.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ orderIndex: idx }),
+                            });
+                          });
+                        }
+                      }}
+                      searchContext={[day.city, day.activities[0]?.place?.country].filter(Boolean).join(', ')}
                     />
                   ))
                 )}
@@ -1697,6 +1856,15 @@ export default function GlobeItinerary({ tripId: propTripId }: GlobeItineraryPro
         bookingId={paymentModalState.bookingId}
         onClose={() => setPaymentModalState({ isOpen: false, bookingId: '', hostId: '', hostName: '', hostPhoto: '' })}
         onSuccess={handlePaymentSuccess}
+      />
+
+<AccommodationLinksModal
+        isOpen={accommodationModal.isOpen}
+        onClose={() => setAccommodationModal((s) => ({ ...s, isOpen: false }))}
+        city={accommodationModal.city}
+        checkin={accommodationModal.checkin}
+        checkout={accommodationModal.checkout}
+        numAdults={accommodationModal.numAdults}
       />
     </div>
   );

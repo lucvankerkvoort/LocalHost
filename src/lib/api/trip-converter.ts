@@ -26,7 +26,8 @@ interface ApiItineraryItem {
   orderIndex: number;
   experience?: {
       hostId: string;
-      photo?: string | null;
+      photos?: string[];
+      host?: { name?: string | null; image?: string | null } | null;
   } | null;
   images?: Array<{
       id: string;
@@ -202,7 +203,9 @@ export function convertTripToGlobeDestinations(trip: ApiTrip): GlobeDestination[
             category: item.type.toLowerCase(),
             title: item.title,
             hostId: item.experience?.hostId || item.hostId || undefined,
-            experienceId: item.experienceId,
+            hostName: item.experience?.host?.name ?? undefined,
+            hostPhoto: item.experience?.host?.image ?? item.experience?.photos?.[0] ?? undefined,
+            experienceId: item.experienceId ?? undefined,
             status: deriveItineraryItemStatus(item),
             candidateId: deriveCandidateId(item),
             position: item.orderIndex,
@@ -333,7 +336,10 @@ export function convertGlobeDestinationsToApiPayload(destinations: GlobeDestinat
         title: item.title,
         description: item.description || item.place?.description || null,
         startTime: null,
-        experienceId: item.experienceId,
+        // Only persist real DB experience IDs (cuid/uuid, length > 10).
+        // Static curated IDs like '1', '1b' fail FK constraints and must be dropped.
+        experienceId: (item.experienceId && item.experienceId.length > 10) ? item.experienceId : null,
+        hostId: item.hostId ?? null,
         locationName: item.place?.name || item.location || dest.city || dest.name,
         placeId: normalizePersistedPlaceId(item.place?.id),
         lat: item.place?.location?.lat,

@@ -1,4 +1,5 @@
-import { loadAllHosts, type Host, type HostExperience } from './data/hosts';
+import { prisma } from './prisma';
+import type { Host, HostExperience } from './data/hosts';
 
 // Category mappings for semantic understanding
 const CATEGORY_SYNONYMS: Record<string, string[]> = {
@@ -214,30 +215,73 @@ export function scoreExperience(
   };
 }
 
+async function loadHostsFromDB(location?: string): Promise<Host[]> {
+  const where: Record<string, unknown> = { isHost: true };
+  if (location) {
+    // Location may be "City, Country" — check each part independently
+    const parts = location.split(',').map(p => p.trim()).filter(Boolean);
+    const orClauses = parts.flatMap(part => [
+      { city: { contains: part, mode: 'insensitive' } },
+      { country: { contains: part, mode: 'insensitive' } },
+    ]);
+    where.OR = orClauses;
+  }
+
+  const users = await prisma.user.findMany({
+    where,
+    include: {
+      hostedExperiences: {
+        where: { isActive: true },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          category: true,
+          duration: true,
+          price: true,
+          rating: true,
+          reviewCount: true,
+          photos: true,
+        },
+      },
+    },
+    take: 200,
+  });
+
+  return users.map(u => ({
+    id: u.id,
+    name: u.name ?? '',
+    photo: u.image ?? '',
+    city: u.city ?? '',
+    country: u.country ?? '',
+    bio: u.bio ?? '',
+    quote: u.quote ?? '',
+    interests: u.interests ?? [],
+    languages: u.languages ?? [],
+    responseTime: u.responseTime ?? 'within a day',
+    memberSince: '',
+    experiences: u.hostedExperiences.map(e => ({
+      id: e.id,
+      title: e.title,
+      description: e.description,
+      category: e.category as HostExperience['category'],
+      duration: e.duration,
+      price: e.price,
+      rating: e.rating ?? 0,
+      reviewCount: e.reviewCount ?? 0,
+      photos: e.photos ?? [],
+    })),
+  }));
+}
+
 /**
  * Semantic search for hosts - scores all hosts and returns top N
  * If intent.location is provided, FILTERS to only hosts in that location
  */
 export async function semanticSearchHosts(intent: SearchIntent, limit: number = 20): Promise<ScoredHost[]> {
-  const allHosts = await loadAllHosts();
-  // Filter by location first if provided (strict filtering, not just boosting)
-  let candidates = allHosts;
-  if (intent.location) {
-    const locationLower = intent.location.toLowerCase();
-    candidates = allHosts.filter(host => 
-      host.city.toLowerCase().includes(locationLower) || 
-      host.country.toLowerCase().includes(locationLower) ||
-      locationLower.includes(host.city.toLowerCase()) ||
-      locationLower.includes(host.country.toLowerCase())
-    );
-    // Fallback to all hosts if no location match (prevents empty results)
-    if (candidates.length === 0) {
-      candidates = allHosts;
-    }
-  }
-  
-  const scored = candidates.map(host => scoreHost(host, intent));
-  return scored
+  const candidates = await loadHostsFromDB(intent.location);
+  return candidates
+    .map(host => scoreHost(host, intent))
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 }
@@ -247,31 +291,13 @@ export async function semanticSearchHosts(intent: SearchIntent, limit: number = 
  * If intent.location is provided, FILTERS to only hosts in that location
  */
 export async function semanticSearchExperiences(intent: SearchIntent, limit: number = 20): Promise<ScoredExperience[]> {
-  const allHosts = await loadAllHosts();
-  // Filter by location first if provided (strict filtering, not just boosting)
-  let candidates = allHosts;
-  if (intent.location) {
-    const locationLower = intent.location.toLowerCase();
-    candidates = allHosts.filter(host => 
-      host.city.toLowerCase().includes(locationLower) || 
-      host.country.toLowerCase().includes(locationLower) ||
-      locationLower.includes(host.city.toLowerCase()) ||
-      locationLower.includes(host.country.toLowerCase())
-    );
-    // Fallback to all hosts if no location match (prevents empty results)
-    if (candidates.length === 0) {
-      candidates = allHosts;
-    }
-  }
-  
+  const candidates = await loadHostsFromDB(intent.location);
   const allExperiences: ScoredExperience[] = [];
-  
   for (const host of candidates) {
     for (const experience of host.experiences) {
       allExperiences.push(scoreExperience(experience, host, intent));
     }
   }
-  
   return allExperiences
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);

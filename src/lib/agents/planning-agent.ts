@@ -92,10 +92,6 @@ export class PlanningAgent implements Agent {
     const isExperiencesMode = userMessageText.includes('[Mode: experiences]');
     const isPlannerMode = !isLocalsMode && !isExperiencesMode;
 
-    // Classify trip intent from conversation + profile; route to the matching strategy.
-    const tripIntent = classifyIntent(messages, context.travelProfile);
-    const strategy = routeToStrategy(tripIntent);
-
     const sessionId = context.sessionId ?? 'planner-session';
     const controllerKey = context.tripId
       ? `trip:${context.tripId}:session:${sessionId}`
@@ -126,6 +122,9 @@ export class PlanningAgent implements Agent {
     let nextQuestion: string | null = null;
 
     if (isPlannerMode) {
+      const tripIntent = classifyIntent(messages, context.travelProfile);
+      const strategy = routeToStrategy(tripIntent);
+
       const extraction = await generateObject({
         model: openai(OPENAI_PLANNING_MODEL),
         schema: PlannerDeltaSchema,
@@ -338,13 +337,25 @@ export class PlanningAgent implements Agent {
       nextQuestion = questionResult?.question ?? null;
       const nextQuestionKey = questionResult?.key;
 
-      const profileContext = buildProfileSystemContext(context.travelProfile);
+      // Suppress saved style label when the current conversation implies a different mode
+      // to avoid the profile section ("Travel Profile: Region Explorer") contradicting the
+      // strategy section ("Travel Mode: Road Tripper").
+      const profileStyleToStrategyId: Partial<Record<string, string>> = {
+        ROAD_TRIP: 'road-trip',
+        REGION_EXPLORER: 'region-explorer',
+        MULTI_COUNTRY: 'multi-country',
+      };
+      const profileImpliedId = profileStyleToStrategyId[context.travelProfile?.travelStyle ?? ''];
+      const strategyConflictsProfile =
+        strategy.id !== 'default' && !!profileImpliedId && profileImpliedId !== strategy.id;
+      const profileContext = buildProfileSystemContext(context.travelProfile, strategyConflictsProfile);
       const strategyContext = strategy.systemPromptSection;
       const discoveryPrompt = buildDiscoveryPrompt(tripIntent, nextState.destinations.length > 0);
       const partyLine = `Party: ${nextState.partySize ?? 'unset'} ${nextState.partyType ?? ''}`.trim();
+      const sections = [profileContext, strategyContext, discoveryPrompt].filter(Boolean);
       plannerDirective = `
-${profileContext}
-${strategyContext ? `\n${strategyContext}\n` : ''}${discoveryPrompt ? `\n${discoveryPrompt}\n` : ''}
+${sections.join('\n\n')}
+
 Planner Context:
 - Known destinations: ${nextState.destinations.length ? nextState.destinations.join(', ') : 'none'}
 - Destination scope: ${nextState.destinationScope}

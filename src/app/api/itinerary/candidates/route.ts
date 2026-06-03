@@ -2,6 +2,25 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { auth } from '@/auth';
+import { z } from 'zod';
+
+const CreateCandidateSchema = z.object({
+  tripId: z.string().uuid().optional(),
+  hostId: z.string().uuid().optional(),
+  experienceId: z.string().uuid().optional(),
+  dayId: z.string().uuid().optional(),
+  dayNumber: z.union([z.string(), z.number()]).optional(),
+  date: z.string().datetime().optional(),
+  itemId: z.string().uuid().optional(),
+  experienceData: z.object({
+    title: z.string().max(200).optional(),
+    description: z.string().max(2000).optional(),
+    city: z.string().max(100).optional(),
+    price: z.number().positive().optional(),
+    lat: z.number().min(-90).max(90).optional(),
+    lng: z.number().min(-180).max(180).optional(),
+  }).optional(),
+});
 
 type TripWithStops = Prisma.TripGetPayload<{
   include: { stops: { include: { days: true } } };
@@ -118,7 +137,11 @@ export async function POST(req: Request) {
     }
     
     const body = await req.json();
-    const { tripId, hostId, experienceId, dayId, dayNumber, date, itemId } = body;
+    const parsed = CreateCandidateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid input', issues: parsed.error.issues }, { status: 400 });
+    }
+    const { tripId, hostId, experienceId, dayId, dayNumber, date, itemId } = parsed.data;
 
     // 1. Find the active trip
     let trip: TripWithStops | null;
@@ -224,8 +247,7 @@ export async function POST(req: Request) {
         }
     }
 
-    // 3. Get or Create Experience
-    const { experienceData } = body;
+    // 3. Get Experience — must already exist in the database
     let experience = null;
     
     if (experienceId) {
@@ -234,53 +256,8 @@ export async function POST(req: Request) {
         });
     }
 
-    // If experience not found and we have experienceData, create it on-the-fly
-    if (!experience && experienceData && hostId) {
-        console.log('[CandidateAPI] Creating experience on-the-fly:', experienceData.title);
-        
-        // First, ensure the host exists (create placeholder if needed)
-        let host = await prisma.user.findUnique({ where: { id: hostId } });
-        
-        if (!host) {
-            console.log('[CandidateAPI] Creating placeholder host:', hostId);
-            // Create a placeholder host user
-            host = await prisma.user.create({
-                data: {
-                    id: hostId,
-                    email: `${hostId}@localhost.placeholder`,
-                    name: hostId.replace(/-/g, ' ').replace(/\d+$/, '').trim() || 'Local Host',
-                    isHost: true,
-                    city: experienceData.city || 'Unknown',
-                    country: 'Unknown',
-                }
-            });
-        }
-        
-        experience = await prisma.experience.create({
-            data: {
-                hostId: host.id,
-                title: experienceData.title || 'Local Experience',
-                description: experienceData.description || 'A unique local experience',
-                category: 'ARTS_CULTURE', // Default category
-                neighborhood: experienceData.city || 'Downtown', // Required field
-                city: experienceData.city || 'Unknown',
-                country: 'Unknown', // Could be derived from city
-                duration: 120, // 2 hours default
-                minGroupSize: 1,
-                maxGroupSize: 6,
-                price: experienceData.price || 5000,
-                currency: 'USD',
-                includedItems: [],
-                excludedItems: [],
-                photos: [],
-                rating: 4.5,
-                reviewCount: 0,
-                isActive: true,
-                latitude: experienceData.lat || null,
-                longitude: experienceData.lng || null,
-            }
-        });
-    }
+    // On-the-fly experience/host creation is intentionally not supported.
+    // All experiences and hosts must exist in the database before creating a candidate.
 
     if (!experience) {
         return new NextResponse('Experience not found and could not be created', { status: 404 });

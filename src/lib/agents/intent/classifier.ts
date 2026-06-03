@@ -3,6 +3,7 @@ import type { TripIntent, SpatialPattern, ActivityFocus, MobilityMode } from './
 
 function extractUserText(messages: Array<{ role?: string; content?: unknown }>): string {
   return messages
+    .slice(-20)
     .filter((m) => m.role === 'user')
     .map((m) => {
       if (typeof m.content === 'string') return m.content;
@@ -29,7 +30,7 @@ function detectSpatialPattern(
     return 'BASE_EXPLORE';
 
   if (
-    /\b(road trip|drive (from|through|across|along)|from .{1,30} to .{1,30}|along (the |highway|route ?\d)|pch)\b/.test(
+    /\b(road trip|drive (from|through|across|along)|along (the |highway|route ?\d)|pch)\b/.test(
       text
     )
   )
@@ -65,7 +66,7 @@ function detectActivityFocus(
     return 'NATURE';
 
   if (
-    /\b(museum|history|historic|culture|cultural|art |heritage|architecture|monument|cathedral|gallery)\b/.test(
+    /\b(museum|history|historic|culture|cultural|art|heritage|architecture|monument|cathedral|gallery)\b/.test(
       text
     )
   )

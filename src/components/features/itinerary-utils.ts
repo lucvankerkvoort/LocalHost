@@ -1,7 +1,9 @@
 import { ItineraryItem } from '@/types/itinerary';
 
 export function isHostedExperienceItem(item: ItineraryItem): boolean {
-  return item.type === 'EXPERIENCE' && Boolean(item.hostId) && Boolean(item.experienceId);
+  // experienceId may be null for static/curated hosts (not persisted due to FK constraints),
+  // so only require hostId to identify a hosted experience.
+  return item.type === 'EXPERIENCE' && Boolean(item.hostId);
 }
 
 export function resolveItineraryItemImageUrl(

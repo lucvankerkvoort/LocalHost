@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test $(find src -name '*.test.ts' -print)",
+    "test:e2e": "playwright test",
     "test:chunk:globe-slice": "tsx --test src/store/globe-slice.test.ts",
     "test:chunk:hosts-slice": "tsx --test src/store/hosts-slice.test.ts",
     "test:chunk:host-creation-slice": "tsx --test src/store/host-creation-slice.test.ts",
@@ -54,6 +55,7 @@
     "cesium": "^1.137.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "ioredis": "^5.10.1",
     "lucide-react": "^0.563.0",
     "next": "16.1.2",
     "next-auth": "^5.0.0-beta.30",
@@ -69,6 +71,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@netlify/plugin-nextjs": "^5.15.9",
     "@playwright/test": "^1.58.1",
     "@prisma/client": "^7.4.2",
     "@tailwindcss/postcss": "^4",

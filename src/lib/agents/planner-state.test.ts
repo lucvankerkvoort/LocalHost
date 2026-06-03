@@ -118,9 +118,9 @@ describe('seedPlannerStateFromProfile — Backpacker persona', () => {
     assert.equal(result.budget, 'budget');
   });
 
-  it('does not override transport with a drive default', () => {
+  it('sets transport to mixed (not drive)', () => {
     const result = seedPlannerStateFromProfile(DEFAULT_PLANNER_STATE, backpacker);
-    assert.equal(result.transportPreference, undefined);
+    assert.equal(result.transportPreference, 'mixed');
   });
 });
 

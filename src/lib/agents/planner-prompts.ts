@@ -4,7 +4,10 @@ import {
   TRAVEL_GROUP_LABELS,
 } from '@/lib/travel-profile/types';
 
-export function buildProfileSystemContext(profile: TravelProfile | null | undefined): string {
+export function buildProfileSystemContext(
+  profile: TravelProfile | null | undefined,
+  suppressStyleLabel = false
+): string {
   if (!profile) {
     return `Travel Profile: Not set up yet.
 - On the user's first message (when no destination is known yet), ask ONE brief question about their travel style before asking where they want to go.
@@ -18,7 +21,7 @@ export function buildProfileSystemContext(profile: TravelProfile | null | undefi
   const paceLabel = profile.pace.toLowerCase();
   const budgetLabel = profile.budget.toLowerCase();
   const lines = [
-    `Travel Profile: ${styleLabel}`,
+    suppressStyleLabel ? 'Saved Travel Preferences:' : `Travel Profile: ${styleLabel}`,
     `- Pace preference: ${paceLabel}`,
     `- Budget tier: ${budgetLabel}`,
     `- Travels: ${groupLabel}`,

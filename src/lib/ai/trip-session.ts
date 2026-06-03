@@ -1,12 +1,13 @@
 /**
  * Trip Session Management
- * 
+ *
  * Stores and manages trip context across conversation messages.
  * Enables the orchestrator to maintain context for modifications,
  * scoped host searches, and booking flows.
  */
 
 import { ItineraryPlan } from './types';
+import type { PartialTripRequirements } from '@/types/trip-requirements';
 
 // ============================================================================
 // Types
@@ -38,6 +39,12 @@ export interface TripSession {
   country: string;
   city: string;
   plan: ItineraryPlan | null;
+  /**
+   * Accumulated trip requirements gathered via conversational intake.
+   * Starts empty and is built up across messages until all required fields
+   * are present, at which point planTrip() is called.
+   */
+  requirements: PartialTripRequirements;
   preferences: string[];
   suggestedHosts: HostMarker[];
   tentativeBookings: BookingItem[];
@@ -69,11 +76,26 @@ export function createSession(country: string, city: string): TripSession {
     country,
     city,
     plan: null,
+    requirements: {},
     preferences: [],
     suggestedHosts: [],
     tentativeBookings: [],
     confirmedBookings: [],
     createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
+
+export function updateSessionRequirements(
+  session: TripSession,
+  requirements: PartialTripRequirements,
+): TripSession {
+  return {
+    ...session,
+    // Carry city/country forward so existing lookups still work
+    city: requirements.destination?.city ?? session.city,
+    country: requirements.destination?.country ?? session.country,
+    requirements,
     updatedAt: new Date(),
   };
 }

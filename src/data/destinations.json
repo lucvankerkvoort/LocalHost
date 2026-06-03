@@ -1,0 +1,461 @@
+[
+  {
+    "city": "Paris",
+    "country": "France",
+    "aliases": ["paris"],
+    "summary": "Paris is France's romantic capital, celebrated for world-class art, haute cuisine, and Haussmann-era boulevards. The city pairs grand monuments with intimate neighbourhood cafés, making it equally rewarding for first-timers and repeat visitors.",
+    "highlights": ["Eiffel Tower", "The Louvre", "Musée d'Orsay", "Notre-Dame Cathedral", "Sainte-Chapelle", "Palace of Versailles", "Montmartre & Sacré-Cœur", "Centre Pompidou", "Palais Royal gardens", "Seine River cruises"],
+    "neighborhoods": ["Le Marais", "Montmartre", "Saint-Germain-des-Prés", "Canal Saint-Martin", "Bastille", "Oberkampf", "Pigalle"],
+    "practical": ["Book Eiffel Tower and Louvre tickets online well in advance.", "Paris Museum Pass covers most major sites and skips ticket queues.", "Metro is fast and cheap; a carnet of 10 tickets saves money.", "Best visited April–June or September–October to avoid peak heat and crowds.", "Bixi-style Vélib' bikes are great for flat arrondissement hops."]
+  },
+  {
+    "city": "Tokyo",
+    "country": "Japan",
+    "aliases": ["tokyo"],
+    "summary": "Tokyo is a hyper-dense metropolis where ultramodern skyscrapers coexist with ancient temples and neighbourhood shotengai shopping streets. It consistently ranks among the world's top foodie cities and offers a seamless public-transport network.",
+    "highlights": ["Senso-ji Temple (Asakusa)", "Shibuya Crossing & Scramble Square", "Shinjuku Gyoen garden", "Tsukiji Outer Market", "teamLab Borderless digital art", "Harajuku Takeshita Street", "Akihabara electronics district", "Meiji Jingu Shrine", "Tokyo Skytree", "Yanaka historic neighbourhood"],
+    "neighborhoods": ["Shinjuku", "Shibuya", "Asakusa", "Harajuku", "Shimokitazawa", "Yanaka", "Akihabara", "Ginza"],
+    "practical": ["Get a Suica or Pasmo IC card for all trains, buses, and convenience stores.", "JR Pass is worth it only if travelling to multiple cities.", "Restaurants often display plastic food models — point at them to order.", "Tipping is not customary and can cause offence.", "Cherry blossom (late March–early April) and autumn foliage (November) are peak seasons."]
+  },
+  {
+    "city": "New York City",
+    "country": "United States",
+    "aliases": ["new york", "nyc"],
+    "summary": "New York City is five boroughs of relentless energy — iconic skyline, world-class museums, diverse food scenes, and a live-music culture that never sleeps. Manhattan anchors most visits but Brooklyn and Queens reward those who wander.",
+    "highlights": ["Central Park", "The Metropolitan Museum of Art", "Brooklyn Bridge & DUMBO", "High Line elevated park", "Times Square", "MoMA", "Statue of Liberty & Ellis Island", "One World Trade & 9/11 Memorial", "The Vessel at Hudson Yards", "Flushing Meadows–Corona Park"],
+    "neighborhoods": ["SoHo", "Williamsburg", "West Village", "Harlem", "Astoria", "Lower East Side", "Upper West Side", "DUMBO"],
+    "practical": ["OMNY contactless payment works on all subway and buses — no MetroCard needed.", "Many museums are free one evening per week; check individual schedules.", "Taxis and rideshares are pricier than subway for most crosstown trips.", "The subway runs 24/7 but service can be infrequent late at night.", "Restaurant reservations (Resy, OpenTable) are essential for popular spots."]
+  },
+  {
+    "city": "London",
+    "country": "United Kingdom",
+    "aliases": ["london"],
+    "summary": "London blends 2,000 years of history with a cutting-edge creative scene. Free world-class museums, royal parks, and a vast restaurant landscape spanning every global cuisine make it one of the most visited cities on earth.",
+    "highlights": ["The British Museum", "Tower of London & Tower Bridge", "Tate Modern", "Buckingham Palace", "Hyde Park & Kensington Gardens", "Borough Market", "Westminster Abbey", "National Gallery", "St Paul's Cathedral", "The Shard viewpoint"],
+    "neighborhoods": ["Shoreditch", "Notting Hill", "Soho", "Brixton", "South Bank", "Covent Garden", "Camden", "Hackney"],
+    "practical": ["Oyster card or contactless bank card works on Tube, buses, and Overground.", "Most major museums and galleries are free.", "Congestion charge applies Mon–Fri if driving into central London.", "Best weather June–August; expect rain any month.", "Pre-book the Tower of London and popular West End shows."]
+  },
+  {
+    "city": "Rome",
+    "country": "Italy",
+    "aliases": ["rome", "roma"],
+    "summary": "Rome is an open-air museum where a single city walk can take you from ancient ruins to Baroque fountains to Renaissance piazzas. The food culture is fiercely local — correct carbonara, cacio e pepe, and supplì are religion here.",
+    "highlights": ["Colosseum & Roman Forum", "Vatican Museums & Sistine Chapel", "St Peter's Basilica", "Trevi Fountain", "Pantheon", "Borghese Gallery", "Campo de' Fiori market", "Castel Sant'Angelo", "Trastevere neighbourhood", "Piazza Navona"],
+    "neighborhoods": ["Trastevere", "Prati", "Testaccio", "Pigneto", "Monti", "Parioli"],
+    "practical": ["Book Vatican Museums and Colosseum tickets online — queues can be 2+ hours.", "Dress modestly (covered shoulders and knees) for churches.", "Most fountains serve drinkable water — bring a reusable bottle.", "Validate public transport tickets before boarding or risk a fine.", "August is hot and many locals leave — quieter but some restaurants close."]
+  },
+  {
+    "city": "Barcelona",
+    "country": "Spain",
+    "aliases": ["barcelona"],
+    "summary": "Barcelona merges Gaudí's surreal architecture, Mediterranean beaches, and a world-renowned food and nightlife scene. The city runs on a late schedule — dinner rarely starts before 9 pm and clubs open at midnight.",
+    "highlights": ["Sagrada Família", "Park Güell", "Casa Batlló", "La Boqueria market", "Gothic Quarter", "Camp Nou stadium", "Barceloneta Beach", "Palau de la Música Catalana", "Montjuïc Castle & cable car", "El Born neighbourhood"],
+    "neighborhoods": ["Gothic Quarter (Barri Gòtic)", "El Born / Sant Pere", "Gràcia", "Eixample", "Poblenou", "Barceloneta"],
+    "practical": ["Book Sagrada Família tickets months ahead — they sell out.", "T-Casual 10-trip metro card is the best value for public transport.", "Tapas culture means ordering many small dishes to share.", "Pickpocketing is common on Las Ramblas and at busy markets — use a money belt.", "Beaches are cleanest mid-week; packed on summer weekends."]
+  },
+  {
+    "city": "Amsterdam",
+    "country": "Netherlands",
+    "aliases": ["amsterdam"],
+    "summary": "Amsterdam's concentric canal ring, world-class museums, and cycling culture create one of Europe's most liveable and visitable cities. The compact centre is best explored on two wheels or on foot.",
+    "highlights": ["Rijksmuseum", "Van Gogh Museum", "Anne Frank House", "Vondelpark", "Jordaan neighbourhood", "Royal Palace on Dam Square", "NEMO Science Museum", "Heineken Experience", "Keukenhof gardens (seasonal)", "Canal boat tour"],
+    "neighborhoods": ["Jordaan", "De Pijp", "Oud-Zuid", "Noord", "Plantage", "Nieuw-West"],
+    "practical": ["Book Anne Frank House and Van Gogh Museum tickets online weeks ahead.", "Renting a bike is the definitive Amsterdam experience — watch for tram tracks.", "GVB day tickets cover trams, metro, and bus.", "Cannabis is tolerated in licensed coffeeshops only — street dealers are illegal.", "Keukenhof flower fields open mid-March to mid-May."]
+  },
+  {
+    "city": "Istanbul",
+    "country": "Turkey",
+    "aliases": ["istanbul"],
+    "summary": "Istanbul straddles two continents and 2,500 years of empire — Byzantine mosaics, Ottoman mosques, bazaars, and a booming contemporary arts scene coexist in a city of 15 million. The Bosphorus strait is best experienced by ferry.",
+    "highlights": ["Hagia Sophia", "Blue Mosque (Sultan Ahmed Mosque)", "Topkapi Palace", "Grand Bazaar", "Spice Bazaar (Mısır Çarşısı)", "Bosphorus ferry cruise", "Dolmabahçe Palace", "Galata Tower", "Chora Church mosaics", "Kadıköy food market"],
+    "neighborhoods": ["Sultanahmet", "Beyoğlu / Karaköy", "Beşiktaş", "Kadıköy", "Balat", "Ortaköy"],
+    "practical": ["İstanbulkart top-up card works on all public transport and saves 50% vs single tickets.", "Mosques are free; remove shoes and women should cover hair inside.", "Haggling is expected in the Grand Bazaar; start at 40% of asking price.", "Ferries across the Bosphorus cost the same as a metro ride and offer spectacular views.", "Visit Hagia Sophia early morning to avoid tour groups."]
+  },
+  {
+    "city": "Dubai",
+    "country": "United Arab Emirates",
+    "aliases": ["dubai"],
+    "summary": "Dubai is a record-breaking city of superlatives — tallest building, largest mall, indoor ski slope in the desert. Beneath the glittering modern facade lies a layered Emirati heritage most visitors never discover in the old creek districts.",
+    "highlights": ["Burj Khalifa observation deck", "Dubai Mall & Dubai Fountain", "The Dubai Frame", "Dubai Creek & Al Fahidi Historical Neighbourhood", "Jumeirah Mosque", "Desert safari", "Palm Jumeirah monorail & Atlantis", "Dubai Museum", "Gold & Spice Souks", "Alserkal Avenue arts district"],
+    "neighborhoods": ["Downtown Dubai", "Al Fahidi / Bur Dubai", "Jumeirah", "Dubai Marina", "Deira", "Al Quoz"],
+    "practical": ["Dress modestly in malls, souks, and heritage areas.", "Alcohol is available in licensed hotel bars and restaurants only.", "Ramadan month means no eating or drinking in public during daylight hours.", "Taxis and Careem are the best way to get around; metro covers main corridors.", "Book Burj Khalifa tickets online — 'At The Top' sells out fast."]
+  },
+  {
+    "city": "Sydney",
+    "country": "Australia",
+    "aliases": ["sydney"],
+    "summary": "Sydney combines a spectacular natural harbour, world-famous architecture, and laid-back beach culture. The Opal card network gives easy access from Circular Quay to surf beaches and Blue Mountains day trips.",
+    "highlights": ["Sydney Opera House tours", "Sydney Harbour Bridge climb", "Bondi to Coogee coastal walk", "Taronga Zoo", "The Rocks historic precinct", "Manly Beach ferry", "Darling Harbour", "Royal Botanic Garden", "Blue Mountains (day trip)", "Newtown street art & cafés"],
+    "neighborhoods": ["The Rocks", "Surry Hills", "Newtown", "Paddington", "Manly", "Glebe", "Bondi"],
+    "practical": ["Opal card works on trains, ferries, buses, and light rail.", "Ferry to Manly from Circular Quay is a stunning 30-minute harbour trip.", "Beaches have patrolled swim zones — always swim between the flags.", "Tipping is not obligatory but appreciated; 10% is generous.", "January–March can be extremely hot; October–April is best for beach weather."]
+  },
+  {
+    "city": "Singapore",
+    "country": "Singapore",
+    "aliases": ["singapore"],
+    "summary": "Singapore is a city-state of extraordinary efficiency, multicultural food courts, and lush vertical gardens. Hawker centres deliver some of the world's best street food, from Hainanese chicken rice to laksa, at prices that defy the city's wealth.",
+    "highlights": ["Gardens by the Bay & Supertrees", "Marina Bay Sands SkyPark", "Hawker Centre culture (Maxwell, Lau Pa Sat)", "Sentosa Island & Universal Studios", "Chinatown & Buddha Tooth Relic Temple", "Little India & Sri Veeramakaliamman Temple", "Singapore Zoo & River Safari", "National Gallery Singapore", "Haw Par Villa", "Night Safari"],
+    "neighborhoods": ["Marina Bay", "Chinatown", "Little India", "Kampong Glam", "Tiong Bahru", "Dempsey Hill"],
+    "practical": ["EZ-Link card works on all MRT, buses, and some hawkers.", "Hawker centres are the best-value meals — look for stalls with queues.", "Chewing gum is prohibited; fines for littering are strictly enforced.", "Heat and humidity year-round; June–July slightly drier.", "Tipping is not expected and can sometimes be refused."]
+  },
+  {
+    "city": "Bangkok",
+    "country": "Thailand",
+    "aliases": ["bangkok", "krung thep"],
+    "summary": "Bangkok is a city of contradictions: solemn gold-spired temples beside raucous night markets, gridlocked traffic above BTS Skytrain stations, and palatial malls beside canal-side wooden houses. The street food is extraordinary.",
+    "highlights": ["Grand Palace & Wat Phra Kaew", "Wat Pho (reclining Buddha)", "Wat Arun (Temple of Dawn)", "Chatuchak Weekend Market", "Khao San Road", "Damnoen Saduak floating market", "Jim Thompson House", "Chinatown (Yaowarat Road)", "Chao Phraya river boat", "Asiatique night market"],
+    "neighborhoods": ["Sukhumvit", "Silom", "Rattanakosin (Old Town)", "Ari", "Banglamphoo", "On Nut"],
+    "practical": ["BTS Skytrain and MRT cover most tourist areas; tuk-tuks are for short hops.", "Dress modestly at temples — long trousers/skirt and covered shoulders required.", "Tap water is not drinkable; bottled water is cheap and widely available.", "Negotiate tuk-tuk fares before getting in.", "April Songkran festival means massive water fights city-wide — fun but plan ahead."]
+  },
+  {
+    "city": "Prague",
+    "country": "Czech Republic",
+    "aliases": ["prague", "praha"],
+    "summary": "Prague is one of Europe's best-preserved medieval cities, with a Gothic old town, Baroque palaces, and a castle district that dominates the Vltava skyline. World-class beer and an emerging food scene add modern appeal.",
+    "highlights": ["Prague Castle & St Vitus Cathedral", "Charles Bridge", "Old Town Square & Astronomical Clock", "Josefov Jewish Quarter", "Vyšehrad fortress", "Vinohrady Art Nouveau architecture", "Lobkowicz Palace", "Kampa Island", "Petřín Hill & funicular", "Stromovka park"],
+    "neighborhoods": ["Staré Město (Old Town)", "Malá Strana", "Vinohrady", "Žižkov", "Holešovice", "Smíchov"],
+    "practical": ["Prague Card bundles transport and museum entry.", "Crown (CZK) is the currency — avoid currency exchange booths near Old Town Square.", "Trams run 24/7 and cover far more of the city than the metro.", "Charles Bridge is best at dawn before tourist crowds arrive.", "Many restaurants add a cover charge for bread brought to the table — you can refuse it."]
+  },
+  {
+    "city": "Vienna",
+    "country": "Austria",
+    "aliases": ["vienna", "wien"],
+    "summary": "Vienna is the Habsburg imperial capital turned cultural powerhouse — home to the world's finest classical music scene, extraordinary art history museums, and a coffeehouse culture that UNESCO recognises as intangible heritage.",
+    "highlights": ["Schönbrunn Palace & gardens", "Kunsthistorisches Museum", "Belvedere Palace (Klimt's The Kiss)", "St Stephen's Cathedral", "Vienna State Opera", "Naschmarkt food market", "Prater & Riesenrad giant wheel", "MuseumsQuartier", "Albertina Modern", "Hundertwasserhaus"],
+    "neighborhoods": ["Innere Stadt (1st district)", "Naschmarkt / Mariahilf", "Neubau", "Prater / Leopoldstadt", "Josefstadt"],
+    "practical": ["Vienna City Card bundles public transport and museum discounts.", "Coffee houses (Kaffeehäuser) — linger as long as you like; it's expected.", "State Opera standing tickets sell day-of for a few euros.", "Most museums are closed on Mondays.", "December Christkindlmarkt (Christmas markets) are among Europe's finest."]
+  },
+  {
+    "city": "Budapest",
+    "country": "Hungary",
+    "aliases": ["budapest"],
+    "summary": "Budapest is the 'Pearl of the Danube', split into Buda's hilly castle district and Pest's grand boulevards. Thermal baths, ruin bars, and a rich Jewish heritage make it one of Europe's most character-filled capitals.",
+    "highlights": ["Széchenyi Thermal Bath", "Buda Castle & Fisherman's Bastion", "Hungarian Parliament Building", "Great Market Hall", "Ruin bars (Szimpla Kert)", "Great Synagogue (Dohány Street)", "Chain Bridge at night", "Heroes' Square", "Andrássy Avenue", "Cave church in Gellért Hill"],
+    "neighborhoods": ["Castle District (Buda)", "Jewish Quarter (VII)", "Palace District (VIII)", "Ferencváros (IX)", "Újlipótváros (XIII)"],
+    "practical": ["Budapest Card covers unlimited public transport and museum entry.", "Forint (HUF) is the currency; EUR is rarely accepted.", "Tram 2 along the Pest embankment is one of the world's most scenic public transport rides.", "Széchenyi is best visited on a weekday morning.", "Ruin bars are evening-only; most open around 6 pm."]
+  },
+  {
+    "city": "Lisbon",
+    "country": "Portugal",
+    "aliases": ["lisbon", "lisboa"],
+    "summary": "Lisbon is built on seven hills above the Tagus estuary, with sun-bleached azulejo tile facades, vintage yellow trams, and a laid-back fado music culture. It's also the gateway to Sintra's fairy-tale palaces and the Atlantic surf coast.",
+    "highlights": ["Alfama neighbourhood & São Jorge Castle", "Belém Tower & Jerónimos Monastery", "LX Factory Sunday market", "Tram 28 ride", "Time Out Market", "Sintra day trip (Palácio da Pena)", "MAAT contemporary art museum", "Fado show in Mouraria", "Pastéis de Belém (original custard tarts)", "Miradouro da Graça viewpoint"],
+    "neighborhoods": ["Alfama", "Bairro Alto", "Mouraria", "Príncipe Real", "Chiado", "Belém", "Intendente"],
+    "practical": ["Viva Viagem card works on metro, trams, and buses.", "Tram 28 is extremely crowded with tourists — carry the route map instead.", "Pastéis de Nata (egg tarts) are different from pastéis de Belém — only the Belém shop makes the original.", "Hills mean cobbled streets and steep climbs; wear comfortable shoes.", "Sintra gets very busy on summer weekends; go midweek and buy palace tickets online."]
+  },
+  {
+    "city": "Madrid",
+    "country": "Spain",
+    "aliases": ["madrid"],
+    "summary": "Madrid is Spain's sun-drenched capital, home to three of the world's greatest art museums within walking distance, a relentless tapas culture, and a nightlife that genuinely begins after midnight.",
+    "highlights": ["Museo del Prado", "Reina Sofía (Guernica)", "Thyssen-Bornemisza Museum", "Retiro Park & Crystal Palace", "Royal Palace of Madrid", "Mercado de San Miguel", "Gran Vía boulevard", "Plaza Mayor", "El Rastro flea market (Sunday)", "Malasaña & Chueca neighbourhoods"],
+    "neighborhoods": ["Malasaña", "Chueca", "Lavapiés", "La Latina", "Salamanca", "Embajadores"],
+    "practical": ["Metro is fast and cheap; 10-trip Metrobús card works on bus and metro.", "Lunch (2–4 pm) is the main meal; 'menú del día' is a 3-course bargain.", "El Rastro flea market runs Sunday mornings only.", "Prado, Reina Sofía, and Thyssen are free on certain late evenings.", "Summers are brutally hot (40°C+) — September and October are ideal."]
+  },
+  {
+    "city": "Athens",
+    "country": "Greece",
+    "aliases": ["athens", "athina"],
+    "summary": "Athens is the cradle of Western democracy and philosophy, with the Acropolis watching over 3.5 million residents below. Beyond the monuments, the city has a thriving street art scene, outstanding tavernas, and a vibrant café culture.",
+    "highlights": ["Acropolis & Parthenon", "Acropolis Museum", "Ancient Agora", "Monastiraki flea market", "Plaka old neighbourhood", "National Archaeological Museum", "Temple of Olympian Zeus", "Anafiotika neighbourhood", "Kerameikos archaeological site", "Lycabettus Hill viewpoint"],
+    "neighborhoods": ["Plaka", "Monastiraki", "Psirri", "Koukaki", "Exarchia", "Kolonaki"],
+    "practical": ["Acropolis combo ticket covers 7 major ancient sites.", "Visit the Acropolis at opening time or late afternoon to avoid midday heat.", "Tap water is drinkable in most of Athens.", "Psirri and Monastiraki are best for affordable taverna food.", "Athens is a base for day trips to Cape Sounion, Hydra, and Aegina."]
+  },
+  {
+    "city": "Cairo",
+    "country": "Egypt",
+    "aliases": ["cairo", "al qahirah"],
+    "summary": "Cairo is the Arab world's largest city, anchored by the last remaining Wonder of the Ancient World. The Egyptian Museum, Khan el-Khalili bazaar, and Islamic Cairo's medieval mosques reward days of exploration.",
+    "highlights": ["Pyramids of Giza & Sphinx", "Egyptian Museum", "Khan el-Khalili bazaar", "Citadel of Saladin & Muhammad Ali Mosque", "Al-Azhar Mosque", "Coptic Cairo (Hanging Church)", "Tahrir Square area", "Gezira Island & Cairo Tower", "Ben Ezra Synagogue", "Sound and Light Show at Giza"],
+    "neighborhoods": ["Downtown (Wust al-Balad)", "Islamic Cairo", "Coptic Cairo", "Zamalek", "Mohandessin"],
+    "practical": ["Book Pyramids tickets online; sunset tours of the sound and light show are popular.", "Dress modestly; women should carry a scarf for mosque visits.", "Negotiate prices in Khan el-Khalili before agreeing to buy.", "Cairo traffic is chaotic; Uber is more reliable than hailing street taxis.", "Drink only bottled water."]
+  },
+  {
+    "city": "Cape Town",
+    "country": "South Africa",
+    "aliases": ["cape town", "kaapstad"],
+    "summary": "Cape Town is flanked by the iconic Table Mountain and two oceans, blending dramatic landscapes with a rich and complex heritage. Vineyards, penguins, whale watching, and vibrant township food tours are all within an hour of the city.",
+    "highlights": ["Table Mountain cable car", "Cape of Good Hope & Cape Point", "Boulder's Beach penguin colony", "Bo-Kaap neighbourhood", "Victoria & Alfred Waterfront", "Robben Island ferry tour", "Stellenbosch wine country (day trip)", "Kalk Bay & Simon's Town", "Kirstenbosch Botanical Garden", "Zeitz MOCAA contemporary art museum"],
+    "neighborhoods": ["Bo-Kaap", "Gardens", "De Waterkant", "Observatory", "Green Point", "Camps Bay"],
+    "practical": ["Book Robben Island ferry well in advance — it sells out.", "Table Mountain is often covered in cloud ('tablecloth'); check webcam before going.", "Uber is safe and significantly cheaper than metered taxis.", "Stay vigilant with belongings in the city centre.", "Whale season is July–November in False Bay."]
+  },
+  {
+    "city": "Mexico City",
+    "country": "Mexico",
+    "aliases": ["mexico city", "ciudad de méxico", "cdmx"],
+    "summary": "Mexico City is a megalopolis of 22 million with astonishing food, pre-Columbian ruins, world-class museums, and a thriving arts scene across its many distinct colonias. Altitude (2,240 m) needs a day of acclimatisation.",
+    "highlights": ["Teotihuacán pyramids (day trip)", "National Museum of Anthropology", "Zócalo & Metropolitan Cathedral", "Frida Kahlo Museum (Casa Azul)", "Xochimilco trajinera boats", "Chapultepec Park & Castle", "Mercado de Jamaica flower market", "Palacio de Bellas Artes", "Coyoacán neighbourhood", "Roma & Condesa food scene"],
+    "neighborhoods": ["Roma Norte", "Condesa", "Polanco", "Coyoacán", "Colonia Centro", "San Ángel"],
+    "practical": ["Metro is very cheap and fast; avoid rush hour with bags.", "Altitude can cause headaches the first day — stay hydrated and rest.", "Mezcal is the city's spirit of choice; tequila is considered unsophisticated by locals.", "Pre-book Frida Kahlo Museum tickets online.", "Tap water is not drinkable — bottled water is cheap."]
+  },
+  {
+    "city": "Buenos Aires",
+    "country": "Argentina",
+    "aliases": ["buenos aires"],
+    "summary": "Buenos Aires is the 'Paris of South America' — European-influenced architecture, world-class steak, Malbec wine, and the birthplace of tango. The city runs on a nocturnal schedule that makes Madrid look early.",
+    "highlights": ["La Boca neighbourhood & Caminito", "Recoleta Cemetery (Evita's tomb)", "MALBA modern art museum", "San Telmo antiques market (Sunday)", "Teatro Colón opera house tour", "Palermo Soho cafés & boutiques", "Casa Rosada & Plaza de Mayo", "Puerto Madero waterfront", "Tango show in San Telmo", "Tigre Delta boat trip"],
+    "neighborhoods": ["Palermo Soho / Palermo Hollywood", "San Telmo", "Recoleta", "La Boca", "Belgrano", "San Nicolás"],
+    "practical": ["Carry USD cash — the 'blue dollar' informal rate is significantly better than official ATM rates.", "Dinner is never before 9 pm; many restaurants open at 8:30 pm.", "Tango shows are tourist-oriented; milongas (dance halls) are where locals dance.", "Book Teatro Colón tours online.", "Uber operates but is officially regulated — use licensed radio taxis in La Boca."]
+  },
+  {
+    "city": "Rio de Janeiro",
+    "country": "Brazil",
+    "aliases": ["rio de janeiro", "rio"],
+    "summary": "Rio is defined by its geography — mountains, Atlantic forest, and crescent beaches squeezed between granite peaks. Christ the Redeemer, Carnival, and the mosaic sidewalks of Ipanema make it one of the world's most visually iconic cities.",
+    "highlights": ["Christ the Redeemer (Corcovado)", "Sugarloaf Mountain cable car", "Ipanema & Copacabana beaches", "Santa Teresa neighbourhood", "Selarón Steps (Escadaria Selarón)", "Maracanã Stadium tour", "Lapa nightlife arches", "Botanical Garden", "Tijuca Forest National Park", "Favela community tours"],
+    "neighborhoods": ["Ipanema", "Copacabana", "Santa Teresa", "Lapa", "Jardim Botânico", "Leblon"],
+    "practical": ["Book Christ the Redeemer tickets online — online price is lower and guarantees entry.", "Don't walk with valuables on the beach; use a small beach bag.", "Carnival (February/March) requires hotel bookings 6+ months ahead.", "Uber is much safer than hailing taxis off the street.", "Drink coconut water straight from the vendor on the beach."]
+  },
+  {
+    "city": "Marrakech",
+    "country": "Morocco",
+    "aliases": ["marrakech", "marrakesh"],
+    "summary": "Marrakech is a sensory assault of colour, sound, and spice — a medieval medina of souks, riads, and the famous Jemaa el-Fna square that transforms from market to open-air theatre at dusk.",
+    "highlights": ["Jemaa el-Fna square", "Koutoubia Mosque (exterior)", "Bahia Palace", "Saadian Tombs", "Majorelle Garden & Yves Saint Laurent Museum", "Medina souks (spice, leather, textiles)", "Ben Youssef Madrasa", "El Badi Palace ruins", "Mellah Jewish quarter", "Day trip to Atlas Mountains"],
+    "neighborhoods": ["Medina (old city)", "Mellah", "Gueliz (Ville Nouvelle)", "Hivernage"],
+    "practical": ["Hire a licensed local guide for first medina navigation — unofficial guides will mislead you.", "Bargaining is expected; start at 30–40% of asking price.", "Dress modestly — covered shoulders and knees are expected in the medina.", "Arrive at Jemaa el-Fna around sunset for the full spectacle.", "Book riads (traditional courtyard guesthouses) inside the medina for the best experience."]
+  },
+  {
+    "city": "Kyoto",
+    "country": "Japan",
+    "aliases": ["kyoto"],
+    "summary": "Kyoto was Japan's imperial capital for over a millennium and remains the country's spiritual and cultural heart — over 1,600 Buddhist temples, 400 Shinto shrines, and the preserved geisha districts of Gion and Ponto-chō.",
+    "highlights": ["Fushimi Inari-taisha (thousands of torii gates)", "Arashiyama bamboo grove & Tenryu-ji", "Kinkaku-ji (Golden Pavilion)", "Gion district & Hanamikoji Street", "Nishiki Market ('Kyoto's Kitchen')", "Philosopher's Path canal walk", "Kiyomizudera Temple", "Nijo Castle", "Monkey Park Iwatayama", "Tofuku-ji Temple gardens"],
+    "neighborhoods": ["Gion", "Arashiyama", "Fushimi", "Higashiyama", "Downtown (Kawaramachi)"],
+    "practical": ["IC card (Suica/ICOCA) works on buses and subway.", "Day bus pass (Kyoto Bus) is cheapest for temple-hopping.", "Spring (cherry blossom) and autumn (foliage) are spectacular but extremely busy — book months ahead.", "Geisha in Gion are not for photographing without consent — respect privacy.", "Many major gardens charge separate admission on top of temple entry."]
+  },
+  {
+    "city": "Bali",
+    "country": "Indonesia",
+    "aliases": ["bali", "denpasar"],
+    "summary": "Bali is Indonesia's Hindu island, where rice terraces, surf beaches, and ornate temple ceremonies coexist. Ubud is the cultural heart; the south coast (Seminyak, Canggu, Uluwatu) draws surfers and the international crowd.",
+    "highlights": ["Tegallalang rice terraces (Ubud)", "Uluwatu Temple & Kecak fire dance", "Tirta Empul holy spring temple", "Mount Batur sunrise trek", "Seminyak beach clubs", "Sacred Monkey Forest Sanctuary (Ubud)", "Tanah Lot sea temple", "Besakih Mother Temple", "Canggu surf & café scene", "Traditional healers (Balian) experience"],
+    "neighborhoods": ["Ubud", "Seminyak", "Canggu", "Uluwatu / Bukit Peninsula", "Sanur", "Kuta", "Amed"],
+    "practical": ["Renting a scooter is the standard way to get around; international driving licence required.", "Dress modestly and wear a sarong at temples.", "Bali Belly (traveller's diarrhoea) is common — drink only bottled water.", "Bargaining is expected in markets but not in restaurants.", "Rainy season is November–March; dry season (April–October) is best for travel."]
+  },
+  {
+    "city": "Hanoi",
+    "country": "Vietnam",
+    "aliases": ["hanoi", "ha noi"],
+    "summary": "Hanoi is Vietnam's ancient capital, defined by its preserved French colonial quarter, 36-street Old Quarter, and a street food culture centred on bun cha, pho, and egg coffee. The nearby Ha Long Bay makes it a natural base.",
+    "highlights": ["Old Quarter (36 Streets)", "Hoan Kiem Lake & Ngoc Son Temple", "Ho Chi Minh Mausoleum complex", "Vietnam Museum of Ethnology", "Temple of Literature", "St Joseph's Cathedral", "Dong Xuan Market", "Train Street cafés", "Ha Long Bay (overnight cruise)", "Ninh Binh day trip"],
+    "neighborhoods": ["Old Quarter (Hoàn Kiếm)", "French Quarter (Ba Đình)", "Tay Ho / West Lake", "Hoan Kiem"],
+    "practical": ["Grab (Southeast Asian Uber) is cheap and reliable.", "Cross busy streets slowly and steadily — traffic flows around pedestrians.", "Tap water is not drinkable.", "Egg coffee (cà phê trứng) is a Hanoi-only speciality.", "Book Ha Long Bay cruises through reputable agencies to avoid overcrowded junk boats."]
+  },
+  {
+    "city": "Ho Chi Minh City",
+    "country": "Vietnam",
+    "aliases": ["ho chi minh city", "saigon", "hcmc"],
+    "summary": "Ho Chi Minh City (Saigon) is a chaotic, frenetic city of motorbikes and skyscrapers, with a searing war history and some of Southeast Asia's best street food. The Mekong Delta and Cu Chi Tunnels are essential day trips.",
+    "highlights": ["War Remnants Museum", "Cu Chi Tunnels (day trip)", "Reunification Palace", "Ben Thanh Market", "Notre-Dame Cathedral of Saigon", "Bui Vien Street backpacker strip", "Mekong Delta boat trip", "HCMC Museum", "Jade Emperor Pagoda", "Pham Ngu Lao neighbourhood"],
+    "neighborhoods": ["District 1 (city centre)", "District 3", "Bình Thạnh", "Pham Ngu Lao"],
+    "practical": ["Grab is safer and cheaper than metered taxis.", "Negotiate xe om (motorbike taxi) prices before getting on.", "Museums are deeply moving; the War Remnants Museum requires emotional preparation.", "Ben Thanh Market prices are inflated — street stalls around it are better value.", "Mekong Delta and Cu Chi tours are half-day or full-day; book with licensed operators."]
+  },
+  {
+    "city": "Seoul",
+    "country": "South Korea",
+    "aliases": ["seoul"],
+    "summary": "Seoul is a city of intense contrasts — ancient palaces beside K-pop entertainment districts, centuries-old markets beside glass-walled skyscrapers, and one of the world's most sophisticated food and beauty cultures.",
+    "highlights": ["Gyeongbokgung Palace & changing of the guard", "Bukchon Hanok Village", "Myeongdong shopping & street food", "Dongdaemun Design Plaza (DDP)", "N Seoul Tower (Namsan)", "Insadong cultural street", "Lotte World amusement park", "Gwangjang Market (bindaetteok, yukhoe)", "Hongdae live music & street art", "DMZ tour"],
+    "neighborhoods": ["Hongdae", "Itaewon", "Insadong", "Myeongdong", "Bukchon", "Gangnam"],
+    "practical": ["T-money card works on all subway, buses, and taxis.", "Korean BBQ etiquette: grill at the table, wrap meat in lettuce with banchan.", "Convenience stores (CU, GS25) sell excellent cheap food 24/7.", "Book DMZ tours in advance through licensed operators.", "Skin care shopping in Myeongdong — huge range at competitive prices."]
+  },
+  {
+    "city": "Osaka",
+    "country": "Japan",
+    "aliases": ["osaka"],
+    "summary": "Osaka is Japan's unofficial food capital and the country's most extrovert city — Osakans will talk to strangers, tell jokes, and take pride in spending all their money on eating (kuidaore). Dotonbori is the most iconic food street in Asia.",
+    "highlights": ["Dotonbori canal & Glico Running Man", "Osaka Castle & Nishinomaru Garden", "Kuromon Ichiba Market", "Shinsekai retro neighbourhood", "Universal Studios Japan", "Sumiyoshi Taisha Grand Shrine", "Tsutenkaku Tower", "Namba Grand Kagetsu comedy theatre", "Osaka Aquarium Kaiyukan", "Day trip to Nara deer park"],
+    "neighborhoods": ["Dotonbori / Namba", "Shinsaibashi", "Umeda", "Shinsekai", "Nakazakicho", "Tenma"],
+    "practical": ["Osaka Amazing Pass covers subway and many attractions.", "Takoyaki (octopus balls) and okonomiyaki are the local must-eats.", "Day trip to Kyoto, Nara, and Kobe all take 15–45 minutes by train.", "Izakayas are the local drinking-eating spots — order many small dishes.", "Don't stand on the wrong side of the escalator (left in Osaka, right in Tokyo)."]
+  },
+  {
+    "city": "Mumbai",
+    "country": "India",
+    "aliases": ["mumbai", "bombay"],
+    "summary": "Mumbai is India's financial capital and the home of Bollywood — a city of 20 million packed on a narrow peninsula with extraordinary colonial architecture, Art Deco boulevards, and some of the world's greatest street food.",
+    "highlights": ["Gateway of India & Taj Mahal Palace Hotel", "Colaba Causeway market", "Elephanta Island cave temples (ferry)", "Dharavi neighbourhood tour", "Chhatrapati Shivaji Maharaj Terminus (Victoria Terminus)", "Crawford Market", "Bandra-Kurla Complex skyline view", "Juhu Beach", "Marine Drive ('Queen's Necklace')", "Bollywood studio tour"],
+    "neighborhoods": ["Colaba", "Bandra West", "Juhu", "Lower Parel", "Fort / CST", "Dadar"],
+    "practical": ["Mumbai's local train network is extraordinary but extremely crowded during rush hours.", "Uber and Ola are reliable and cheap.", "Avoid tap water; bottled water only.", "Vada pav (potato burger) is Mumbai's iconic street food.", "Monsoon (June–September) brings heavy flooding but also a green, atmospheric Mumbai."]
+  },
+  {
+    "city": "Delhi",
+    "country": "India",
+    "aliases": ["delhi", "new delhi"],
+    "summary": "Delhi is three cities layered on top of each other — the Mughal old city of Shahjahanabad, British New Delhi's grand boulevards, and a sprawling modern metropolis. It is one of the great food cities of the world.",
+    "highlights": ["Red Fort", "Jama Masjid mosque", "Qutb Minar complex", "Humayun's Tomb", "India Gate & Rajpath", "Akshardham Temple", "Chandni Chowk bazaar & street food", "National Museum", "Hauz Khas village", "Lodhi Garden"],
+    "neighborhoods": ["Old Delhi (Shahjahanabad)", "Connaught Place", "Hauz Khas", "Lajpat Nagar", "Karol Bagh"],
+    "practical": ["Delhi Metro is modern, cheap, and air-conditioned — essential in summer.", "Hire a pre-paid taxi or use Uber; avoid unmarked taxis.", "Chandni Chowk is best explored on foot very early morning.", "Delhi belly risk is real — be careful with street food and drink only bottled water.", "Air quality is severe October–January; check AQI and carry a mask."]
+  },
+  {
+    "city": "Havana",
+    "country": "Cuba",
+    "aliases": ["havana", "la habana"],
+    "summary": "Havana is frozen in time — 1950s American cars cruise past crumbling Art Deco mansions, salsa spills from doorways, and mojitos are consumed at legendary bars. A city of extraordinary beauty, music, and complexity.",
+    "highlights": ["Old Havana (Habana Vieja) UNESCO district", "El Malecón seafront boulevard", "El Floridita bar (Hemingway's daiquiri)", "La Bodeguita del Medio (mojitos)", "Museum of the Revolution", "Fábrica de Arte Cubano (FAC)", "Callejón de Hamel Afro-Cuban murals", "Necropolis Cristóbal Colón cemetery", "Classic car tour", "Vedado neighbourhood Art Deco"],
+    "neighborhoods": ["Habana Vieja", "Vedado", "Centro Habana", "Miramar"],
+    "practical": ["US dollars and Euros convert at similar rates; bring cash — credit cards often don't work.", "WiFi is state-controlled and expensive; buy ETECSA cards at Etecsa offices.", "Casas particulares (homestays) are better value and more atmospheric than state hotels.", "Paladares (private restaurants) are far better than state-run restaurants.", "Tipping is significant to locals — 10–15% CUP is generous."]
+  },
+  {
+    "city": "Dubrovnik",
+    "country": "Croatia",
+    "aliases": ["dubrovnik"],
+    "summary": "Dubrovnik's perfectly preserved medieval walled city drops straight into the Adriatic — it's one of Europe's most dramatic settings. Game of Thrones filming made it globally famous; go early morning or in shoulder season to reclaim its magic.",
+    "highlights": ["City Walls walk (2 km circuit)", "Stradun (Placa) main street", "Lovrijenac Fortress", "Cable car to Mount Srđ", "Lokrum Island ferry & peacocks", "Old Town sea kayaking", "Rector's Palace", "Dubrovnik Cathedral", "Boat tour to Elaphiti Islands", "Buža cliff bars"],
+    "neighborhoods": ["Old Town (Stari Grad)", "Lapad", "Gruž"],
+    "practical": ["City Walls tickets are expensive — buy online to skip queues.", "Walk the walls at dawn or dusk to avoid the 10 am–4 pm cruise ship peak.", "Old Town is car-free; luggage must be carried in on foot.", "Afternoon trips to Lokrum Island (10-min ferry) escape the city crowds.", "May, June, and September offer warm weather without peak summer prices."]
+  },
+  {
+    "city": "Reykjavik",
+    "country": "Iceland",
+    "aliases": ["reykjavik", "reykjavík"],
+    "summary": "Reykjavik is the world's northernmost capital and the gateway to Iceland's extraordinary natural landscape — geysers, waterfalls, lava fields, and the Northern Lights. The city itself is compact, walkable, and full of geothermal pools.",
+    "highlights": ["Hallgrímskirkja church", "Harpa Concert Hall", "National Museum of Iceland", "Blue Lagoon geothermal spa", "Golden Circle day trip (Geysir, Gullfoss, Þingvellir)", "Northern Lights (October–March)", "Laugardalslaug public pool", "Reykjavik Art Museum", "Solfar (Sun Voyager) sculpture", "Tjörnin lake walk"],
+    "neighborhoods": ["City Centre (Miðborg)", "101 Reykjavik", "Laugardalur", "Vesturbær"],
+    "practical": ["Book Blue Lagoon online months ahead — it sells out.", "Renting a car is essential for anything beyond the city.", "Northern Lights require a clear sky and dark location — apps like Aurora Forecast help.", "Tap water is excellent glacier water — don't buy plastic bottles.", "Prices are extremely high; cooking your own food saves significant money."]
+  },
+  {
+    "city": "Edinburgh",
+    "country": "United Kingdom",
+    "aliases": ["edinburgh"],
+    "summary": "Edinburgh is Scotland's dramatic capital, split between the medieval Old Town clinging to a volcanic ridge and the Georgian New Town below. The August Fringe Festival doubles the city's population; year-round it's one of Britain's most walkable cities.",
+    "highlights": ["Edinburgh Castle", "Royal Mile & Grassmarket", "Arthur's Seat (volcanic hill hike)", "Holyrood Palace", "Scottish National Museum (free)", "Whisky Experience on the Royal Mile", "Greyfriars Kirkyard cemetery", "Victoria Street (Harry Potter inspiration)", "Dean Village", "Leith Shore (waterfront bars & restaurants)"],
+    "neighborhoods": ["Old Town", "New Town", "Stockbridge", "Leith", "Morningside"],
+    "practical": ["Edinburgh Fringe (August) is world's largest arts festival — book accommodation a year ahead.", "Arthur's Seat hike is accessible from city centre in 30 minutes.", "Scotrail day pass covers the city region including Stirling and St Andrews.", "Many of the best museums are free.", "The 'haar' (sea fog) can roll in any month — bring layers."]
+  },
+  {
+    "city": "Copenhagen",
+    "country": "Denmark",
+    "aliases": ["copenhagen", "københavn"],
+    "summary": "Copenhagen is the capital of hygge — a city of world-class restaurants (Noma alumni have scattered across the city), cycling culture, and Scandinavian design. It's a model of liveable urban planning.",
+    "highlights": ["Nyhavn canal & colourful houses", "Tivoli Gardens amusement park", "The Little Mermaid statue", "Rosenborg Castle & Crown Jewels", "Louisiana Museum of Modern Art (day trip)", "Copenhagen Street Food (Reffen)", "Freetown Christiania", "National Museum of Denmark (free)", "Designmuseum Danmark", "Cycling along the harbour"],
+    "neighborhoods": ["Nørrebro", "Vesterbro", "Frederiksberg", "Islands Brygge", "Østerbro"],
+    "practical": ["Copenhagen Card covers unlimited public transport and 80+ attractions.", "Biking is the fastest way to get around; rental bikes are everywhere.", "Eat at street food market Reffen for half the price of restaurants.", "Tipping is not expected but rounding up is appreciated.", "Most museums are free on specific days — check individual schedules."]
+  },
+  {
+    "city": "Stockholm",
+    "country": "Sweden",
+    "aliases": ["stockholm"],
+    "summary": "Stockholm is built on 14 islands where Lake Mälaren meets the Baltic — a city of water, islands, and extraordinary design culture. Gamla Stan's medieval warren, ABBA Museum, and the Vasa warship are must-visits.",
+    "highlights": ["Gamla Stan (Old Town) medieval streets", "Vasa Museum (17th century warship)", "ABBA The Museum", "Djurgården island museums", "Royal Palace", "Fotografiska photography museum", "ACNE Studios & design district", "Skansen open-air museum", "Archipelago boat day trip", "Östermalm Saluhall food hall"],
+    "neighborhoods": ["Gamla Stan", "Södermalm", "Östermalm", "Djurgården", "Vasastan"],
+    "practical": ["Stockholm Travel Card covers all public transport.", "Punching holes in your ticket (pre-app era) — everything is now contactless.", "Systembolaget (state alcohol stores) are the only place to buy wine/spirits.", "Archipelago day trips (ferries from Strömkajen) are a highlight June–August.", "Midnight sun in June means very late sunsets — light until 10:30 pm."]
+  },
+  {
+    "city": "Oslo",
+    "country": "Norway",
+    "aliases": ["oslo"],
+    "summary": "Oslo is the world's most expensive city and Norway's fjord-gateway capital. The Vigeland sculpture park, Viking Ship Museum, and Munch's The Scream are set against a backdrop of forests, ski slopes, and the Oslofjord.",
+    "highlights": ["Vigeland Sculpture Park (free)", "Viking Ship Museum", "Munch Museum", "Aker Brygge waterfront", "Holmenkollen ski jump & museum", "National Gallery (The Scream)", "Akershus Fortress", "Bygdøy peninsula museums", "Tjuvholmen neighbourhood", "Oslo Opera House rooftop walk"],
+    "neighborhoods": ["Grünerløkka", "Aker Brygge", "Tjuvholmen", "Majorstuen", "Grønland"],
+    "practical": ["Oslo City Pass covers public transport and all major museums.", "Ruter app or contactless card for all public transport.", "Bring a reusable water bottle — Oslo tap water is excellent.", "Most attractions are expensive; the City Pass pays for itself in 1–2 days.", "Fjord day trips: Nærøyfjord (Flåm Railway) is a full-day excursion from Oslo."]
+  },
+  {
+    "city": "Warsaw",
+    "country": "Poland",
+    "aliases": ["warsaw", "warszawa"],
+    "summary": "Warsaw was almost entirely destroyed in WWII and rebuilt from scratch — making it both a deeply moving memorial city and a forward-looking capital with a pulsating young culture, tech scene, and restaurant landscape.",
+    "highlights": ["Warsaw Old Town (UNESCO, rebuilt after WWII)", "Warsaw Rising Museum", "POLIN Museum of the History of Polish Jews", "Łazienki Park & Palace on the Water", "Palace of Culture and Science observation deck", "Royal Castle", "Wilanów Palace & gardens", "Neon Museum", "Praga neighbourhood street art", "Jewish Ghetto memorials"],
+    "neighborhoods": ["Śródmieście (city centre)", "Praga Północ", "Powiśle", "Żoliborz", "Wilanów"],
+    "practical": ["Warsaw Tourist Card covers public transport and museum discounts.", "Warsaw Rising Museum is one of Europe's best WWII museums — allow 3–4 hours.", "Tram and bus network is extensive; buy a day ticket at any kiosk.", "Milk bars (bar mleczny) are communist-era canteens serving cheap Polish food.", "Golden Week in Poland: avoid first weekend of November (All Saints Day cemetery visits)."]
+  },
+  {
+    "city": "Zurich",
+    "country": "Switzerland",
+    "aliases": ["zurich", "zürich"],
+    "summary": "Zurich is Switzerland's largest city and global banking capital — also unexpectedly artistic, with a thriving gallery scene, the world's best swimming in the lake and Limmat river, and excellent day trips to Rhine Falls and Lucerne.",
+    "highlights": ["Old Town (Altstadt) both banks of Limmat", "Lake Zurich swimming & promenade", "Kunsthaus Zürich art museum", "Grossmünster & Fraumünster churches", "Bahnhofstrasse luxury shopping", "Uetliberg hill views", "Landesmuseum (Swiss National Museum)", "Zurich Zoo", "Rhine Falls (day trip, Schaffhausen)", "Lucerne day trip"],
+    "neighborhoods": ["Altstadt", "Langstrasse", "Zürich-West", "Seefeld", "Hürlimann Areal"],
+    "practical": ["Swiss Travel Pass covers trains, buses, and many museums (expensive but good value for multi-day).", "Zürichcard covers public transport and most museums within the city.", "Eat at Migros and Coop supermarket restaurants for affordable meals.", "Lake swimming is free and excellent from June–September.", "Swiss trains are precisely on time — missing a connection is easy to fix but involves planning."]
+  },
+  {
+    "city": "San Francisco",
+    "country": "United States",
+    "aliases": ["san francisco", "sf"],
+    "summary": "San Francisco packs extraordinary diversity into 49 square miles — Victorian painted ladies, a fog-laced bay, Silicon Valley culture, and one of the world's best Asian food corridors in the Richmond and Sunset districts.",
+    "highlights": ["Golden Gate Bridge walk or bike", "Alcatraz Island ferry tour", "Chinatown (largest outside Asia)", "Fisherman's Wharf & Pier 39", "Haight-Ashbury neighbourhood", "Mission District murals & taquerias", "SFMOMA", "Lombard Street (crookedest)", "Twin Peaks viewpoint", "Ferry Building Marketplace"],
+    "neighborhoods": ["Mission District", "Haight-Ashbury", "North Beach", "Castro", "Richmond", "Sunset", "SoMa"],
+    "practical": ["BART connects SFO airport to downtown in 30 minutes.", "Muni day pass works on buses, trams, and cable cars.", "Cable cars are tourist-priced; the historic F-Line streetcar is cheaper and equally scenic.", "Fog ('Karl') is most common June–August — pack layers regardless of forecast.", "Alcatraz sells out weeks ahead; book online as soon as plans are confirmed."]
+  },
+  {
+    "city": "Los Angeles",
+    "country": "United States",
+    "aliases": ["los angeles", "la"],
+    "summary": "Los Angeles is a sprawling constellation of distinct neighbourhoods stitched together by freeway — from Malibu surf beaches to Highland Park's art galleries, with Hollywood studios, Beverly Hills, and the world's most diverse food scene in between.",
+    "highlights": ["The Getty Center (free admission)", "Griffith Observatory", "Hollywood Walk of Fame & TCL Chinese Theatre", "Venice Beach Boardwalk", "The Broad & LACMA (art museums)", "Santa Monica Pier", "Universal Studios Hollywood", "Runyon Canyon hike", "Grand Central Market (downtown)", "Warner Bros. Studio Tour"],
+    "neighborhoods": ["Silver Lake", "Los Feliz", "Venice", "Echo Park", "Highland Park", "West Hollywood", "Beverly Hills"],
+    "practical": ["A car is essential — LA has limited public transport except the E and K lines.", "Parking is expensive; apps like SpotHero save money.", "Traffic on 405 and 101 is brutal 7–10 am and 4–7 pm.", "LAX is congested — consider FlyAway bus or Uber/Lyft pickup from Economy lot.", "Best weather September–November; May–June ('June Gloom') is overcast mornings."]
+  },
+  {
+    "city": "Chicago",
+    "country": "United States",
+    "aliases": ["chicago"],
+    "summary": "Chicago is America's most architecturally significant city — the birthplace of the skyscraper — with a world-class art museum, deep-dish pizza, Blues clubs, and a genuinely spectacular lakefront.",
+    "highlights": ["Millennium Park & Cloud Gate ('The Bean')", "Art Institute of Chicago", "Willis Tower Skydeck", "Chicago Architecture River Cruise", "Navy Pier", "Lincoln Park Zoo (free)", "Wrigley Field baseball tour", "Chicago Blues Club (Buddy Guy's, Kingston Mines)", "Deep-dish pizza (Lou Malnati's, Giordano's)", "Museum of Science and Industry"],
+    "neighborhoods": ["The Loop", "River North", "Wicker Park", "Logan Square", "Hyde Park", "Lincoln Park"],
+    "practical": ["Ventra card works on CTA trains and buses; airport Blue Line is cheap and direct.", "Architecture River Cruise is the single best 1.5-hour activity in Chicago.", "Deep-dish pizza takes 45 minutes to bake — order immediately on sitting down.", "Chicago winters are brutal (windchill below -20°C); visit May–October.", "Tipping is expected: 18–20% at restaurants."]
+  },
+  {
+    "city": "Miami",
+    "country": "United States",
+    "aliases": ["miami"],
+    "summary": "Miami is sun, Art Deco, Latin music, and turquoise water — a city where Cuban coffee windows serve the most powerful espresso in America and the nightlife doesn't start until midnight. The design district and Wynwood murals add cultural depth.",
+    "highlights": ["South Beach Art Deco Historic District", "Wynwood Walls & murals", "Little Havana (Calle Ocho)", "Vizcaya Museum & Gardens", "Pérez Art Museum Miami (PAMM)", "Everglades National Park (airboat tour)", "Miami Design District", "Coconut Grove", "Key West day trip", "Ocean Drive at night"],
+    "neighborhoods": ["South Beach", "Wynwood", "Little Havana", "Brickell", "Coconut Grove", "Design District"],
+    "practical": ["Brightline train connects Miami to Fort Lauderdale and Orlando.", "Car or rideshare is needed for most exploration; parking in South Beach is expensive.", "Hurricane season is June–November; tropical storms can disrupt plans.", "Café Cubano (Cuban espresso) and pastelitos are the local fuel.", "Art Basel Miami Beach (December) fills hotels months ahead."]
+  },
+  {
+    "city": "New Orleans",
+    "country": "United States",
+    "aliases": ["new orleans", "nola"],
+    "summary": "New Orleans is America's most culturally distinct city — a Caribbean-French-African fusion that produced jazz, the second line parade, Creole cuisine, and a Mardi Gras that defines collective joy. The Garden District and French Quarter feel like no other city in the country.",
+    "highlights": ["French Quarter & Jackson Square", "Bourbon Street nightlife", "Garden District mansions & cemetery tours", "Preservation Hall jazz", "Commander's Palace restaurant", "Oak Alley Plantation (day trip)", "Audubon Zoo & Park", "NOMA (New Orleans Museum of Art)", "Frenchmen Street live music", "Café Du Monde beignets"],
+    "neighborhoods": ["French Quarter", "Garden District", "Frenchmen Street / Marigny", "Warehouse District", "Uptown"],
+    "practical": ["Mardi Gras (February/March) requires hotel bookings 6–12 months ahead.", "Po'boys, étouffée, jambalaya, and beignets are the essential eats.", "Hurricanes (cocktails at Pat O'Brien's) are tourist traps — locals drink Abita beer.", "Frenchmen Street is where locals hear live jazz; Bourbon Street is for tourists.", "Summer is brutally hot and humid (38°C+); October–April is ideal weather."]
+  },
+  {
+    "city": "Vancouver",
+    "country": "Canada",
+    "aliases": ["vancouver"],
+    "summary": "Vancouver is framed by Pacific Ocean and the Coast Mountains — ski in the morning, sail in the afternoon. Stanley Park is one of North America's finest urban parks, and the city's food culture reflects its status as Canada's Pacific gateway.",
+    "highlights": ["Stanley Park seawall & forest trails", "Granville Island Public Market", "Capilano Suspension Bridge (North Shore)", "Gastown neighbourhood & steam clock", "Whistler (ski day trip)", "Grouse Mountain gondola", "Chinatown & Dr Sun Yat-Sen Garden", "Vancouver Art Gallery", "Robson Street shopping", "Wreck Beach"],
+    "neighborhoods": ["Gastown", "Yaletown", "Kitsilano", "Commercial Drive", "Mount Pleasant", "Strathcona"],
+    "practical": ["Compass Card works on SkyTrain, buses, and SeaBus.", "Translink connects downtown to North Shore (SeaBus) and airports.", "Bear spray is useful on North Shore trails in summer.", "Best weather July–September; Pacific rain dominates October–May.", "Tipping is 15–20% at restaurants."]
+  },
+  {
+    "city": "Toronto",
+    "country": "Canada",
+    "aliases": ["toronto"],
+    "summary": "Toronto is one of the world's most multicultural cities — half its population was born outside Canada. Kensington Market, Distillery District, and Little Portugal coexist with the CN Tower, and the city's restaurant scene reflects every culture on earth.",
+    "highlights": ["CN Tower EdgeWalk or glass floor", "Royal Ontario Museum", "Kensington Market & Chinatown", "Distillery District", "Toronto Islands ferry", "Art Gallery of Ontario", "St Lawrence Market (Saturday farmers market)", "Little Italy & Little Portugal", "Aga Khan Museum", "Niagara Falls day trip"],
+    "neighborhoods": ["Kensington Market", "Queen West", "Distillery District", "Leslieville", "Greektown", "Little Portugal"],
+    "practical": ["Presto card works on TTC subway, buses, and GO Transit commuter rail.", "TTC day pass is good value for tourist-heavy days.", "Niagara Falls is 1.5 hours by Go Bus; book tickets online.", "Best weather June–September; winters are genuinely cold with heavy snow.", "Tipping is 15–18% at restaurants."]
+  },
+  {
+    "city": "Petra",
+    "country": "Jordan",
+    "aliases": ["petra", "wadi musa"],
+    "summary": "Petra is one of the New Seven Wonders of the World — the rose-red Nabataean city carved into Jordanian sandstone cliffs. The 1.2 km Siq gorge walk ending at the Treasury facade is one of travel's most dramatic reveals.",
+    "highlights": ["The Treasury (Al-Khazneh)", "The Siq entrance gorge", "Street of Facades", "The Monastery (Ad Deir) — 800-step climb", "Royal Tombs", "High Place of Sacrifice trail", "Little Petra (Al Baydha)", "Petra by Night candlelit experience", "Wadi Rum desert (day or overnight)", "Dana Biosphere Reserve (hiking)"],
+    "neighborhoods": ["Wadi Musa (gateway town)"],
+    "practical": ["Jordan Pass (online purchase) bundles visa + Petra entry and saves significantly.", "Petra requires 1–2 full days; The Monastery alone is a half-day hike.", "Donkey and horse rides in the Siq are aggressive solicitations — decline firmly.", "Start hiking by 6 am in summer to avoid peak heat.", "Petra by Night (Monday, Wednesday, Thursday) is atmospheric but controversial for value."]
+  },
+  {
+    "city": "Machu Picchu",
+    "country": "Peru",
+    "aliases": ["machu picchu", "aguas calientes", "cusco"],
+    "summary": "Machu Picchu is Peru's Inca citadel set at 2,430 metres on a cloud forest ridge — one of humanity's most breathtaking archaeological achievements. The base city Cusco is itself a layered Inca-Spanish colonial city worth several days.",
+    "highlights": ["Machu Picchu citadel", "Sun Gate (Inti Punku) hike", "Huayna Picchu mountain (limited tickets)", "Aguas Calientes town", "Cusco Plaza de Armas", "Sacsayhuamán Inca fortress", "Sacred Valley (Ollantaytambo, Pisac)", "Qorikancha Inca temple", "Rainbow Mountain (Vinicunca)", "Maras salt pans & Moray"],
+    "neighborhoods": ["Cusco Centro", "San Blas (artisan quarter)", "Aguas Calientes"],
+    "practical": ["Altitude in Cusco (3,400 m) requires 1–2 days of acclimatisation before Machu Picchu.", "Book Machu Picchu entry tickets months ahead — daily visitor cap is strict.", "Huayna Picchu requires separate advance booking; very limited slots.", "Inca Rail or Peru Rail to Aguas Calientes must be booked in advance.", "Coca tea is the local altitude remedy and is legal in Peru."]
+  },
+  {
+    "city": "Nairobi",
+    "country": "Kenya",
+    "aliases": ["nairobi"],
+    "summary": "Nairobi is the gateway to East Africa's safari circuit and a vibrant city in its own right — Africa's fastest-growing tech hub, with a thriving food and art scene and Nairobi National Park on the city's doorstep.",
+    "highlights": ["Nairobi National Park (Big Five, city skyline backdrop)", "David Sheldrick Wildlife Trust (elephant orphanage)", "Giraffe Centre", "Karen Blixen Museum", "Maasai Market", "Kibera neighbourhood tours", "Railway Museum", "Karura Forest walk & cycling", "Nairobi National Museum", "Day trip to Amboseli National Park"],
+    "neighborhoods": ["Karen", "Westlands", "Kilimani", "CBD", "Langata"],
+    "practical": ["Nairobi National Park is the world's only urban national park with free-roaming lions — book a morning game drive.", "Matatus (minibuses) are the local transport; tourist-safe options are Uber/Bolt.", "Altitude is 1,795 m — UV is intense; use high SPF.", "David Sheldrick Wildlife Trust elephant visits are at 11 am only; pre-book.", "Safari packages to Masai Mara (3–5 days) are best arranged in Nairobi."]
+  }
+]

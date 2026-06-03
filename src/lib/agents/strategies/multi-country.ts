@@ -10,13 +10,4 @@ export const multiCountryStrategy: AgentStrategy = {
 - One stop per city. Stop type: CITY for each destination.
 - Surface visa and entry logistics where relevant: Schengen area day limits, e-visa countries, visa-on-arrival availability.
 - When asking clarifying questions, focus on: which cities or countries they have in mind, total trip length, and whether budget allows flights vs. trains.`,
-  allowedTools: [
-    'semanticSearch',
-    'generateItinerary',
-    'getCurrentItinerary',
-    'updateItinerary',
-    'navigate',
-    'saveUserProfile',
-    'flyToLocation',
-  ],
 };

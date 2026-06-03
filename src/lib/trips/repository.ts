@@ -5,6 +5,44 @@ import {
   type TripPlanWritePayload,
 } from './contracts/trip-plan.schema';
 
+function deserializeJsonbToStops(raw: unknown): TripPlanStopSnapshot[] | null {
+  const parsed = TripPlanWritePayloadSchema.safeParse(raw);
+  if (!parsed.success || parsed.data.stops.length === 0) return null;
+  return parsed.data.stops.map((stop) => ({
+    title: stop.title ?? 'Unknown',
+    type: stop.type ?? 'CITY',
+    locations:
+      stop.locations && stop.locations.length > 0
+        ? stop.locations.map((loc) => ({
+            name: loc.name ?? 'Unknown',
+            lat: loc.lat ?? 0,
+            lng: loc.lng ?? 0,
+            placeId: loc.placeId,
+          }))
+        : [{ name: stop.title ?? 'Unknown', lat: 0, lng: 0 }],
+    days: (stop.days ?? []).map((day) => ({
+      dayIndex: day.dayIndex,
+      date: day.date ? new Date(day.date) : null,
+      title: day.title ?? null,
+      suggestedHosts: day.suggestedHosts ?? [],
+      items: (day.items ?? []).map((item) => ({
+        type: (item.type ?? 'SIGHT') as TripPlanItemSnapshot['type'],
+        title: item.title ?? 'Untitled',
+        description: item.description ?? null,
+        startTime: item.startTime ? new Date(item.startTime) : null,
+        endTime: item.endTime ? new Date(item.endTime) : null,
+        locationName: item.locationName ?? null,
+        placeId: item.placeId ?? null,
+        lat: item.lat ?? null,
+        lng: item.lng ?? null,
+        experienceId: item.experienceId ?? null,
+        hostId: item.hostId ?? null,
+        createdByAI: item.createdByAI ?? true,
+      })),
+    })),
+  }));
+}
+
 export type PlannerTripSeedSnapshot = {
   destinationTitles: string[];
   hasPersistedItineraryDays: boolean;
@@ -235,11 +273,27 @@ export async function getPlannerTripSeedForUser(
     },
     select: {
       id: true,
+      itineraryData: true,
     },
   });
 
   if (!trip) return null;
 
+  // JSONB-first path
+  if (trip.itineraryData !== null && trip.itineraryData !== undefined) {
+    const stops = deserializeJsonbToStops(trip.itineraryData);
+    if (stops !== null) {
+      const destinationTitles = stops
+        .map((s) => s.title)
+        .filter((t) => t.trim().length > 0);
+      return {
+        destinationTitles,
+        hasPersistedItineraryDays: stops.some((s) => s.days.length > 0),
+      };
+    }
+  }
+
+  // Fallback: normalized tables
   const tripAnchors = await prisma.tripAnchor.findMany({
     where: { tripId: trip.id },
     orderBy: { order: 'asc' },
@@ -279,10 +333,27 @@ export async function loadTripPlanSnapshotForUser(
       title: true,
       status: true,
       currentVersion: true,
+      itineraryData: true,
     },
   });
   if (!trip) return null;
 
+  const tripSummary = {
+    id: trip.id,
+    title: trip.title,
+    status: trip.status,
+    currentVersion: trip.currentVersion,
+  };
+
+  // JSONB-first path
+  if (trip.itineraryData !== null && trip.itineraryData !== undefined) {
+    const stops = deserializeJsonbToStops(trip.itineraryData);
+    if (stops !== null) {
+      return { trip: tripSummary, stops };
+    }
+  }
+
+  // Fallback: normalized join path (pre-migration rows)
   const supportsItemPlaceId = await supportsItineraryItemPlaceIdColumn(prisma);
 
   const tripAnchors = (await prisma.tripAnchor.findMany({
@@ -329,12 +400,7 @@ export async function loadTripPlanSnapshotForUser(
   })) as unknown as TripAnchorSnapshotRecord[];
 
   return {
-    trip: {
-      id: trip.id,
-      title: trip.title,
-      status: trip.status,
-      currentVersion: trip.currentVersion,
-    },
+    trip: tripSummary,
     stops: tripAnchors.map((stop) => {
       const locations = coerceLocations(stop.locations);
       return {

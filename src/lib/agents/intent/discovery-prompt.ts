@@ -11,7 +11,7 @@ export function buildDiscoveryPrompt(intent: TripIntent, hasDestinations: boolea
   // Spatial pattern is the only dimension that determines which strategy (and tool set)
   // to use. Other dimensions (activity, mobility, pace) can be resolved during normal
   // planning conversation once the spatial pattern is known.
-  if (intent.spatialPattern !== 'UNKNOWN') return '';
+  if (!intent.unresolvedDimensions.includes('spatialPattern')) return '';
 
   // If destinations are already set we can infer spatial pattern from their count.
   if (hasDestinations) return '';
